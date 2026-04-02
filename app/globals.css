@@ -3,6 +3,17 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --surf-base: #050505;
+  --surf-surface: #0a0a0a;
+
+  --surf-primary: #00e5ff;
+  --surf-primary-dark: #00b7cc;
+  --surf-positive: #00ff88;
+  --surf-negative: #ff4d4d;
+  --surf-neutral: #ffc857;
+
+  --surf-ink: rgba(255, 255, 255, 0.92);
+  --surf-ink-muted: rgba(255, 255, 255, 0.62);
 }
 
 @theme inline {
@@ -14,7 +25,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: var(--surf-base);
     --foreground: #ededed;
   }
 }
@@ -23,4 +34,121 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@keyframes surfWaveDrift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2%, 1%, 0) scale(1.02);
+  }
+  100% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+}
+
+@keyframes surfGrain {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-1%, 1%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes surfPulse {
+  0% {
+    box-shadow: 0 0 0 rgba(0, 229, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(0, 229, 255, 0.14);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(0, 229, 255, 0);
+  }
+}
+
+.surf-bg {
+  position: relative;
+}
+
+.surf-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.05;
+  background: radial-gradient(1100px 600px at 50% 0%, rgba(0, 229, 255, 0.05), transparent 62%);
+}
+
+.surf-bg::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  background-image: none;
+  background-size: auto;
+  animation: none;
+}
+
+.surf-content {
+  position: relative;
+  z-index: 1;
+}
+
+.surf-container {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  border-radius: 24px;
+}
+
+.surf-glass {
+  background: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.surf-inner {
+  background: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.surf-edge {
+  position: relative;
+}
+
+.surf-edge::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: transparent;
+  opacity: 0;
+  filter: none;
+}
+
+.surf-badge-pulse {
+  animation: surfPulse 6s ease-in-out infinite;
+}
+
+.surf-card-hover {
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.surf-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.65);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.surf-card-hover:hover .surf-edge::before {
+  opacity: 0;
 }

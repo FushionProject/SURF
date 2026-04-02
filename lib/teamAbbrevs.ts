@@ -1,0 +1,36 @@
+export const TEAM_ABBREVS: Record<string, string> = {
+  "Los Angeles Lakers": "LAL",
+  "New York Knicks": "NYK",
+  "Boston Celtics": "BOS",
+  "Miami Heat": "MIA",
+  "Chicago Bulls": "CHI",
+  "Golden State Warriors": "GSW",
+  "Brooklyn Nets": "BKN",
+  "Dallas Mavericks": "DAL",
+  "Denver Nuggets": "DEN",
+  "Philadelphia 76ers": "PHI",
+  "Phoenix Suns": "PHX",
+  "Milwaukee Bucks": "MIL",
+  "Toronto Raptors": "TOR",
+  "Atlanta Hawks": "ATL",
+  "Orlando Magic": "ORL",
+  "Indiana Pacers": "IND",
+  "Cleveland Cavaliers": "CLE",
+  "Detroit Pistons": "DET",
+  "San Antonio Spurs": "SAS",
+  "Houston Rockets": "HOU",
+  "Memphis Grizzlies": "MEM",
+  "New Orleans Pelicans": "NOP",
+  "Oklahoma City Thunder": "OKC",
+  "Utah Jazz": "UTA",
+  "Sacramento Kings": "SAC",
+  "Portland Trail Blazers": "POR",
+  "Minnesota Timberwolves": "MIN",
+  "LA Clippers": "LAC",
+  "Charlotte Hornets": "CHA",
+  "Washington Wizards": "WSH",
+};
+
+export function getTeamAbbrev(teamName: string) {
+  return TEAM_ABBREVS[teamName] ?? null;
+}
