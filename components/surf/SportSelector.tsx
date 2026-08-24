@@ -1,6 +1,6 @@
 "use client";
 
-import { getSurfSportConfig, SURF_SPORTS, type SurfSportKey } from "@/lib/surf/sports";
+import { SURF_SPORTS, type SurfSportKey } from "@/lib/surf/sports";
 
 type Props = {
   value: SurfSportKey;
@@ -9,8 +9,6 @@ type Props = {
 };
 
 export function SportSelector({ value, onChange, disabled = false }: Props) {
-  const active = getSurfSportConfig(value);
-
   return (
     <div className="mb-4">
       <div className="grid w-full grid-cols-4 rounded-full border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-03)] p-1">
@@ -30,10 +28,6 @@ export function SportSelector({ value, onChange, disabled = false }: Props) {
               {sport.selectorLabel}
             </button>
           ))}
-      </div>
-
-      <div className="mt-1.5 text-right text-[11px] font-medium tracking-wide text-[color:var(--surf-ink-45)]">
-        {active.label}
       </div>
     </div>
   );

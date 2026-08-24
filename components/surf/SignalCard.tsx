@@ -21,7 +21,7 @@ function roundToHalf(value: number): number {
   return Math.round(value * 2) / 2;
 }
 
-function renderKeyDetail(detail: string) {
+function renderKeyDetail(detail: string, highlightDirection = true) {
   const m = detail.match(/^(.*?)([+-]?\d+(?:\.\d+)?)(\s*(?:→|vs)\s*)([+-]?\d+(?:\.\d+)?)(.*)$/);
   if (!m) return <>{detail}</>;
 
@@ -34,12 +34,13 @@ function renderKeyDetail(detail: string) {
   const a = Number(aRaw);
   const b = Number(bRaw);
   const dir = Number.isFinite(a) && Number.isFinite(b) ? b - a : 0;
-  const bClass =
-    dir >= 0.5
+  const bClass = highlightDirection
+    ? dir >= 0.5
       ? "text-[color:var(--surf-positive)]"
       : dir <= -0.5
         ? "text-[color:var(--surf-negative)]"
-        : "text-[color:var(--surf-ink-solid)]";
+        : "text-[color:var(--surf-ink-solid)]"
+    : "text-[color:var(--surf-ink-solid)]";
 
   return (
     <>
@@ -158,6 +159,11 @@ function getWhyThisMattersText(signalType: SignalCardType["signalType"], card: S
   }
 
   if (signalType === "Book Disagreement") {
+    if (card.valueOptions && card.valueOptions.length > 0) {
+      return card.market === "totals"
+        ? "Over gets the lower total; Under gets the higher total. Compare the price before acting."
+        : "The better number depends on your side. Use the book giving that team more points, then compare the price.";
+    }
     return "Books haven’t aligned yet → there may be value in line shopping.";
   }
 
@@ -294,6 +300,13 @@ export function SignalCard({ card, showStrength, showStrengthLabel = true }: Pro
 
   const awayAbbrev = getTeamAbbrev(card.game.awayTeam) ?? card.game.awayTeam;
   const homeAbbrev = getTeamAbbrev(card.game.homeTeam) ?? card.game.homeTeam;
+  const hasValueOptions = card.signalType === "Book Disagreement" && Boolean(card.valueOptions?.length);
+  const keyLabel =
+    card.signalType === "Book Disagreement"
+      ? card.market === "spreads"
+        ? `${homeAbbrev} spread range`
+        : "Total range"
+      : "Key";
 
   const league = card.game.league;
   const awayLogo = getTeamLogo(card.game.awayTeam, league);
@@ -411,20 +424,48 @@ export function SignalCard({ card, showStrength, showStrengthLabel = true }: Pro
         <div className="surf-inner rounded-[var(--surf-radius-inner)] border border-[color:var(--surf-line-06)] bg-[color:var(--surf-fill-02)] px-4 py-3 shadow-[0_18px_55px_rgba(0,0,0,0.55)]">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]">Key</div>
+              <div className="text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]">{keyLabel}</div>
               <p className="mt-1 font-mono text-[16px] font-semibold leading-6 text-[color:var(--surf-ink-solid)]">
-                {renderKeyDetail(card.detail)}
+                {renderKeyDetail(card.detail, card.signalType !== "Book Disagreement")}
               </p>
             </div>
           </div>
         </div>
 
         <div>
-          <div className="text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]">Why this matters</div>
+          <div className="text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]">
+            {hasValueOptions ? "Where the value lies" : "Why this matters"}
+          </div>
           <p className={`mt-1 text-[13px] leading-5 ${strengthTone.insight}`}>{whyThisMatters}</p>
         </div>
 
-        {card.sources && card.sources.length > 0 ? (
+        {hasValueOptions ? (
+          <div className="mt-1 rounded-[var(--surf-radius-inner)] border border-[color:var(--surf-neutral)]/20 bg-[color:var(--surf-neutral)]/5 px-3 py-2.5">
+            <div className="text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]">Best line by side</div>
+            <div className="mt-2 space-y-1.5">
+              {card.valueOptions?.map((option) => {
+                const selectionLabel = getTeamAbbrev(option.selection) ?? option.selection;
+                return (
+                  <div
+                    key={`${option.selection}:${option.book}:${option.line}:${option.price ?? ""}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--surf-line-06)] bg-[color:var(--surf-inner)] px-3 py-2"
+                  >
+                    <span className="shrink-0 text-xs font-medium tracking-wide text-[color:var(--surf-ink-70)]">
+                      Best for {selectionLabel}
+                    </span>
+                    <span className="min-w-0 truncate text-right text-sm font-medium text-[color:var(--surf-ink-solid)]">
+                      {option.book}
+                      <span className="ml-2 font-mono text-sm text-[color:var(--surf-positive)]">{option.line}</span>
+                      {option.price ? (
+                        <span className="ml-1 font-mono text-xs text-[color:var(--surf-ink-55)]">({option.price})</span>
+                      ) : null}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : card.sources && card.sources.length > 0 ? (
           card.signalType === "Best Number" ? (
             (() => {
               const best = card.sources.find((s) => (s.label ?? "").toLowerCase() === "best");

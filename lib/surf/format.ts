@@ -12,6 +12,12 @@ function formatAmericanOdds(value: number): string {
   return v > 0 ? `+${v}` : `${v}`;
 }
 
+function formatOptionalAmericanOdds(value: number | undefined): string | undefined {
+  if (value == null) return undefined;
+  const formatted = formatAmericanOdds(value);
+  return formatted || undefined;
+}
+
 const MAX_SIGNALS_PER_GAME = 3;
 const MAX_TOTAL_SIGNALS = 12;
 
@@ -29,6 +35,10 @@ function formatNumber(value: number): string {
   const v = roundToHalf(value);
   const sign = v > 0 ? "+" : "";
   return `${sign}${v}`;
+}
+
+function formatMarketPoint(value: number, market: SurfSignalDetection["market"]): string {
+  return market === "spreads" ? formatNumber(value) : `${roundToHalf(value)}`;
 }
 
 function buildSources(items: Array<SignalCardSource | undefined>): SignalCardSource[] | undefined {
@@ -94,7 +104,7 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
 
     const detail =
       d.lowPoint != null && d.highPoint != null
-        ? `${formatNumber(d.lowPoint)} → ${formatNumber(d.highPoint)}`
+        ? `${formatMarketPoint(d.lowPoint, d.market)} to ${formatMarketPoint(d.highPoint, d.market)}`
         : "—";
 
     const insight =
@@ -106,12 +116,19 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
 
     const sources = buildSources([
       d.lowBook && d.lowPoint != null
-        ? { label: "Lower", book: d.lowBook.title, value: `${formatNumber(d.lowPoint)}` }
+        ? { label: "Lower", book: d.lowBook.title, value: formatMarketPoint(d.lowPoint, d.market) }
         : undefined,
       d.highBook && d.highPoint != null
-        ? { label: "Higher", book: d.highBook.title, value: `${formatNumber(d.highPoint)}` }
+        ? { label: "Higher", book: d.highBook.title, value: formatMarketPoint(d.highPoint, d.market) }
         : undefined,
     ]);
+
+    const valueOptions = d.valueOptions?.map((option) => ({
+      selection: option.selection,
+      book: option.book.title,
+      line: formatMarketPoint(option.point, d.market),
+      price: formatOptionalAmericanOdds(option.price),
+    }));
 
     return {
       id: signalId(d),
@@ -129,6 +146,7 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
       detail,
       insight,
       sources,
+      valueOptions,
       commenceTime: d.commenceTime,
       gap: Number.isFinite(d.range) ? d.range : undefined,
     };
@@ -136,7 +154,6 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
 
   if (d.type === "RUN_LINE_PRICE_CONFLICT") {
     const pc = d.priceConflict;
-    const absLine = pc?.absLine;
     const plus = pc?.plus;
     const minus = pc?.minus;
 
@@ -241,7 +258,7 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
         ? `${label} ${formatNumber(cluster)} vs ${formatNumber(stale)}`
         : "—";
 
-    const insight = "Most books have moved — one book lagging behind.";
+    const insight = "Most books cluster on one number while one book is currently outside that cluster.";
 
     const sources = buildSources([
       cluster != null ? { label: "Market", book: "Consensus", value: `${formatNumber(cluster)}` } : undefined,
@@ -328,7 +345,7 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
 
   const detail =
     bestPoint != null && marketPoint != null
-      ? `${formatNumber(marketPoint)} → ${formatNumber(bestPoint)}`
+      ? `${formatNumber(marketPoint)} vs ${formatNumber(bestPoint)}`
       : bestPoint != null
         ? `${formatNumber(bestPoint)}`
         : "—";

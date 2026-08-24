@@ -1,3 +1,5 @@
+import { normalizeMlbAbbrev } from "./mlbLogos";
+
 export const TEAM_ABBREVS: Record<string, string> = {
   "Los Angeles Lakers": "LAL",
   "New York Knicks": "NYK",
@@ -64,5 +66,5 @@ export const TEAM_ABBREVS: Record<string, string> = {
 };
 
 export function getTeamAbbrev(teamName: string) {
-  return TEAM_ABBREVS[teamName] ?? null;
+  return TEAM_ABBREVS[teamName] ?? normalizeMlbAbbrev(teamName);
 }

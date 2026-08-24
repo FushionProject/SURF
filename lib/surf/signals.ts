@@ -360,7 +360,6 @@ export function debugSurfSignals(games: OddsApiGame[]): SurfDebugResult {
     ...detectBookDisagreement(games),
     ...detectRunLinePriceConflict(games, { debug: true }),
     ...detectBestNumberAvailable(games),
-    ...detectLineMovement(games),
     ...detectStaleBook(games),
     ...detectSnapshotMovement(games),
   ];
@@ -736,8 +735,6 @@ export function detectLineMovement(games: OddsApiGame[]): SurfSignalDetection[] 
     const spreads = collectSpreadSamples(game);
     const totals = collectTotalSamples(game);
 
-    const isMlb = game.sport_key === "baseball_mlb";
-
     // Spreads: proxy for movement is deviation from the median baseline across books.
     // We only evaluate one side (home) to keep comparisons consistent.
     if (spreads.length >= 3) {
@@ -997,6 +994,8 @@ type TotalSample = {
   bookKey: string;
   bookTitle: string;
   point: number;
+  overPrice?: number;
+  underPrice?: number;
 };
 
 function collectTotalSamples(game: OddsApiGame): TotalSample[] {
@@ -1018,6 +1017,8 @@ function collectTotalSamples(game: OddsApiGame): TotalSample[] {
       bookKey: book.key,
       bookTitle: book.title,
       point,
+      overPrice: over?.price,
+      underPrice: under?.price,
     });
   }
 
@@ -1044,6 +1045,8 @@ export function detectBookDisagreement(games: OddsApiGame[]): SurfSignalDetectio
       const highSample = isMlb ? maxBy(spreads, (s) => Math.abs(s.homePoint)) : maxBy(spreads, (s) => s.homePoint);
       const spreadRange = range(homeSpreadPoints);
       if (spreadRange >= SPREAD_DISAGREEMENT_THRESHOLD) {
+        const bestHome = maxBy(spreads, (s) => s.homePoint);
+        const bestAway = maxBy(spreads, (s) => s.awayPoint);
         detections.push({
           type: "BOOK_DISAGREEMENT",
           gameId: game.id,
@@ -1055,6 +1058,26 @@ export function detectBookDisagreement(games: OddsApiGame[]): SurfSignalDetectio
           highPoint: high,
           lowBook: lowSample ? { key: lowSample.bookKey, title: lowSample.bookTitle } : undefined,
           highBook: highSample ? { key: highSample.bookKey, title: highSample.bookTitle } : undefined,
+          valueOptions: !isMlb
+            ? [
+                bestHome
+                  ? {
+                      selection: game.home_team,
+                      book: { key: bestHome.bookKey, title: bestHome.bookTitle },
+                      point: bestHome.homePoint,
+                      price: bestHome.homePrice,
+                    }
+                  : undefined,
+                bestAway
+                  ? {
+                      selection: game.away_team,
+                      book: { key: bestAway.bookKey, title: bestAway.bookTitle },
+                      point: bestAway.awayPoint,
+                      price: bestAway.awayPrice,
+                    }
+                  : undefined,
+              ].filter((option): option is NonNullable<typeof option> => option != null)
+            : undefined,
         });
       }
     }
@@ -1078,6 +1101,24 @@ export function detectBookDisagreement(games: OddsApiGame[]): SurfSignalDetectio
           highPoint: high,
           lowBook: lowSample ? { key: lowSample.bookKey, title: lowSample.bookTitle } : undefined,
           highBook: highSample ? { key: highSample.bookKey, title: highSample.bookTitle } : undefined,
+          valueOptions: [
+            lowSample
+              ? {
+                  selection: "Over",
+                  book: { key: lowSample.bookKey, title: lowSample.bookTitle },
+                  point: lowSample.point,
+                  price: lowSample.overPrice,
+                }
+              : undefined,
+            highSample
+              ? {
+                  selection: "Under",
+                  book: { key: highSample.bookKey, title: highSample.bookTitle },
+                  point: highSample.point,
+                  price: highSample.underPrice,
+                }
+              : undefined,
+          ].filter((option): option is NonNullable<typeof option> => option != null),
         });
       }
     }
@@ -1223,9 +1264,6 @@ export function detectSurfSignals(games: OddsApiGame[], opts?: { debug?: boolean
   const runLinePriceConflict = detectRunLinePriceConflict(games, { debug: opts?.debug === true });
   const bestNumber = detectBestNumberAvailable(games);
 
-  const disagreementKeys = new Set([...disagreement, ...runLinePriceConflict].map((d) => `${d.gameId}:${d.market}`));
-  const lineMovement = detectLineMovement(games).filter((d) => !disagreementKeys.has(`${d.gameId}:${d.market}`));
-
   const staleBook = detectStaleBook(games);
 
   const snapshotMovement = detectSnapshotMovement(games);
@@ -1268,5 +1306,8 @@ export function detectSurfSignals(games: OddsApiGame[], opts?: { debug?: boolean
 
   // Note: any game+market without one of the trio simply won't be present in preferredByKey.
   // Other signal types remain unchanged.
-  return [...filteredDisagreement, ...filteredRunLinePriceConflict, ...filteredBestNumber, ...lineMovement, ...filteredStaleBook, ...snapshotMovement];
+  // Only SNAPSHOT_MOVEMENT is shown as movement: it compares the current
+  // consensus with a prior observation. A cross-book outlier is a snapshot
+  // state, not proof that a book moved.
+  return [...filteredDisagreement, ...filteredRunLinePriceConflict, ...filteredBestNumber, ...filteredStaleBook, ...snapshotMovement];
 }
