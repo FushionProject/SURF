@@ -10,10 +10,8 @@ type Item = {
 };
 
 const ITEMS: Item[] = [
-  { label: "Main", href: "/", isActive: (p) => p === "/" },
-  { label: "Top", href: "/top", isActive: (p) => p === "/top" || p.startsWith("/top/") },
+  { label: "Feed", href: "/", isActive: (p) => p === "/" || p.startsWith("/top") },
   { label: "Games", href: "/games", isActive: (p) => p === "/games" || p.startsWith("/games/") },
-  { label: "Eval", href: "/eval", isActive: (p) => p === "/eval" || p.startsWith("/eval/") },
 ];
 
 export function SurfBottomNav() {
@@ -22,7 +20,7 @@ export function SurfBottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[color:var(--surf-line-06)] bg-[color:var(--surf-chrome-bg)]">
       <div className="surf-shell mx-auto w-full max-w-md px-4 py-3">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {ITEMS.map((it) => {
             const active = pathname ? it.isActive(pathname) : false;
             return (

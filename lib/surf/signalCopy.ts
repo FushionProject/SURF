@@ -5,10 +5,6 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function roundToHalf(value: number): number {
-  return Math.round(value * 2) / 2;
-}
-
 function formatTime(ts: number): string {
   const dt = new Date(ts);
   if (Number.isNaN(dt.getTime())) return "";
@@ -85,13 +81,13 @@ export function getWhyItMatters(card: Pick<SignalCard, "signalType" | "market" |
   }
 
   if (card.signalType === "Book Disagreement") {
-    if (market === "totals") return "Market hasn’t agreed on a true total yet.";
-    if (market === "spreads") return league === "MLB" ? "Books aren’t aligned on the run line number." : "Market hasn’t agreed on a true spread yet.";
-    return "Books aren’t aligned yet.";
+    if (market === "totals") return "Books currently have different totals in the latest snapshot.";
+    if (market === "spreads") return league === "MLB" ? "Books currently show different run lines." : "Books currently show different spreads.";
+    return "Books currently show different numbers.";
   }
 
   if (card.signalType === "Stale Book") {
-    return "Books are adjusting at different speeds.";
+    return "One book is currently outside the number shown by most books.";
   }
 
   if (card.signalType === "Best Number") {
@@ -110,8 +106,6 @@ export function topBadgeLabel(
 ): string {
   const gap = isFiniteNumber(card.gap) ? card.gap : 0;
   const mv = isFiniteNumber(card.lineMovement) ? card.lineMovement : 0;
-  const recent = isFiniteNumber(card.recentMovementAbs) ? card.recentMovementAbs : 0;
-
   const mvBadge = getMovementBadge(card);
   if (mvBadge) return mvBadge;
   if (mv >= 2.5) return "SHARP";

@@ -22,6 +22,8 @@ import {
 } from "@/lib/surf/signalCopy";
 import { getMLBSignalStrengthFromDetections } from "@/lib/surf/mlbSignalStrength";
 import { getDemoSurfFeed, isSurfDemoMode } from "@/lib/surf/demoData";
+import { getNflInjuryFeed } from "@/lib/surf/injuries";
+import { getOvernightMarketSummary, recordOvernightMarkets } from "@/lib/surf/overnightMarket";
 import {
   DEFAULT_SURF_SPORT_KEY,
   getSurfSportConfig,
@@ -47,6 +49,52 @@ const CORE_BOOKMAKER_KEYS = new Set([
 ]);
 
 const TOP_SIGNAL_THRESHOLD = 1.5;
+
+type SignalLifecycleEntry = {
+  signature: string;
+  detectedAt: number;
+  signalChangedAt: number;
+  lastSeenAt: number;
+};
+
+declare global {
+  var __surfSignalLifecycleStore: Map<string, SignalLifecycleEntry> | undefined;
+}
+
+const SIGNAL_LIFECYCLE_STORE: Map<string, SignalLifecycleEntry> =
+  globalThis.__surfSignalLifecycleStore ?? new Map<string, SignalLifecycleEntry>();
+globalThis.__surfSignalLifecycleStore = SIGNAL_LIFECYCLE_STORE;
+
+function signalSignature(signal: SignalCard): string {
+  return JSON.stringify({
+    type: signal.signalType,
+    market: signal.market,
+    detail: signal.detail,
+    sources: signal.sources,
+    valueOptions: signal.valueOptions,
+  });
+}
+
+function addSignalLifecycle(signals: SignalCard[], now: number): SignalCard[] {
+  const ttlMs = 24 * 60 * 60 * 1000;
+  for (const [id, entry] of SIGNAL_LIFECYCLE_STORE.entries()) {
+    if (now - entry.lastSeenAt > ttlMs) SIGNAL_LIFECYCLE_STORE.delete(id);
+  }
+
+  return signals.map((signal) => {
+    const signature = signalSignature(signal);
+    const previous = SIGNAL_LIFECYCLE_STORE.get(signal.id);
+    const changed = Boolean(previous && previous.signature !== signature);
+    const entry: SignalLifecycleEntry = {
+      signature,
+      detectedAt: previous?.detectedAt ?? now,
+      signalChangedAt: changed ? now : (previous?.signalChangedAt ?? now),
+      lastSeenAt: now,
+    };
+    SIGNAL_LIFECYCLE_STORE.set(signal.id, entry);
+    return { ...signal, ...entry, status: "active" as const };
+  });
+}
 
 function collapseMLBSignalsByGame(signals: SignalCard[], debug?: boolean): SignalCard[] {
   const byGame = new Map<string, SignalCard[]>();
@@ -181,47 +229,6 @@ function asStrongContextMovementCards(games: OddsApiGame[]): SignalCard[] {
       insight: "Tracked move from open to current consensus.",
       commenceTime: g.commence_time,
       lineMovement,
-    });
-  }
-
-  return out;
-}
-
-function asCurrentLineFallbackCards(games: OddsApiGame[]): SignalCard[] {
-  const ctx = computeGameMarketContext(games);
-  const out: SignalCard[] = [];
-
-  for (const g of games) {
-    const gc = ctx[g.id];
-    const pick =
-      (gc?.totals && typeof gc.totals.currentLine === "number" ? { market: "totals" as const, c: gc.totals } : undefined) ??
-      (gc?.spreads && typeof gc.spreads.currentLine === "number" ? { market: "spreads" as const, c: gc.spreads } : undefined);
-    if (!pick) continue;
-
-    const current = pick.c.currentLine;
-    if (typeof current !== "number" || !Number.isFinite(current)) continue;
-
-    const label = pick.market === "totals" ? "Total:" : "Spread:";
-    const detail = `${label} ${formatNumber(current)}`;
-    const sportKey = isSurfSportKey(g.sport_key) ? g.sport_key : DEFAULT_SURF_SPORT_KEY;
-    const sport = getSurfSportConfig(sportKey);
-
-    out.push({
-      id: `CTX_LINE:${g.id}:${pick.market}`,
-      game: {
-        id: g.id,
-        league: sport.league,
-        sportKey,
-        sportLabel: sport.label,
-        homeTeam: g.home_team,
-        awayTeam: g.away_team,
-      },
-      signalType: "Market Movement",
-      market: pick.market,
-      title: "Current market line",
-      detail,
-      insight: "Current consensus line (open not captured yet).",
-      commenceTime: g.commence_time,
     });
   }
 
@@ -503,6 +510,8 @@ async function getLiveSurfFeed(request: Request) {
     ...g,
     bookmakers: (g.bookmakers ?? []).filter((b) => CORE_BOOKMAKER_KEYS.has(normalizeBookmakerKey(b.key))),
   }));
+  recordOvernightMarkets(filteredGames, sportKey, now);
+  const overnight = getOvernightMarketSummary(sportKey, now);
 
   if (isDebug) {
     const includedBooks = new Map<string, string>();
@@ -515,15 +524,13 @@ async function getLiveSurfFeed(request: Request) {
     const { detections, debug } = debugSurfSignals(filteredGames);
     const signals = formatSignalCards(detections, filteredGames);
     const contextMoves = asStrongContextMovementCards(filteredGames);
-    const fallbackLines = signals.length === 0 ? asCurrentLineFallbackCards(filteredGames) : [];
     const byId = new Set(signals.map((s) => s.id));
     const mergedSignals = [
       ...signals,
       ...contextMoves.filter((s) => !byId.has(s.id)),
-      ...fallbackLines.filter((s) => !byId.has(s.id)),
     ];
     let loggedMovement = false;
-    const taggedSignals = collapseMLBSignalsByGame(enrichSignals(mergedSignals, filteredGames, detections, true), true).map((s) => {
+    const taggedSignalsRaw = collapseMLBSignalsByGame(enrichSignals(mergedSignals, filteredGames, detections, true), true).map((s) => {
       const isTopSignal = Boolean(s.isTopSignal);
       if (!loggedMovement && (s.signalType === "Line Movement" || s.signalType === "Market Movement")) {
         loggedMovement = true;
@@ -548,7 +555,8 @@ async function getLiveSurfFeed(request: Request) {
       }
       return { ...s, isTopSignal };
     });
-
+    const taggedSignals = addSignalLifecycle(taggedSignalsRaw, now);
+    const injuries = await getNflInjuryFeed(filteredGames, sportKey);
     console.log(JSON.stringify({ surfDebug: debug }, null, 2));
     console.log(
       JSON.stringify(
@@ -586,6 +594,9 @@ async function getLiveSurfFeed(request: Request) {
       signals: taggedSignals,
       sportKey,
       sportLabel: sportConfig.label,
+      generatedAt: now,
+      injuries,
+      overnight,
       debug,
       coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
     });
@@ -595,16 +606,14 @@ async function getLiveSurfFeed(request: Request) {
   const detections = detectSurfSignals(filteredGames, { debug: isDebug });
   const signals = formatSignalCards(detections, filteredGames);
   const contextMoves = asStrongContextMovementCards(filteredGames);
-  const fallbackLines = signals.length === 0 ? asCurrentLineFallbackCards(filteredGames) : [];
   const byId = new Set(signals.map((s) => s.id));
   const mergedSignals = [
     ...signals,
     ...contextMoves.filter((s) => !byId.has(s.id)),
-    ...fallbackLines.filter((s) => !byId.has(s.id)),
   ];
   const taggedSignalsRaw = enrichSignals(mergedSignals, filteredGames, detections, isDebug);
-  const taggedSignals = collapseMLBSignalsByGame(taggedSignalsRaw, isDebug);
-
+  const taggedSignals = addSignalLifecycle(collapseMLBSignalsByGame(taggedSignalsRaw, isDebug), now);
+  const injuries = await getNflInjuryFeed(filteredGames, sportKey);
   if (isDebug) {
     const leagueCounts = taggedSignals.reduce(
       (acc, s) => {
@@ -634,6 +643,9 @@ async function getLiveSurfFeed(request: Request) {
     count: taggedSignals.length,
     sportKey,
     sportLabel: sportConfig.label,
+    generatedAt: now,
+    injuries,
+    overnight,
     signals: taggedSignals.slice().sort((a, b) => {
       const as = typeof a.strengthScore === "number" && Number.isFinite(a.strengthScore) ? a.strengthScore : 0;
       const bs = typeof b.strengthScore === "number" && Number.isFinite(b.strengthScore) ? b.strengthScore : 0;

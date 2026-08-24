@@ -99,6 +99,15 @@ export type SurfSignalDetection = {
     title: string;
     point: number;
   };
+  valueOptions?: Array<{
+    selection: string;
+    book: {
+      key: string;
+      title: string;
+    };
+    point: number;
+    price?: number;
+  }>;
 
   // MLB run line price conflict (same abs line, conflicting prices)
   priceConflict?: {
@@ -114,6 +123,13 @@ export type SignalCardSource = {
   label: string;
   book: string;
   value: string;
+};
+
+export type SignalCardValueOption = {
+  selection: string;
+  book: string;
+  line: string;
+  price?: string;
 };
 
 export type SignalCard = {
@@ -132,6 +148,7 @@ export type SignalCard = {
   detail: string;
   insight: string;
   sources?: SignalCardSource[];
+  valueOptions?: SignalCardValueOption[];
   commenceTime: string;
   gap?: number;
   lineMovement?: number;
@@ -140,8 +157,42 @@ export type SignalCard = {
   recentMovementMinutes?: number;
   recentMovementLabel?: string;
   lastMovedAt?: number;
+  detectedAt?: number;
+  signalChangedAt?: number;
+  lastSeenAt?: number;
+  status?: "active" | "resolved";
   strengthScore?: number;
   isTopSignal?: boolean;
   topBadge?: string;
   topReason?: "gap" | "movement" | "disagreement";
+};
+
+export type OvernightMarketMove = {
+  id: string;
+  game: {
+    id: string;
+    sportKey: SurfSportKey;
+    homeTeam: string;
+    awayTeam: string;
+  };
+  market: SurfMarketType;
+  selectionName: string;
+  startPoint: number;
+  currentPoint: number;
+  lowPoint: number;
+  highPoint: number;
+  netMovement: number;
+  largestSwing: number;
+  observedFrom: number;
+  lastMovedAt: number;
+  observations: number;
+};
+
+export type OvernightMarketSummary = {
+  windowKey: string;
+  windowLabel: string;
+  isActive: boolean;
+  isMorningRecap: boolean;
+  minimumMove: number;
+  moves: OvernightMarketMove[];
 };
