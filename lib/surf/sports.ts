@@ -17,7 +17,7 @@ export type SurfSportConfig = {
   seasonType: "preseason" | "regular";
 };
 
-export const DEFAULT_SURF_SPORT_KEY: SurfSportKey = "americanfootball_nfl_preseason";
+export const DEFAULT_SURF_SPORT_KEY: SurfSportKey = "americanfootball_nfl";
 
 export const SURF_SPORTS: readonly SurfSportConfig[] = [
   {

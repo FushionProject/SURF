@@ -24,9 +24,9 @@ the server and must never use a `NEXT_PUBLIC_` prefix.
 
 ## Sports and data sources
 
-- NFL preseason (the explicit default): The Odds API sport key
-  `americanfootball_nfl_preseason`
-- NFL regular season: `americanfootball_nfl`
+- NFL regular season (the explicit default): The Odds API sport key
+  `americanfootball_nfl`
+- NFL preseason: `americanfootball_nfl_preseason`
 - NBA: `basketball_nba`
 - MLB: `baseball_mlb`
 
@@ -45,7 +45,7 @@ Add this to `.env.local`, then restart the development server:
 NEXT_PUBLIC_SURF_DEMO_MODE=true
 ```
 
-Demo mode serves a simulated MLB slate through the existing Main, Top, and Game Summary screens. All simulated output is visibly labeled and does not call the live odds API. Set the value to `false` or remove it, then restart, to restore live behavior. In development only, failed live NBA or MLB requests fall back to the same visibly labeled simulated data.
+Demo mode serves a simulated MLB slate through the existing Main, Top, and Game Summary screens. All simulated output is visibly labeled and does not call the live odds API. Set the value to `false` or remove it, then restart, to restore live behavior. In development only, failed live requests fall back to the same visibly labeled simulated data.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
