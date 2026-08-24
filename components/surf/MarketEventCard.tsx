@@ -60,6 +60,42 @@ function selectionLabel(value: string): string {
   return getTeamAbbrev(value) ?? value;
 }
 
+function strengthTier(score: number): { dots: 1 | 3 | 4 | 5; label: "Quiet" | "Moderate" | "Solid" | "Strong" } {
+  if (score >= 80) return { dots: 5, label: "Strong" };
+  if (score >= 60) return { dots: 4, label: "Solid" };
+  if (score >= 40) return { dots: 3, label: "Moderate" };
+  return { dots: 1, label: "Quiet" };
+}
+
+function SignalStrength({ score }: { score: number | undefined }) {
+  if (typeof score !== "number" || !Number.isFinite(score)) return null;
+  const tier = strengthTier(Math.max(0, Math.min(100, Math.round(score))));
+
+  return (
+    <div
+      className="mt-2 flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.09em] text-[color:var(--surf-ink-40)]"
+      aria-label={`Signal strength ${tier.label}. Measures market magnitude, not pick confidence.`}
+      title="Measures market magnitude, not pick confidence"
+    >
+      <span>Signal strength</span>
+      <span className="flex items-center gap-1" aria-hidden="true">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <span
+            key={index}
+            className={`h-1.5 w-1.5 rounded-full ${
+              index < tier.dots
+                ? "bg-[color:var(--surf-primary)] shadow-[0_0_8px_color-mix(in_srgb,var(--surf-primary)_55%,transparent)]"
+                : "bg-[color:var(--surf-fill-08)]"
+            }`}
+          />
+        ))}
+      </span>
+      <span className="text-[color:var(--surf-ink-60)]">{tier.label}</span>
+      <span className="normal-case tracking-normal text-[color:var(--surf-ink-30)]">· market magnitude</span>
+    </div>
+  );
+}
+
 export function MarketEventCard({ card, now }: Props) {
   const away = getTeamAbbrev(card.game.awayTeam) ?? card.game.awayTeam;
   const home = getTeamAbbrev(card.game.homeTeam) ?? card.game.homeTeam;
@@ -89,6 +125,7 @@ export function MarketEventCard({ card, now }: Props) {
       <h2 className="mt-3 text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[color:var(--surf-ink-solid)]">
         {headline(card)}
       </h2>
+      <SignalStrength score={card.strengthScore} />
 
       {tracked ? (
         <div className="mt-3">
