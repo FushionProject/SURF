@@ -1,4 +1,9 @@
+"use client";
+
+import { useState } from "react";
+
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
+import { getTeamLogo } from "@/lib/teamLogos";
 import type { SignalCard } from "@/lib/surf/types";
 
 type Props = {
@@ -60,6 +65,34 @@ function selectionLabel(value: string): string {
   return getTeamAbbrev(value) ?? value;
 }
 
+function TeamLogo({ card, side }: { card: SignalCard; side: "away" | "home" }) {
+  const team = side === "away" ? card.game.awayTeam : card.game.homeTeam;
+  const abbreviation = getTeamAbbrev(team) ?? team.slice(0, 3).toUpperCase();
+  const logo = getTeamLogo(team, card.game.league);
+  const [logoVisible, setLogoVisible] = useState(Boolean(logo));
+
+  return (
+    <div
+      className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-05)] text-[8px] font-bold text-[color:var(--surf-ink-55)]"
+      title={team}
+    >
+      <span aria-hidden="true">{abbreviation}</span>
+      {logo && logoVisible ? (
+        // The established Surf logo source is remote and intentionally shared across leagues.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logo}
+          alt=""
+          className="absolute inset-0 h-full w-full bg-[color:var(--surf-fill-05)] object-contain p-0.5"
+          loading="lazy"
+          decoding="async"
+          onError={() => setLogoVisible(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function strengthTier(score: number): { dots: 1 | 3 | 4 | 5; label: "Quiet" | "Moderate" | "Solid" | "Strong" } {
   if (score >= 80) return { dots: 5, label: "Strong" };
   if (score >= 60) return { dots: 4, label: "Solid" };
@@ -116,10 +149,16 @@ export function MarketEventCard({ card, now }: Props) {
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="text-xs font-semibold text-[color:var(--surf-ink-80)]">
-          {away} <span className="font-normal text-[color:var(--surf-ink-35)]">at</span> {home}
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
+            <TeamLogo card={card} side="away" />
+            <TeamLogo card={card} side="home" />
+          </div>
+          <div className="truncate text-xs font-semibold text-[color:var(--surf-ink-80)]">
+            {away} <span className="font-normal text-[color:var(--surf-ink-35)]">at</span> {home}
+          </div>
         </div>
-        <div className="text-[10px] text-[color:var(--surf-ink-40)]">{gameTime(card.commenceTime)}</div>
+        <div className="shrink-0 text-[10px] text-[color:var(--surf-ink-40)]">{gameTime(card.commenceTime)}</div>
       </div>
 
       <h2 className="mt-3 text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[color:var(--surf-ink-solid)]">
