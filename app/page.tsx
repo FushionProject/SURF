@@ -12,7 +12,7 @@ import { SurfFooter } from "@/components/surf/SurfFooter";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import { isOvernight, nextRefreshDelayMs, refreshScheduleLabel } from "@/lib/surf/feedSchedule";
 import { getSurfSportConfig, type SurfSportKey, type SurfSportLabel } from "@/lib/surf/sports";
-import type { OvernightMarketSummary, SignalCard } from "@/lib/surf/types";
+import type { OvernightHorizonSummary, OvernightMarketSummary, SignalCard } from "@/lib/surf/types";
 
 type WindowMinutes = 15 | 60 | 180 | 1440;
 
@@ -32,6 +32,7 @@ type SurfFeedResponse = {
   sportLabel?: SurfSportLabel;
   generatedAt?: number;
   overnight?: OvernightMarketSummary;
+  overnightHorizon?: OvernightHorizonSummary;
   dataSource?: "demo" | "fallback";
   dataNotice?: string;
 };
@@ -51,6 +52,10 @@ function signalEventTime(signal: SignalCard, fallback?: number | null): number {
     return signal.lastMovedAt;
   }
   return signal.signalChangedAt ?? signal.detectedAt ?? fallback ?? 0;
+}
+
+function isVerifiedEvent(signal: SignalCard): boolean {
+  return Boolean(signal.marketHorizon || signal.trackedMarket);
 }
 
 export default function Home() {
@@ -125,11 +130,14 @@ export default function Home() {
     const threshold = now - windowMinutes * 60_000;
     return (data?.signals ?? [])
       .filter((signal) => signalEventTime(signal, data?.generatedAt ?? updatedAt) >= threshold)
-      .sort(
-        (a, b) =>
+      .sort((a, b) => {
+        const verifiedDifference = Number(isVerifiedEvent(b)) - Number(isVerifiedEvent(a));
+        if (verifiedDifference !== 0) return verifiedDifference;
+        return (
           signalEventTime(b, data?.generatedAt ?? updatedAt) -
-          signalEventTime(a, data?.generatedAt ?? updatedAt),
-      );
+          signalEventTime(a, data?.generatedAt ?? updatedAt)
+        );
+      });
   }, [data, now, updatedAt, windowMinutes]);
 
   const sinceLastVisit = useMemo(() => {
@@ -149,7 +157,7 @@ export default function Home() {
         <div className="surf-shell mx-auto w-full max-w-md px-4 pb-24">
           <SurfAppHeader
             title="Market feed"
-            subtitle="Verified line moves and meaningful book splits, latest first."
+            subtitle="Verified changes first. Exceptional current splits second."
             onRefresh={() => void load("refresh", sport)}
             isRefreshing={isRefreshing}
           />
@@ -179,7 +187,7 @@ export default function Home() {
             </div>
           ) : null}
 
-          <OvernightMoves summary={data?.overnight} />
+          <OvernightMoves summary={data?.overnight} horizon={data?.overnightHorizon} />
 
           <section className="mb-4 rounded-[20px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] p-1">
             <div className="grid grid-cols-4 gap-1">
@@ -207,7 +215,7 @@ export default function Home() {
                 {visibleSignals.length} market {visibleSignals.length === 1 ? "event" : "events"}
               </div>
               <div className="mt-0.5 text-[10px] text-[color:var(--surf-ink-35)]">
-                Tracked moves and current book splits
+                Verified events and useful current numbers
               </div>
             </div>
             {sinceLastVisit != null && sinceLastVisit > 0 ? (
