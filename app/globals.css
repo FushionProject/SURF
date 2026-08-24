@@ -1,19 +1,184 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================================
+   SURF THEMES
+
+   Three complete looks share one token contract. Components read the tokens
+   (or the .surf-* classes below), so flipping `data-theme` on <html> restyles
+   the entire app without touching component markup.
+
+     signal  (default) — the original: near-black, neon cyan, soft bloom.
+     atlas             — deep-blue bioluminescent dashboard: navy glass,
+                         aqua indicator, blueprint grid, wide board layout.
+     onyx              — clean-cut professional tool: true black, neutral
+                         hairlines, deep indigo-blue accent, zero glow.
+
+   Scoping rules:
+     [data-theme="signal"]                       — untouched original.
+     :is([data-theme="atlas"],[data-theme="onyx"]) — shared "dashboard"
+         structure (wide shell, grid feed, dense toolbar, opacity-scale
+         tokens). Values inside resolve per-theme through the tokens.
+     [data-theme="atlas"] / [data-theme="onyx"]  — each theme's own visuals.
+
+   Components consume tokens directly (e.g. text-[color:var(--surf-ink-70)],
+   bg-[color:var(--surf-surface)]) rather than literal Tailwind values, so
+   there is no utility-remap layer to keep in sync.
+   ========================================================================= */
+
+:root,
+[data-theme="signal"] {
+  --foreground: #ededed;
+
+  /* Surfaces */
   --surf-base: #050505;
   --surf-surface: #0a0a0a;
+  --surf-inner: #111111;
+  --surf-sunken: #0d0d0d;
 
+  /* Accents */
   --surf-primary: #00e5ff;
   --surf-primary-dark: #00b7cc;
+  --surf-primary-rgb: 0, 229, 255;
   --surf-positive: #00ff88;
   --surf-negative: #ff4d4d;
   --surf-neutral: #ffc857;
 
+  /* Ink */
   --surf-ink: rgba(255, 255, 255, 0.92);
   --surf-ink-muted: rgba(255, 255, 255, 0.62);
+  --surf-ink-rgb: 255, 255, 255;
+
+  /* Structure */
+  --surf-line: rgba(255, 255, 255, 0.05);
+  --surf-line-strong: rgba(255, 255, 255, 0.1);
+  --surf-fill-1: rgba(255, 255, 255, 0.03);
+  --surf-fill-2: rgba(255, 255, 255, 0.06);
+  --surf-fill-3: rgba(255, 255, 255, 0.08);
+  --surf-shell-max: 28rem;
+  --surf-radius-card: 24px;
+  --surf-radius-inner: 16px;
+  --surf-radius-featured: 28px;
+  --surf-card-shadow: 0 14px 60px rgba(0, 0, 0, 0.55);
+
+  /* Ink opacity scale — one token per historical text-white/NN step. */
+  --surf-ink-solid: #ffffff;
+  --surf-ink-98: rgba(var(--surf-ink-rgb), 0.98);
+  --surf-ink-95: rgba(var(--surf-ink-rgb), 0.95);
+  --surf-ink-90: rgba(var(--surf-ink-rgb), 0.9);
+  --surf-ink-85: rgba(var(--surf-ink-rgb), 0.85);
+  --surf-ink-80: rgba(var(--surf-ink-rgb), 0.8);
+  --surf-ink-75: rgba(var(--surf-ink-rgb), 0.75);
+  --surf-ink-70: rgba(var(--surf-ink-rgb), 0.7);
+  --surf-ink-66: rgba(var(--surf-ink-rgb), 0.66);
+  --surf-ink-65: rgba(var(--surf-ink-rgb), 0.65);
+  --surf-ink-60: rgba(var(--surf-ink-rgb), 0.6);
+  --surf-ink-55: rgba(var(--surf-ink-rgb), 0.55);
+  --surf-ink-52: rgba(var(--surf-ink-rgb), 0.52);
+  --surf-ink-45: rgba(var(--surf-ink-rgb), 0.45);
+  --surf-ink-40: rgba(var(--surf-ink-rgb), 0.4);
+  --surf-ink-35: rgba(var(--surf-ink-rgb), 0.35);
+  --surf-ink-25: rgba(var(--surf-ink-rgb), 0.25);
+
+  /* Hairline opacity scale — one token per historical border-white/NN step. */
+  --surf-line-10: var(--surf-line-strong);
+  --surf-line-09: rgba(255, 255, 255, 0.09);
+  --surf-line-08: rgba(255, 255, 255, 0.08);
+  --surf-line-06: rgba(255, 255, 255, 0.06);
+  --surf-line-05: var(--surf-line);
+
+  /* Fill opacity scale — one token per historical bg-white/[0.0N] step. */
+  --surf-fill-02: rgba(255, 255, 255, 0.02);
+  --surf-fill-03: var(--surf-fill-1);
+  --surf-fill-04: rgba(255, 255, 255, 0.04);
+  --surf-fill-06: var(--surf-fill-2);
+  --surf-fill-08: var(--surf-fill-3);
+
+  /* Header/nav chrome fill; dashboard themes render this transparent so their
+     own gradient chrome (and the ambient background) shows through. */
+  --surf-chrome-bg: var(--surf-base);
+}
+
+/* ---------------------------------------------------------------------------
+   ATLAS — deep-blue bioluminescent dashboard.
+
+   The palette is an abyssal water column: a near-black navy base, panels that
+   read as lit glass a few metres above it, and a single aqua accent doing the
+   work the cyan neon used to do — but as a precise indicator rather than a glow.
+   ------------------------------------------------------------------------ */
+[data-theme="atlas"] {
+  --foreground: #e9f1fc;
+
+  --surf-base: #060b15;
+  --surf-surface: #0b1322;
+  --surf-inner: #101a2c;
+  --surf-sunken: #080f1c;
+  --surf-raised: #142137;
+
+  --surf-primary: #2fe3d1;
+  --surf-primary-dark: #12a594;
+  --surf-primary-rgb: 47, 227, 209;
+  --surf-positive: #3ddc97;
+  --surf-negative: #ff6b81;
+  --surf-neutral: #f5b841;
+
+  --surf-ink: #e9f1fc;
+  --surf-ink-muted: rgba(198, 216, 242, 0.66);
+  --surf-ink-rgb: 226, 238, 252;
+
+  --surf-line: rgba(126, 168, 224, 0.13);
+  --surf-line-strong: rgba(126, 168, 224, 0.26);
+  --surf-fill-1: rgba(126, 168, 224, 0.045);
+  --surf-fill-2: rgba(126, 168, 224, 0.075);
+  --surf-fill-3: rgba(126, 168, 224, 0.11);
+  --surf-shell-max: 64rem;
+  --surf-radius-card: 12px;
+  --surf-radius-inner: 10px;
+  --surf-card-shadow:
+    0 1px 0 0 rgba(190, 220, 255, 0.05) inset,
+    0 10px 30px rgba(2, 6, 16, 0.62);
+}
+
+/* ---------------------------------------------------------------------------
+   ONYX — clean-cut professional tool.
+
+   True black, neutral gray hairlines, and one deep indigo-blue accent. No
+   glow, no gradient wash, no bounce: contrast comes from crisp borders and
+   flat elevated surfaces, the way a trading terminal or IDE carries weight.
+   --surf-accent-text exists because the raw deep blue is too dim for tiny
+   active labels on black — small text gets a lifted variant of the accent.
+   ------------------------------------------------------------------------ */
+[data-theme="onyx"] {
+  --foreground: #f1f1f3;
+
+  --surf-base: #000000;
+  --surf-surface: #0b0b0d;
+  --surf-inner: #101014;
+  --surf-sunken: #060608;
+  --surf-raised: #16161a;
+
+  --surf-primary: #3e63dd;
+  --surf-primary-dark: #2a4bb8;
+  --surf-primary-rgb: 62, 99, 221;
+  --surf-positive: #30a46c;
+  --surf-negative: #e5484d;
+  --surf-neutral: #d4a72c;
+  --surf-accent-text: #94a8f0;
+
+  --surf-ink: #f1f1f3;
+  --surf-ink-muted: rgba(240, 240, 244, 0.62);
+  --surf-ink-rgb: 240, 240, 244;
+
+  --surf-line: rgba(255, 255, 255, 0.08);
+  --surf-line-strong: rgba(255, 255, 255, 0.16);
+  --surf-fill-1: rgba(255, 255, 255, 0.035);
+  --surf-fill-2: rgba(255, 255, 255, 0.06);
+  --surf-fill-3: rgba(255, 255, 255, 0.09);
+  --surf-shell-max: 64rem;
+  --surf-radius-card: 8px;
+  --surf-radius-inner: 6px;
+  --surf-card-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+    0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
@@ -23,17 +188,114 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: var(--surf-base);
-    --foreground: #ededed;
-  }
+/* The app is dark in all themes; keep the document behind the shell in sync so
+   overscroll and the area under the fixed nav never flash white. */
+:root {
+  --background: var(--surf-base);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Onyx types like a tool: the app's actual sans, not the browser fallback. */
+[data-theme="onyx"] body {
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* ============================================================================
+   SHARED LAYOUT PRIMITIVES
+   ========================================================================= */
+
+/* Page shell. Phone-width in signal, dashboard-width in atlas/onyx. */
+.surf-shell {
+  max-width: var(--surf-shell-max);
+}
+
+.surf-content {
+  position: relative;
+  z-index: 1;
+}
+
+.surf-bg {
+  position: relative;
+}
+
+.surf-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.05;
+  background: radial-gradient(1100px 600px at 50% 0%, rgba(0, 229, 255, 0.05), transparent 62%);
+}
+
+.surf-bg::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  background-image: none;
+  background-size: auto;
+  animation: none;
+}
+
+.surf-container {
+  background: transparent;
+  border: 1px solid var(--surf-line);
+  box-shadow: none;
+  border-radius: var(--surf-radius-card);
+}
+
+.surf-glass {
+  background: var(--surf-surface);
+  border: 1px solid var(--surf-line);
+}
+
+.surf-inner {
+  background: var(--surf-inner);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.surf-edge {
+  position: relative;
+}
+
+.surf-edge::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: transparent;
+  opacity: 0;
+  filter: none;
+}
+
+.surf-badge-pulse {
+  animation: surfPulse 6s ease-in-out infinite;
+}
+
+.surf-card-hover {
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    border-color 200ms ease;
+}
+
+.surf-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.65);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.surf-card-hover:hover .surf-edge::before {
+  opacity: 0;
 }
 
 @keyframes surfWaveDrift {
@@ -72,83 +334,325 @@ body {
   }
 }
 
-.surf-bg {
-  position: relative;
+/* ============================================================================
+   ATLAS THEME — its own visuals
+   ========================================================================= */
+
+/* --- Ambient background: depth gradient + blueprint grid ----------------- */
+[data-theme="atlas"] .surf-bg::before {
+  opacity: 1;
+  background:
+    radial-gradient(900px 460px at 50% -6%, rgba(47, 227, 209, 0.1), transparent 68%),
+    radial-gradient(1200px 700px at 12% 8%, rgba(37, 99, 235, 0.12), transparent 72%),
+    linear-gradient(180deg, #08101f 0%, var(--surf-base) 46%, #04070f 100%);
 }
 
-.surf-bg::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.05;
-  background: radial-gradient(1100px 600px at 50% 0%, rgba(0, 229, 255, 0.05), transparent 62%);
+/* The faint plotted grid that makes it read as an instrument, not a feed. */
+[data-theme="atlas"] .surf-bg::after {
+  opacity: 1;
+  background-image:
+    linear-gradient(to right, rgba(126, 168, 224, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(126, 168, 224, 0.055) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(circle at 50% 22%, rgba(0, 0, 0, 0.9), transparent 78%);
+  -webkit-mask-image: radial-gradient(circle at 50% 22%, rgba(0, 0, 0, 0.9), transparent 78%);
 }
 
-.surf-bg::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0;
-  background-image: none;
-  background-size: auto;
+/* --- Surfaces ------------------------------------------------------------ */
+[data-theme="atlas"] .surf-container {
+  background: rgba(9, 16, 29, 0.55);
+  border-color: var(--surf-line);
+  border-radius: var(--surf-radius-card);
+}
+
+[data-theme="atlas"] .surf-glass {
+  background: linear-gradient(180deg, rgba(17, 28, 48, 0.92), var(--surf-surface));
+  border-color: var(--surf-line);
+  border-radius: var(--surf-radius-card);
+  box-shadow: var(--surf-card-shadow);
+}
+
+[data-theme="atlas"] .surf-inner {
+  background: var(--surf-inner);
+  border-color: var(--surf-line);
+  border-radius: var(--surf-radius-inner);
+  box-shadow: none;
+}
+
+/* Dashboards don't bounce. Depth on hover comes from the border and shadow. */
+[data-theme="atlas"] .surf-card-hover:hover {
+  transform: none;
+  border-color: var(--surf-line-strong);
+  box-shadow:
+    0 1px 0 0 rgba(190, 220, 255, 0.07) inset,
+    0 14px 36px rgba(2, 6, 16, 0.7);
+}
+
+/* --- Signal-card accent rail: 3px status edge ---------------------------- */
+[data-theme="atlas"] article[data-variant="Primary"] {
+  box-shadow:
+    inset 3px 0 0 0 var(--surf-primary),
+    var(--surf-card-shadow);
+}
+
+[data-theme="atlas"] article[data-variant="Positive"] {
+  box-shadow:
+    inset 3px 0 0 0 var(--surf-positive),
+    var(--surf-card-shadow);
+}
+
+[data-theme="atlas"] article[data-variant="Negative"] {
+  box-shadow:
+    inset 3px 0 0 0 var(--surf-negative),
+    var(--surf-card-shadow);
+}
+
+[data-theme="atlas"] article[data-variant="Neutral"] {
+  box-shadow:
+    inset 3px 0 0 0 var(--surf-neutral),
+    var(--surf-card-shadow);
+}
+
+/* --- Chrome: blue glass header and dock ---------------------------------- */
+[data-theme="atlas"] header {
+  background: linear-gradient(180deg, rgba(6, 11, 21, 0.94), rgba(6, 11, 21, 0.82));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--surf-line);
+}
+
+[data-theme="atlas"] nav.fixed {
+  background: linear-gradient(180deg, rgba(8, 14, 26, 0.9), rgba(6, 11, 21, 0.98));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--surf-line);
+}
+
+[data-theme="atlas"] .surf-segment {
+  border-color: var(--surf-line);
+  background: rgba(8, 15, 28, 0.8);
+}
+
+/* ============================================================================
+   ONYX THEME — its own visuals
+   ========================================================================= */
+
+/* --- Ambient background: flat black, one whisper of blue at the top ------ */
+[data-theme="onyx"] .surf-bg::before {
+  opacity: 1;
+  background:
+    radial-gradient(820px 300px at 50% -10%, rgba(62, 99, 221, 0.07), transparent 70%),
+    var(--surf-base);
+}
+
+/* No grid, no grain: ::after stays at the shared default (opacity 0). */
+
+/* --- Kill every decorative glow. Professional tools don't bloom. ---------
+   All neon glows in the app are authored as `shadow-[0_0_<blur>_rgba(...)]`
+   arbitrary utilities; matching the class attribute substring flattens each
+   of them in one rule. Rules below this one (rails, cards) re-add the few
+   shadows onyx actually wants, and win on specificity. */
+[data-theme="onyx"] [class*="shadow-[0_0_"] {
+  box-shadow: none;
+}
+
+/* --- Surfaces ------------------------------------------------------------ */
+[data-theme="onyx"] .surf-container {
+  background: rgba(255, 255, 255, 0.015);
+  border-color: var(--surf-line);
+  border-radius: var(--surf-radius-card);
+}
+
+[data-theme="onyx"] .surf-glass {
+  background: var(--surf-surface);
+  border-color: var(--surf-line);
+  border-radius: var(--surf-radius-card);
+  box-shadow: var(--surf-card-shadow);
+}
+
+[data-theme="onyx"] .surf-inner {
+  background: var(--surf-inner);
+  border-color: var(--surf-line);
+  border-radius: var(--surf-radius-inner);
+  box-shadow: none;
+}
+
+[data-theme="onyx"] .surf-card-hover:hover {
+  transform: none;
+  border-color: var(--surf-line-strong);
+  box-shadow: var(--surf-card-shadow);
+}
+
+/* --- Signal-card accent rail: 2px status edge, no glow ------------------- */
+[data-theme="onyx"] article[data-variant="Primary"] {
+  box-shadow:
+    inset 2px 0 0 0 var(--surf-primary),
+    var(--surf-card-shadow);
+}
+
+[data-theme="onyx"] article[data-variant="Positive"] {
+  box-shadow:
+    inset 2px 0 0 0 var(--surf-positive),
+    var(--surf-card-shadow);
+}
+
+[data-theme="onyx"] article[data-variant="Negative"] {
+  box-shadow:
+    inset 2px 0 0 0 var(--surf-negative),
+    var(--surf-card-shadow);
+}
+
+[data-theme="onyx"] article[data-variant="Neutral"] {
+  box-shadow:
+    inset 2px 0 0 0 var(--surf-neutral),
+    var(--surf-card-shadow);
+}
+
+/* --- Chrome: solid black bars with crisp hairlines ------------------------ */
+[data-theme="onyx"] header {
+  background: rgba(3, 3, 5, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--surf-line);
+}
+
+[data-theme="onyx"] nav.fixed {
+  background: rgba(3, 3, 5, 0.96);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--surf-line);
+}
+
+[data-theme="onyx"] .surf-segment {
+  border-color: var(--surf-line);
+  background: var(--surf-surface);
+}
+
+/* ============================================================================
+   DASHBOARD SHARED — structure common to atlas and onyx.
+   Values resolve per-theme through the tokens.
+   ========================================================================= */
+
+/* Token scales resolved per-theme through each theme's own --surf-ink-rgb /
+   --surf-line(-strong) / --surf-fill-N — the same grouping the utility remap
+   below used to apply by matching literal class names. */
+:is([data-theme="atlas"], [data-theme="onyx"]) {
+  --surf-ink-solid: var(--surf-ink);
+  --surf-ink-98: rgba(var(--surf-ink-rgb), 0.98);
+  --surf-ink-95: rgba(var(--surf-ink-rgb), 0.95);
+  --surf-ink-90: rgba(var(--surf-ink-rgb), 0.9);
+  --surf-ink-85: rgba(var(--surf-ink-rgb), 0.86);
+  --surf-ink-80: rgba(var(--surf-ink-rgb), 0.82);
+  --surf-ink-75: rgba(var(--surf-ink-rgb), 0.77);
+  --surf-ink-70: rgba(var(--surf-ink-rgb), 0.73);
+  --surf-ink-66: rgba(var(--surf-ink-rgb), 0.69);
+  --surf-ink-65: rgba(var(--surf-ink-rgb), 0.69);
+  --surf-ink-60: rgba(var(--surf-ink-rgb), 0.64);
+  --surf-ink-55: rgba(var(--surf-ink-rgb), 0.6);
+  --surf-ink-52: rgba(var(--surf-ink-rgb), 0.57);
+  --surf-ink-45: rgba(var(--surf-ink-rgb), 0.52);
+  --surf-ink-40: rgba(var(--surf-ink-rgb), 0.48);
+  --surf-ink-35: rgba(var(--surf-ink-rgb), 0.44);
+  --surf-ink-25: rgba(var(--surf-ink-rgb), 0.34);
+
+  --surf-line-10: var(--surf-line-strong);
+  --surf-line-09: var(--surf-line-strong);
+  --surf-line-08: var(--surf-line-strong);
+  --surf-line-06: var(--surf-line);
+  --surf-line-05: var(--surf-line);
+
+  --surf-fill-02: var(--surf-fill-1);
+  --surf-fill-03: var(--surf-fill-1);
+  --surf-fill-04: var(--surf-fill-2);
+  --surf-fill-06: var(--surf-fill-2);
+  --surf-fill-08: var(--surf-fill-3);
+
+  --surf-chrome-bg: transparent;
+  --surf-radius-featured: var(--surf-radius-card);
+}
+
+:is([data-theme="atlas"], [data-theme="onyx"]) .surf-badge-pulse {
   animation: none;
 }
 
-.surf-content {
-  position: relative;
-  z-index: 1;
+:is([data-theme="atlas"], [data-theme="onyx"]) article[data-variant] {
+  border-radius: var(--surf-radius-card);
 }
 
-.surf-container {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: none;
-  border-radius: 24px;
+/* --- Dashboard grid ------------------------------------------------------
+   The single mobile column becomes a multi-column board once there's room.
+   A featured <section> spans the full width as the board's lead tile. */
+@media (min-width: 60rem) {
+  :is([data-theme="atlas"], [data-theme="onyx"]) .surf-feed {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(24rem, 1fr));
+    align-items: start;
+    gap: 0.875rem;
+  }
+
+  :is([data-theme="atlas"], [data-theme="onyx"]) .surf-feed > section {
+    grid-column: 1 / -1;
+  }
 }
 
-.surf-glass {
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+/* The header's stacked mobile rows collapse into one dense toolbar row.
+   `display: contents` in the signal theme keeps the original stacking. */
+.surf-headmeta {
+  display: contents;
 }
 
-.surf-inner {
-  background: #111111;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+@media (min-width: 48rem) {
+  :is([data-theme="atlas"], [data-theme="onyx"]) .surf-headmeta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.625rem;
+  }
+
+  :is([data-theme="atlas"], [data-theme="onyx"]) .surf-headtabs,
+  :is([data-theme="atlas"], [data-theme="onyx"]) .surf-headmode {
+    margin-top: 0;
+  }
+
+  :is([data-theme="atlas"], [data-theme="onyx"]) .surf-headtabs {
+    justify-content: flex-start;
+  }
+
+  :is([data-theme="atlas"], [data-theme="onyx"]) .surf-headsub {
+    margin-top: 0.625rem;
+  }
+
+  /* A compact docked toolbar instead of four full-width mobile buttons. */
+  :is([data-theme="atlas"], [data-theme="onyx"]) nav.fixed .grid {
+    display: flex;
+    justify-content: center;
+    gap: 0.375rem;
+  }
+
+  :is([data-theme="atlas"], [data-theme="onyx"]) nav.fixed .grid > a {
+    min-width: 7.5rem;
+  }
 }
 
-.surf-edge {
-  position: relative;
+/* Active chip in segmented controls. --surf-accent-text lets a theme lift the
+   accent for small type (onyx); atlas falls back to its bright primary. */
+:is([data-theme="atlas"], [data-theme="onyx"]) .surf-segment-item[data-active="true"] {
+  background: rgba(var(--surf-primary-rgb), 0.14);
+  color: var(--surf-accent-text, var(--surf-primary));
+  box-shadow: inset 0 0 0 1px rgba(var(--surf-primary-rgb), 0.3);
 }
 
-.surf-edge::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  pointer-events: none;
-  background: transparent;
-  opacity: 0;
-  filter: none;
+/* --- Numerics read as instrument output ---------------------------------- */
+:is([data-theme="atlas"], [data-theme="onyx"]) .font-mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
-.surf-badge-pulse {
-  animation: surfPulse 6s ease-in-out infinite;
-}
-
-.surf-card-hover {
-  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
-}
-
-.surf-card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.65);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.surf-card-hover:hover .surf-edge::before {
-  opacity: 0;
+@media (prefers-reduced-motion: reduce) {
+  .surf-card-hover,
+  .surf-badge-pulse {
+    transition: none;
+    animation: none;
+  }
 }

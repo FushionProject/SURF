@@ -1,4 +1,5 @@
-import type { SignalCard, SurfMarketType } from "@/lib/surf/types";
+import type { SignalCard } from "@/lib/surf/types";
+import { getMovementTitle, getMovementWhyItMatters } from "@/lib/surf/movementCopy";
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -46,10 +47,15 @@ export function getMovementBadge(card: Pick<SignalCard, "signalType" | "recentMo
 
 export function getSignalTitle(card: Pick<SignalCard, "signalType" | "market" | "gap" | "lineMovement">): string {
   const market = card.market;
+  const league = (card as unknown as { game?: { league?: "NBA" | "MLB" } })?.game?.league;
+
+  if (card.signalType === "Run Line Price Conflict") {
+    return "Run line price conflict";
+  }
 
   if (card.signalType === "Book Disagreement") {
     if (market === "totals") return "Market split on total";
-    if (market === "spreads") return "Market split on spread";
+    if (market === "spreads") return league === "MLB" ? "Run line mismatch" : "Market split on spread";
     return "Market split across books";
   }
 
@@ -64,10 +70,7 @@ export function getSignalTitle(card: Pick<SignalCard, "signalType" | "market" | 
   }
 
   if (card.signalType === "Line Movement" || card.signalType === "Market Movement") {
-    const mv = isFiniteNumber(card.lineMovement) ? card.lineMovement : undefined;
-    if (mv != null && mv >= 2.5) return "Sharp move since open";
-    if (mv != null && mv >= 1.5) return "Line is moving";
-    return "Market adjusted";
+    return getMovementTitle({ movementAbs: card.lineMovement });
   }
 
   return "Market update";
@@ -75,10 +78,15 @@ export function getSignalTitle(card: Pick<SignalCard, "signalType" | "market" | 
 
 export function getWhyItMatters(card: Pick<SignalCard, "signalType" | "market" | "gap" | "lineMovement">): string {
   const market = card.market;
+  const league = (card as unknown as { game?: { league?: "NBA" | "MLB" } })?.game?.league;
+
+  if (card.signalType === "Run Line Price Conflict") {
+    return "Books disagree on pricing of the same run line.";
+  }
 
   if (card.signalType === "Book Disagreement") {
     if (market === "totals") return "Market hasn’t agreed on a true total yet.";
-    if (market === "spreads") return "Market hasn’t agreed on a true spread yet.";
+    if (market === "spreads") return league === "MLB" ? "Books aren’t aligned on the run line number." : "Market hasn’t agreed on a true spread yet.";
     return "Books aren’t aligned yet.";
   }
 
@@ -91,9 +99,7 @@ export function getWhyItMatters(card: Pick<SignalCard, "signalType" | "market" |
   }
 
   if (card.signalType === "Line Movement" || card.signalType === "Market Movement") {
-    const mv = isFiniteNumber(card.lineMovement) ? card.lineMovement : undefined;
-    if (mv != null && mv >= 2.5) return "This is a meaningful move across the market.";
-    return "Market is still finding its level.";
+    return getMovementWhyItMatters({ movementAbs: card.lineMovement });
   }
 
   return "Market behavior worth tracking.";
@@ -113,10 +119,30 @@ export function topBadgeLabel(
   return "STRONG";
 }
 
-export function computeSignalStrengthScore(card: Pick<SignalCard, "gap" | "lineMovement" | "recentMovementAbs">): number {
+function closenessMultiplier(absSpread: number): number {
+  const a = Math.abs(absSpread);
+  if (a <= 2) return 1.5;
+  if (a <= 4) return 1.3;
+  if (a <= 7) return 1.15;
+  if (a <= 10) return 1.0;
+  if (a <= 14) return 0.85;
+  return 0.7;
+}
+
+export function computeSignalStrengthScore(
+  card: Pick<SignalCard, "gap" | "lineMovement" | "recentMovementAbs" | "market"> & { absSpread?: number }
+): number {
   const gap = isFiniteNumber(card.gap) ? card.gap : 0;
-  const mv = isFiniteNumber(card.lineMovement) ? card.lineMovement : 0;
-  const recent = isFiniteNumber(card.recentMovementAbs) ? card.recentMovementAbs : 0;
+  const mvRaw = isFiniteNumber(card.lineMovement) ? card.lineMovement : 0;
+  const recentRaw = isFiniteNumber(card.recentMovementAbs) ? card.recentMovementAbs : 0;
+
+  const mult =
+    card.market === "spreads" && isFiniteNumber(card.absSpread)
+      ? closenessMultiplier(Math.abs(card.absSpread))
+      : 1;
+
+  const mv = card.market === "spreads" ? mvRaw * mult : mvRaw;
+  const recent = card.market === "spreads" ? recentRaw * mult : recentRaw;
 
   const base = Math.max(gap, mv, recent);
   if (!Number.isFinite(base) || base <= 0) return 0;

@@ -6,33 +6,62 @@ import { SignalCard } from "@/components/surf/SignalCard";
 import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
 import { SurfFooter } from "@/components/surf/SurfFooter";
 import { SurfHeader } from "@/components/surf/SurfHeader";
+import { DemoDataNotice } from "@/components/surf/DemoDataNotice";
+import { SportSelector } from "@/components/surf/SportSelector";
+import { useSurfSport } from "@/components/surf/useSurfSport";
 import type { SignalCard as SignalCardType } from "@/lib/surf/types";
+import { getSurfSportConfig, type SurfSportKey, type SurfSportLabel } from "@/lib/surf/sports";
+
+type RefreshMode = "dynamic" | "fixed15" | "manual";
+const REFRESH_MODE_STORAGE_KEY = "surf:refreshMode";
 
 type SurfFeedResponse = {
   count: number;
   signals: SignalCardType[];
+  sportKey?: SurfSportKey;
+  sportLabel?: SurfSportLabel;
+  dataSource?: "demo" | "fallback";
+  dataNotice?: string;
 };
 
-async function fetchSurfFeed(): Promise<SurfFeedResponse> {
-  const res = await fetch("/api/surf-feed", { cache: "no-store" });
+async function fetchSurfFeed(refreshMode: RefreshMode, sport: SurfSportKey): Promise<SurfFeedResponse> {
+  const params = new URLSearchParams();
+  params.set("refreshMode", refreshMode);
+  params.set("sport", sport);
+  const url = `/api/surf-feed?${params.toString()}`;
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load surf feed (${res.status})`);
   return (await res.json()) as SurfFeedResponse;
 }
 
 export default function Home() {
   const didInitialLoad = useRef(false);
+  const { sport, sportSynced, selectSport } = useSurfSport();
+
+  const [refreshMode, setRefreshMode] = useState<RefreshMode>("dynamic");
   const [data, setData] = useState<SurfFeedResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
 
-  const load = useCallback(async (mode: "initial" | "refresh") => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(REFRESH_MODE_STORAGE_KEY);
+    if (saved === "fixed15" || saved === "dynamic" || saved === "manual") setRefreshMode(saved);
+  }, []);
+
+  useEffect(() => {
+    if (refreshMode !== "manual") return;
+    console.log("[SURF] Manual mode active — no auto refresh");
+  }, [refreshMode]);
+
+  const load = useCallback(async (mode: "initial" | "refresh", requestedSport = sport) => {
     if (mode === "refresh") setIsRefreshing(true);
     if (mode === "initial") setIsLoading(true);
 
     try {
-      const next = await fetchSurfFeed();
+      const next = await fetchSurfFeed(refreshMode, requestedSport);
       setData(next);
       setError(null);
       setUpdatedAt(Date.now());
@@ -42,50 +71,70 @@ export default function Home() {
       if (mode === "refresh") setIsRefreshing(false);
       if (mode === "initial") setIsLoading(false);
     }
-  }, []);
+  }, [refreshMode, sport]);
 
   useEffect(() => {
+    if (!sportSynced) return;
     // Prevent duplicate requests in React Strict Mode (dev) which can double-invoke effects.
     if (didInitialLoad.current) return;
     didInitialLoad.current = true;
     void load("initial");
-  }, [load]);
+  }, [load, sportSynced]);
+
+  const sportLabel = getSurfSportConfig(sport).label;
 
   return (
     <div className="min-h-full flex-1 bg-[color:var(--surf-base)] surf-bg">
       <div className="surf-content">
-        <div className="mx-auto w-full max-w-md px-4 pb-24">
+        <div className="surf-shell mx-auto w-full max-w-md px-4 pb-24">
           <SurfHeader
-            subtitle="Signals across today’s games"
+            subtitle={`${sportLabel} market signals, translated`}
             onRefresh={() => void load("refresh")}
             isRefreshing={isRefreshing}
+            refreshMode={refreshMode}
+            onRefreshModeChange={(next) => {
+              setRefreshMode(next);
+              if (typeof window !== "undefined") window.localStorage.setItem(REFRESH_MODE_STORAGE_KEY, next);
+              if (next !== "manual") void load("refresh");
+            }}
           />
 
           <div className="surf-container px-4 pb-4 pt-3">
 
+            {data?.dataSource ? <DemoDataNotice source={data.dataSource} notice={data.dataNotice} /> : null}
+
+            <SportSelector
+              value={sport}
+              disabled={isRefreshing}
+              onChange={(next) => {
+                selectSport(next);
+                void load("refresh", next);
+              }}
+            />
+
             {isLoading ? (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70">
+              <div className="rounded-[var(--surf-radius-inner)] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-03)] p-4 text-sm text-[color:var(--surf-ink-70)]">
                 Loading…
               </div>
             ) : error ? (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70">
+              <div className="rounded-[var(--surf-radius-inner)] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-03)] p-4 text-sm text-[color:var(--surf-ink-70)]">
                 {error}
               </div>
             ) : data && data.signals.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/70">
-                No signals yet. Check back soon.
+              <div className="rounded-[var(--surf-radius-inner)] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-03)] p-4 text-sm text-[color:var(--surf-ink-70)]">
+                No {sportLabel} signals yet. The market may be quiet or the next slate may not be posted.
               </div>
             ) : (
-              <main className="flex flex-col gap-3 pb-2">
+              <main className="surf-feed flex flex-col gap-3 pb-2">
                 {(data?.signals ?? []).map((card) => (
-                  <SignalCard key={card.id} card={card} />
+                  <SignalCard key={card.id} card={card} showStrength />
                 ))}
               </main>
             )}
           </div>
         </div>
 
-        <SurfFooter updatedAt={updatedAt} />
+        <SurfFooter updatedAt={updatedAt} isSimulated={Boolean(data?.dataSource)} />
         <SurfBottomNav />
       </div>
     </div>

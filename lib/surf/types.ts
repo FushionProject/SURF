@@ -1,3 +1,5 @@
+import type { SurfLeague, SurfSportKey, SurfSportLabel } from "./sports";
+
 export type OddsApiOutcome = {
   name: string;
   price?: number;
@@ -29,6 +31,7 @@ export type OddsApiGame = {
 
 export type SurfSignalType =
   | "BOOK_DISAGREEMENT"
+  | "RUN_LINE_PRICE_CONFLICT"
   | "BEST_NUMBER_AVAILABLE"
   | "LINE_MOVEMENT"
   | "SNAPSHOT_MOVEMENT"
@@ -36,6 +39,7 @@ export type SurfSignalType =
 
 export type SurfSignalTypeLabel =
   | "Book Disagreement"
+  | "Run Line Price Conflict"
   | "Best Number"
   | "Line Movement"
   | "Market Movement"
@@ -95,6 +99,15 @@ export type SurfSignalDetection = {
     title: string;
     point: number;
   };
+
+  // MLB run line price conflict (same abs line, conflicting prices)
+  priceConflict?: {
+    team: string;
+    absLine: number;
+    plus?: { point: number; price: number; book: { key: string; title: string } };
+    minus?: { point: number; price: number; book: { key: string; title: string } };
+    delta?: number;
+  };
 };
 
 export type SignalCardSource = {
@@ -107,7 +120,9 @@ export type SignalCard = {
   id: string;
   game: {
     id: string;
-    league: "NBA";
+    league: SurfLeague;
+    sportKey: SurfSportKey;
+    sportLabel: SurfSportLabel;
     homeTeam: string;
     awayTeam: string;
   };

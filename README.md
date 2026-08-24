@@ -1,4 +1,7 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Surf
+
+Surf is a fast, NFL-first market companion. It translates spreads, totals, book
+differences, and line movement into short matchup reads; it is not a picks product.
 
 ## Getting Started
 
@@ -15,6 +18,34 @@ bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+Copy `.env.example` to `.env.local` and add `ODDS_API_KEY`. Provider keys stay on
+the server and must never use a `NEXT_PUBLIC_` prefix.
+
+## Sports and data sources
+
+- NFL preseason (the explicit default): The Odds API sport key
+  `americanfootball_nfl_preseason`
+- NFL regular season: `americanfootball_nfl`
+- NBA: `basketball_nba`
+- MLB: `baseball_mlb`
+
+All four are explicit choices in the Main, Top, and Games views. An invalid sport
+query returns a 400 response; routes do not silently substitute NBA.
+
+NFL injury context is reserved for API-Sports. Until `API_SPORTS_KEY` and an
+audited provider team-ID mapping are available, the UI shows an unavailable state
+and never invents injury records.
+
+## SURF demo mode
+
+Add this to `.env.local`, then restart the development server:
+
+```bash
+NEXT_PUBLIC_SURF_DEMO_MODE=true
+```
+
+Demo mode serves a simulated MLB slate through the existing Main, Top, and Game Summary screens. All simulated output is visibly labeled and does not call the live odds API. Set the value to `false` or remove it, then restart, to restore live behavior. In development only, failed live NBA or MLB requests fall back to the same visibly labeled simulated data.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

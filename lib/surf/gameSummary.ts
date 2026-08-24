@@ -1,6 +1,7 @@
 import type { OddsApiGame, SurfMarketType, SurfSignalDetection } from "@/lib/surf/types";
 import type { GameMarketContext, MarketContext } from "@/lib/surf/marketContext";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
+import { getMovementHeadline, getMovementLabel } from "@/lib/surf/movementCopy";
 
 export type GameSummary = {
   gameId: string;
@@ -10,6 +11,11 @@ export type GameSummary = {
   marketRead: string;
   bullets: string[];
   usedDetections: SurfSignalDetection[];
+  openingSnapshot?: { spreads?: number; totals?: number };
+  openingMedianSnapshot?: { spreads?: number; totals?: number };
+  openingMedianPriceSnapshot?: { spreads?: { home?: number; away?: number }; totals?: { over?: number; under?: number } };
+  currentMedianSnapshot?: { spreads?: number; totals?: number };
+  currentMedianPriceSnapshot?: { spreads?: { home?: number; away?: number }; totals?: { over?: number; under?: number } };
 };
 
 export type GameSummaryInputs = {
@@ -130,10 +136,9 @@ function makeMarketRead(game: OddsApiGame, top: SurfSignalDetection[], marketCon
 
       if (pickedMarket === "totals" && absDelta >= 0.5) {
         if (absDelta >= 2.0) {
-          return delta > 0 ? "Market moving toward OVER" : "Market moving toward UNDER";
+          return getMovementHeadline({ market: "totals", delta, moved: true });
         }
-        if (delta > 0) return "Market moving toward OVER";
-        if (delta < 0) return "Market moving toward UNDER";
+        return getMovementHeadline({ market: "totals", delta, moved: true });
       }
 
       if (pickedMarket === "spreads" && absDelta >= 0.5) {
@@ -145,8 +150,8 @@ function makeMarketRead(game: OddsApiGame, top: SurfSignalDetection[], marketCon
         const curUnderdogPts = Math.abs(curHome);
 
         const underdogPtsDelta = curUnderdogPts - openUnderdogPts;
-        if (underdogPtsDelta > 0) return "Market backing the FAVORITE";
-        if (underdogPtsDelta < 0) return "Market backing the UNDERDOG";
+        if (underdogPtsDelta > 0) return "Recent movement toward the FAVORITE";
+        if (underdogPtsDelta < 0) return "Recent movement toward the UNDERDOG";
       }
     }
   }
@@ -163,10 +168,10 @@ function bulletsForDetection(d: SurfSignalDetection): string[] {
   if (d.type === "SNAPSHOT_MOVEMENT" || d.type === "LINE_MOVEMENT") {
     const baseline = d.baselinePoint;
     const moved = d.movedPoint ?? d.selection?.point;
-    const label = d.market === "totals" ? "Total" : "Spread";
+    const label = getMovementLabel(d.market);
 
     if (isNumber(baseline) && isNumber(moved)) {
-      const b1 = `${label} moved ${fmtLine(baseline)} → ${fmtLine(moved)}`;
+      const b1 = `Recent ${label} movement: ${fmtLine(baseline)} → ${fmtLine(moved)}`;
       const b2 = isNumber(moved) ? `Most books now around ${fmtLine(moved)}` : undefined;
       return b2 ? [b1, b2] : [b1];
     }
@@ -263,17 +268,17 @@ function contextBulletsForMarket(game: OddsApiGame, market: SurfMarketType, c?: 
 
   if (market === "totals") {
     if (absDelta >= 2.0) {
-      out.push({ text: `Total moved ${fmtLine(open)} → ${fmtLine(current)} (${fmtDelta(delta)})`, priority: 100 });
-      out.push({ text: "Significant market shift", priority: 95 });
+      out.push({ text: `Recent total movement: ${fmtLine(open)} → ${fmtLine(current)} (${fmtDelta(delta)})`, priority: 100 });
+      out.push({ text: "Strong recent adjustment across books", priority: 95 });
       return out;
     }
 
     if (absDelta >= 0.5) {
-      out.push({ text: `Total moved ${fmtLine(open)} → ${fmtLine(current)}`, priority: 92 });
-      out.push({ text: delta > 0 ? "Market trending upward" : "Market trending downward", priority: 91 });
+      out.push({ text: `Recent total movement: ${fmtLine(open)} → ${fmtLine(current)}`, priority: 92 });
+      out.push({ text: delta > 0 ? "Tracked movement has pushed the total higher" : "Tracked movement has pushed the total lower", priority: 91 });
 
       if (alignedNow && absDelta >= 1.0) {
-        out.push({ text: `Earlier total ${fmtLine(open)} no longer available`, priority: 89 });
+        out.push({ text: `Earlier number ${fmtLine(open)} no longer widely available`, priority: 89 });
       }
     }
 
@@ -323,23 +328,25 @@ function contextBulletsForMarket(game: OddsApiGame, market: SurfMarketType, c?: 
   if (absDelta >= 2.0) {
     out.push({
       text: underdogAbbrev
-        ? `Spread moved ${underdogAbbrev} ${openText} → ${curText} (${fmtSigned(underdogPtsDelta)})`
-        : `Spread moved ${fmtLine(openHome)} → ${fmtLine(curHome)} (${fmtSigned(delta)})`,
+        ? `Recent spread movement: ${underdogAbbrev} ${openText} → ${curText} (${fmtSigned(underdogPtsDelta)})`
+        : `Recent spread movement: ${fmtLine(openHome)} → ${fmtLine(curHome)} (${fmtSigned(delta)})`,
       priority: 100,
     });
-    out.push({ text: "Large move across books", priority: 95 });
+    out.push({ text: "Strong recent adjustment across books", priority: 95 });
     if (direction) out.push({ text: direction, priority: 94 });
     return out;
   }
 
   if (absDelta >= 0.5) {
     out.push({
-      text: underdogAbbrev ? `Spread moved ${underdogAbbrev} ${openText} → ${curText}` : `Spread moved ${fmtLine(openHome)} → ${fmtLine(curHome)}`,
+      text: underdogAbbrev
+        ? `Recent spread movement: ${underdogAbbrev} ${openText} → ${curText}`
+        : `Recent spread movement: ${fmtLine(openHome)} → ${fmtLine(curHome)}`,
       priority: 92,
     });
     if (direction) out.push({ text: direction, priority: 91 });
     if (alignedNow && absDelta >= 1.0) {
-      out.push({ text: `Earlier number ${openText} no longer available`, priority: 89 });
+      out.push({ text: `Earlier number ${openText} no longer widely available`, priority: 89 });
     }
   }
 

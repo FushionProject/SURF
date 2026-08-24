@@ -1,4 +1,5 @@
 import type { OddsApiGame, SurfMarketType } from "@/lib/surf/types";
+import { isValidMLBRunLine } from "@/lib/surf/mlbRunLine";
 
 export type MarketContext = {
   market: SurfMarketType;
@@ -58,6 +59,12 @@ function median(values: number[]): number | undefined {
   return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
 }
 
+function isValidAmericanOdds(value: unknown): value is number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  if (value === 0) return false;
+  return true;
+}
+
 function range(values: number[]): number {
   if (values.length === 0) return 0;
   return Math.max(...values) - Math.min(...values);
@@ -65,15 +72,16 @@ function range(values: number[]): number {
 
 function readSpreadHomePoint(game: OddsApiGame): number[] {
   const points: number[] = [];
+  const isMlb = game.sport_key === "baseball_mlb";
 
   for (const book of game.bookmakers ?? []) {
     for (const m of book.markets ?? []) {
       if (m.key !== "spreads") continue;
       for (const o of m.outcomes ?? []) {
         if (o.name !== game.home_team) continue;
-        if (typeof o.point === "number" && Number.isFinite(o.point)) {
-          points.push(o.point);
-        }
+        if (typeof o.point !== "number" || !Number.isFinite(o.point)) continue;
+        if (isMlb && !isValidMLBRunLine(o.point)) continue;
+        points.push(o.point);
       }
     }
   }
@@ -210,9 +218,27 @@ export function recentConsensusMovement(opts: {
   return { recentDelta, minutes };
 }
 
-function updateMarketContext(key: string, market: SurfMarketType, points: number[], now: number): MarketContext {
+function updateMarketContext(
+  key: string,
+  market: SurfMarketType,
+  points: number[],
+  now: number,
+  validateStoredLine?: (value: number) => boolean
+): MarketContext {
   const storeId = storeKey(key, market);
   const prev = store.get(storeId);
+
+  const prevOpen =
+    prev?.openLine != null && typeof prev.openLine === "number" && Number.isFinite(prev.openLine)
+      ? prev.openLine
+      : undefined;
+  const prevCur =
+    prev?.currentLine != null && typeof prev.currentLine === "number" && Number.isFinite(prev.currentLine)
+      ? prev.currentLine
+      : undefined;
+
+  const prevOpenOk = prevOpen != null && (validateStoredLine ? validateStoredLine(prevOpen) : true);
+  const prevCurOk = prevCur != null && (validateStoredLine ? validateStoredLine(prevCur) : true);
 
   const snapped = points.map((p) => roundToHalf(p));
   const current = consensusLine(snapped);
@@ -222,14 +248,14 @@ function updateMarketContext(key: string, market: SurfMarketType, points: number
 
   const next: MarketContext = {
     market,
-    openLine: prev?.openLine,
+    openLine: prevOpenOk ? prevOpen : undefined,
     currentLine: current,
     range: r,
     booksInSample,
     firstSeenAt: prev?.firstSeenAt ?? now,
     lastSeenAt: now,
-    lastChangedAt: prev?.lastChangedAt,
-    changeCount: prev?.changeCount ?? 0,
+    lastChangedAt: prevCurOk ? prev?.lastChangedAt : undefined,
+    changeCount: prevCurOk ? (prev?.changeCount ?? 0) : 0,
     observedCount: (prev?.observedCount ?? 0) + 1,
   };
 
@@ -241,8 +267,8 @@ function updateMarketContext(key: string, market: SurfMarketType, points: number
     pushHistoryPoint(storeId, now, current);
   }
 
-  if (prev?.currentLine != null && current != null) {
-    const changed = Math.abs(roundToHalf(current) - roundToHalf(prev.currentLine)) >= HALF;
+  if (prevCurOk && prevCur != null && current != null) {
+    const changed = Math.abs(roundToHalf(current) - roundToHalf(prevCur)) >= HALF;
     if (changed) {
       next.lastChangedAt = now;
       next.changeCount = (prev?.changeCount ?? 0) + 1;
@@ -266,8 +292,117 @@ export function computeGameMarketContext(games: OddsApiGame[]): Record<string, G
     const spreadsPoints = readSpreadHomePoint(g);
     const totalsPoints = readTotalPoints(g);
 
-    const spreads = spreadsPoints.length > 0 ? updateMarketContext(key, "spreads", spreadsPoints, now) : undefined;
+    const isMlb = g.sport_key === "baseball_mlb";
+
+    const spreads =
+      spreadsPoints.length > 0
+        ? updateMarketContext(key, "spreads", spreadsPoints, now, isMlb ? isValidMLBRunLine : undefined)
+        : undefined;
     const totals = totalsPoints.length > 0 ? updateMarketContext(key, "totals", totalsPoints, now) : undefined;
+
+    out[g.id] = { spreads, totals };
+  }
+
+  return out;
+}
+
+export function computeGameMedianPriceSnapshot(
+  games: OddsApiGame[],
+  medianLines?: Record<string, { spreads?: number; totals?: number }>
+): Record<string, { spreads?: { home?: number; away?: number }; totals?: { over?: number; under?: number } }> {
+  const out: Record<string, { spreads?: { home?: number; away?: number }; totals?: { over?: number; under?: number } }> = {};
+
+  const lines = medianLines ?? computeGameMedianSnapshot(games);
+
+  for (const g of games) {
+    const targetTotals = lines[g.id]?.totals;
+    const targetSpreadsHome = lines[g.id]?.spreads;
+
+    const isMlb = g.sport_key === "baseball_mlb";
+    const spreadsOk = !isMlb || (typeof targetSpreadsHome === "number" && isValidMLBRunLine(targetSpreadsHome));
+
+    const totalsOverPrices: number[] = [];
+    const totalsUnderPrices: number[] = [];
+    const spreadsHomePrices: number[] = [];
+    const spreadsAwayPrices: number[] = [];
+
+    const targetTotalsSnapped = typeof targetTotals === "number" && Number.isFinite(targetTotals) ? roundToHalf(targetTotals) : undefined;
+    const targetHomeSnapped =
+      typeof targetSpreadsHome === "number" && Number.isFinite(targetSpreadsHome) && spreadsOk ? roundToHalf(targetSpreadsHome) : undefined;
+    const targetAwaySnapped = targetHomeSnapped != null ? roundToHalf(-targetHomeSnapped) : undefined;
+
+    for (const book of g.bookmakers ?? []) {
+      for (const m of book.markets ?? []) {
+        if (m.key === "totals" && targetTotalsSnapped != null) {
+          for (const o of m.outcomes ?? []) {
+            if (!isValidAmericanOdds(o.price)) continue;
+            if (typeof o.point !== "number" || !Number.isFinite(o.point)) continue;
+            if (roundToHalf(o.point) !== targetTotalsSnapped) continue;
+            if (o.name === "Over") totalsOverPrices.push(o.price);
+            if (o.name === "Under") totalsUnderPrices.push(o.price);
+          }
+        }
+
+        if (m.key === "spreads" && targetHomeSnapped != null && targetAwaySnapped != null) {
+          for (const o of m.outcomes ?? []) {
+            if (!isValidAmericanOdds(o.price)) continue;
+            if (typeof o.point !== "number" || !Number.isFinite(o.point)) continue;
+            const p = roundToHalf(o.point);
+            if (o.name === g.home_team && p === targetHomeSnapped) spreadsHomePrices.push(o.price);
+            if (o.name === g.away_team && p === targetAwaySnapped) spreadsAwayPrices.push(o.price);
+          }
+        }
+      }
+    }
+
+    const medOrUndef = (vals: number[]): number | undefined => {
+      const m = median(vals);
+      return typeof m === "number" && Number.isFinite(m) ? Math.round(m) : undefined;
+    };
+
+    const totals =
+      totalsOverPrices.length > 0 || totalsUnderPrices.length > 0
+        ? { over: medOrUndef(totalsOverPrices), under: medOrUndef(totalsUnderPrices) }
+        : undefined;
+    const spreads =
+      spreadsHomePrices.length > 0 || spreadsAwayPrices.length > 0
+        ? { home: medOrUndef(spreadsHomePrices), away: medOrUndef(spreadsAwayPrices) }
+        : undefined;
+
+    out[g.id] = { totals, spreads };
+  }
+
+  return out;
+}
+
+export function computeGameMedianSnapshot(games: OddsApiGame[]): Record<string, { spreads?: number; totals?: number }> {
+  const out: Record<string, { spreads?: number; totals?: number }> = {};
+
+  for (const g of games) {
+    const spreadsPoints = readSpreadHomePoint(g).map((p) => roundToHalf(p));
+    const totalsPoints = readTotalPoints(g).map((p) => roundToHalf(p));
+
+    const spreadsMed = spreadsPoints.length > 0 ? median(spreadsPoints) : undefined;
+    const totalsMed = totalsPoints.length > 0 ? median(totalsPoints) : undefined;
+
+    const spreads = typeof spreadsMed === "number" && Number.isFinite(spreadsMed) ? roundToHalf(spreadsMed) : undefined;
+    const totals = typeof totalsMed === "number" && Number.isFinite(totalsMed) ? roundToHalf(totalsMed) : undefined;
+
+    out[g.id] = { spreads, totals };
+  }
+
+  return out;
+}
+
+export function computeGameConsensusSnapshot(games: OddsApiGame[]): Record<string, { spreads?: number; totals?: number }> {
+  const out: Record<string, { spreads?: number; totals?: number }> = {};
+
+  for (const g of games) {
+    const spreadsPoints = readSpreadHomePoint(g);
+    const totalsPoints = readTotalPoints(g);
+
+    const spreads = spreadsPoints.length > 0 ? consensusLine(spreadsPoints) : undefined;
+    const totals = totalsPoints.length > 0 ? consensusLine(totalsPoints) : undefined;
 
     out[g.id] = { spreads, totals };
   }

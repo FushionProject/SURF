@@ -1,0 +1,83 @@
+export const SURF_SPORT_KEYS = [
+  "americanfootball_nfl_preseason",
+  "americanfootball_nfl",
+  "basketball_nba",
+  "baseball_mlb",
+] as const;
+
+export type SurfSportKey = (typeof SURF_SPORT_KEYS)[number];
+export type SurfLeague = "NFL" | "NBA" | "MLB";
+export type SurfSportLabel = "NFL Preseason" | SurfLeague;
+
+export type SurfSportConfig = {
+  key: SurfSportKey;
+  league: SurfLeague;
+  label: SurfSportLabel;
+  selectorLabel: string;
+  seasonType: "preseason" | "regular";
+};
+
+export const DEFAULT_SURF_SPORT_KEY: SurfSportKey = "americanfootball_nfl_preseason";
+
+export const SURF_SPORTS: readonly SurfSportConfig[] = [
+  {
+    key: "americanfootball_nfl_preseason",
+    league: "NFL",
+    label: "NFL Preseason",
+    selectorLabel: "Preseason",
+    seasonType: "preseason",
+  },
+  {
+    key: "americanfootball_nfl",
+    league: "NFL",
+    label: "NFL",
+    selectorLabel: "NFL",
+    seasonType: "regular",
+  },
+  {
+    key: "basketball_nba",
+    league: "NBA",
+    label: "NBA",
+    selectorLabel: "NBA",
+    seasonType: "regular",
+  },
+  {
+    key: "baseball_mlb",
+    league: "MLB",
+    label: "MLB",
+    selectorLabel: "MLB",
+    seasonType: "regular",
+  },
+] as const;
+
+const SURF_SPORT_BY_KEY = new Map<SurfSportKey, SurfSportConfig>(
+  SURF_SPORTS.map((sport) => [sport.key, sport])
+);
+
+export function isSurfSportKey(value: unknown): value is SurfSportKey {
+  return typeof value === "string" && SURF_SPORT_BY_KEY.has(value as SurfSportKey);
+}
+
+export function getSurfSportConfig(sportKey: SurfSportKey): SurfSportConfig {
+  return SURF_SPORT_BY_KEY.get(sportKey) ?? SURF_SPORT_BY_KEY.get(DEFAULT_SURF_SPORT_KEY)!;
+}
+
+export function getSurfLeague(sportKey: string | undefined): SurfLeague {
+  return isSurfSportKey(sportKey) ? getSurfSportConfig(sportKey).league : "NFL";
+}
+
+export function isNflSport(sportKey: string | undefined): boolean {
+  return sportKey === "americanfootball_nfl" || sportKey === "americanfootball_nfl_preseason";
+}
+
+export function parseRequestedSport(value: string | null):
+  | { ok: true; sportKey: SurfSportKey; config: SurfSportConfig }
+  | { ok: false; value: string } {
+  if (value == null || value === "") {
+    const sportKey = DEFAULT_SURF_SPORT_KEY;
+    return { ok: true, sportKey, config: getSurfSportConfig(sportKey) };
+  }
+
+  if (!isSurfSportKey(value)) return { ok: false, value };
+  return { ok: true, sportKey: value, config: getSurfSportConfig(value) };
+}

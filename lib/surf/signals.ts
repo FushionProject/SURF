@@ -8,6 +8,9 @@ import type {
   SurfSignalDetection,
 } from "./types";
 
+import { isValidMLBRunLine } from "@/lib/surf/mlbRunLine";
+import { getAmericanOddsDelta, isValidAmericanOdds } from "@/lib/surf/oddsPrice";
+
 const SPREAD_DISAGREEMENT_THRESHOLD = 1.0;
 const TOTAL_DISAGREEMENT_THRESHOLD = 1.0;
 
@@ -22,6 +25,8 @@ const LINE_MOVEMENT_MIN_BASELINE_BOOKS = 2;
 const STALE_BOOK_THRESHOLD = 1.0;
 const STALE_BOOK_MAJORITY_FRACTION = 0.65;
 const STALE_BOOK_TIGHT_RANGE = 0.5;
+
+const MLB_RUN_LINE_PRICE_CONFLICT_THRESHOLD = 25;
 
 const SNAPSHOT_WINDOW_MS = 3 * 60 * 60 * 1000;
 const SNAPSHOT_LINE_MOVED_THRESHOLD = 0.5;
@@ -353,6 +358,7 @@ function explainSnapshotMovement(gameId: string, market: SurfMarketType, m: Surf
 export function debugSurfSignals(games: OddsApiGame[]): SurfDebugResult {
   const detections = [
     ...detectBookDisagreement(games),
+    ...detectRunLinePriceConflict(games, { debug: true }),
     ...detectBestNumberAvailable(games),
     ...detectLineMovement(games),
     ...detectStaleBook(games),
@@ -481,10 +487,13 @@ type SpreadSample = {
   bookTitle: string;
   homePoint: number;
   awayPoint: number;
+  homePrice?: number;
+  awayPrice?: number;
 };
 
 function collectSpreadSamples(game: OddsApiGame): SpreadSample[] {
   const books = game.bookmakers ?? [];
+  const isMlb = game.sport_key === "baseball_mlb";
 
   const samples: SpreadSample[] = [];
   for (const book of books) {
@@ -497,15 +506,138 @@ function collectSpreadSamples(game: OddsApiGame): SpreadSample[] {
     // If a book omits the point for a spread outcome, we can't use it.
     if (home?.point == null || away?.point == null) continue;
 
+    if (isMlb && (!isValidMLBRunLine(home.point) || !isValidMLBRunLine(away.point))) continue;
+
     samples.push({
       bookKey: book.key,
       bookTitle: book.title,
       homePoint: home.point,
       awayPoint: away.point,
+      homePrice: home.price,
+      awayPrice: away.price,
     });
   }
 
   return samples;
+}
+
+function bestAmericanPrice(samples: Array<{ price?: number; bookKey: string; bookTitle: string; point: number }>):
+  | { price: number; book: { key: string; title: string }; point: number }
+  | undefined {
+  const eligible = samples.filter((s) => isValidAmericanOdds(s.price));
+  if (eligible.length === 0) return undefined;
+  // For American odds, larger numeric value is always better for the bettor
+  // (+160 > +140, and -120 > -150).
+  const best = maxBy(eligible, (s) => s.price as number);
+  if (!best || !isValidAmericanOdds(best.price)) return undefined;
+  return {
+    price: Math.round(best.price),
+    point: best.point,
+    book: { key: best.bookKey, title: best.bookTitle },
+  };
+}
+
+export function detectRunLinePriceConflict(games: OddsApiGame[], opts?: { debug?: boolean }): SurfSignalDetection[] {
+  const detections: SurfSignalDetection[] = [];
+  const debug = opts?.debug === true;
+
+  for (const game of games) {
+    if (game.sport_key !== "baseball_mlb") continue;
+    const spreads = collectSpreadSamples(game);
+    if (spreads.length < 2) continue;
+
+    // We assume run line markets share the same absolute line across books (usually 1.5).
+    // The conflict we care about: for the SAME TEAM, some books list it at +abs and others at -abs,
+    // and the best available prices for each side are far apart.
+    const absLines = spreads
+      .map((s) => Math.abs(roundToHalf(s.homePoint)))
+      .filter((x) => Number.isFinite(x));
+    if (absLines.length === 0) continue;
+    const absLine = median(absLines);
+    if (absLine == null || !Number.isFinite(absLine) || absLine < 0.5) continue;
+
+    const candidates: SurfSignalDetection[] = [];
+
+    const evalTeam = (team: "home" | "away") => {
+      const teamName = team === "home" ? game.home_team : game.away_team;
+      const getPoint = (s: SpreadSample) => (team === "home" ? s.homePoint : s.awayPoint);
+      const getPrice = (s: SpreadSample) => (team === "home" ? s.homePrice : s.awayPrice);
+
+      const plus: Array<{ price?: number; bookKey: string; bookTitle: string; point: number }> = [];
+      const minus: Array<{ price?: number; bookKey: string; bookTitle: string; point: number }> = [];
+
+      for (const s of spreads) {
+        const p = getPoint(s);
+        if (!isValidMLBRunLine(p)) continue;
+        if (Math.abs(roundToHalf(p)) !== roundToHalf(absLine)) continue;
+        const rec = { price: getPrice(s), bookKey: s.bookKey, bookTitle: s.bookTitle, point: p };
+        if (p > 0) plus.push(rec);
+        if (p < 0) minus.push(rec);
+      }
+
+      const bestPlus = bestAmericanPrice(plus);
+      const bestMinus = bestAmericanPrice(minus);
+      const delta = getAmericanOddsDelta(bestMinus?.price, bestPlus?.price);
+      const absDelta = delta != null ? Math.abs(delta) : null;
+
+      if (!bestPlus || !bestMinus || absDelta == null) return;
+      if (absDelta < 15) return;
+      if (absDelta < MLB_RUN_LINE_PRICE_CONFLICT_THRESHOLD) return;
+
+      candidates.push({
+        type: "RUN_LINE_PRICE_CONFLICT",
+        gameId: game.id,
+        market: "spreads",
+        commenceTime: game.commence_time,
+        booksInSample: spreads.length,
+        range: absDelta,
+        selection: {
+          market: "spreads",
+          team: teamName,
+          point: bestMinus.point,
+        },
+        priceConflict: {
+          team: teamName,
+          absLine: roundToHalf(absLine),
+          plus: { point: bestPlus.point, price: bestPlus.price, book: bestPlus.book },
+          minus: { point: bestMinus.point, price: bestMinus.price, book: bestMinus.book },
+          delta: absDelta,
+        },
+      });
+    };
+
+    evalTeam("home");
+    evalTeam("away");
+
+    if (candidates.length === 0) continue;
+    const winner = maxBy(candidates, (d) => (typeof d.range === "number" && Number.isFinite(d.range) ? d.range : 0));
+    if (!winner) continue;
+
+    if (debug) {
+      console.log(
+        JSON.stringify(
+          {
+            mlbRunLinePriceConflictDedupedDebug: {
+              gameId: game.id,
+              matchup: `${game.away_team} @ ${game.home_team}`,
+              candidates: candidates.length,
+              winnerTeam: winner.priceConflict?.team,
+              winnerAbsLine: winner.priceConflict?.absLine,
+              winnerDelta: winner.priceConflict?.delta,
+              winnerPlusBook: winner.priceConflict?.plus?.book?.key,
+              winnerMinusBook: winner.priceConflict?.minus?.book?.key,
+            },
+          },
+          null,
+          2
+        )
+      );
+    }
+
+    detections.push(winner);
+  }
+
+  return detections;
 }
 
 function pickLineMovementFromBuckets<T>(
@@ -603,6 +735,8 @@ export function detectLineMovement(games: OddsApiGame[]): SurfSignalDetection[] 
   for (const game of games) {
     const spreads = collectSpreadSamples(game);
     const totals = collectTotalSamples(game);
+
+    const isMlb = game.sport_key === "baseball_mlb";
 
     // Spreads: proxy for movement is deviation from the median baseline across books.
     // We only evaluate one side (home) to keep comparisons consistent.
@@ -897,13 +1031,17 @@ export function detectBookDisagreement(games: OddsApiGame[]): SurfSignalDetectio
     const spreads = collectSpreadSamples(game);
     const totals = collectTotalSamples(game);
 
-    // Spreads: we only need to look at one side (home) because away is the mirror.
-    const homeSpreadPoints = spreads.map((s) => s.homePoint);
+    const isMlb = game.sport_key === "baseball_mlb";
+
+    // Spreads:
+    // NBA/etc: compare one side (home) because away is the mirror.
+    // MLB run line: only treat as a true mismatch if ABS(run line) differs across books.
+    const homeSpreadPoints = isMlb ? spreads.map((s) => Math.abs(s.homePoint)) : spreads.map((s) => s.homePoint);
     if (homeSpreadPoints.length >= 2) {
       const low = Math.min(...homeSpreadPoints);
       const high = Math.max(...homeSpreadPoints);
-      const lowSample = minBy(spreads, (s) => s.homePoint);
-      const highSample = maxBy(spreads, (s) => s.homePoint);
+      const lowSample = isMlb ? minBy(spreads, (s) => Math.abs(s.homePoint)) : minBy(spreads, (s) => s.homePoint);
+      const highSample = isMlb ? maxBy(spreads, (s) => Math.abs(s.homePoint)) : maxBy(spreads, (s) => s.homePoint);
       const spreadRange = range(homeSpreadPoints);
       if (spreadRange >= SPREAD_DISAGREEMENT_THRESHOLD) {
         detections.push({
@@ -1080,11 +1218,12 @@ export function detectBestNumberAvailable(games: OddsApiGame[]): SurfSignalDetec
   return detections;
 }
 
-export function detectSurfSignals(games: OddsApiGame[]): SurfSignalDetection[] {
+export function detectSurfSignals(games: OddsApiGame[], opts?: { debug?: boolean }): SurfSignalDetection[] {
   const disagreement = detectBookDisagreement(games);
+  const runLinePriceConflict = detectRunLinePriceConflict(games, { debug: opts?.debug === true });
   const bestNumber = detectBestNumberAvailable(games);
 
-  const disagreementKeys = new Set(disagreement.map((d) => `${d.gameId}:${d.market}`));
+  const disagreementKeys = new Set([...disagreement, ...runLinePriceConflict].map((d) => `${d.gameId}:${d.market}`));
   const lineMovement = detectLineMovement(games).filter((d) => !disagreementKeys.has(`${d.gameId}:${d.market}`));
 
   const staleBook = detectStaleBook(games);
@@ -1099,16 +1238,18 @@ export function detectSurfSignals(games: OddsApiGame[]): SurfSignalDetection[] {
   const preferredByKey = new Map<string, SurfSignalDetection>();
 
   const priority = (t: SurfSignalDetection["type"]) => {
-    if (t === "STALE_BOOK") return 3;
-    if (t === "BOOK_DISAGREEMENT") return 2;
+    if (t === "BOOK_DISAGREEMENT") return 4;
+    if (t === "RUN_LINE_PRICE_CONFLICT") return 3;
+    if (t === "STALE_BOOK") return 2;
     if (t === "BEST_NUMBER_AVAILABLE") return 1;
     return 0;
   };
 
-  for (const d of [...staleBook, ...disagreement, ...bestNumber]) {
+  for (const d of [...disagreement, ...runLinePriceConflict, ...staleBook, ...bestNumber]) {
     if (
       d.type !== "STALE_BOOK" &&
       d.type !== "BOOK_DISAGREEMENT" &&
+      d.type !== "RUN_LINE_PRICE_CONFLICT" &&
       d.type !== "BEST_NUMBER_AVAILABLE"
     ) {
       continue;
@@ -1121,10 +1262,11 @@ export function detectSurfSignals(games: OddsApiGame[]): SurfSignalDetection[] {
   }
 
   const filteredDisagreement = disagreement.filter((d) => preferredByKey.get(`${d.gameId}:${d.market}`)?.type === d.type);
+  const filteredRunLinePriceConflict = runLinePriceConflict.filter((d) => preferredByKey.get(`${d.gameId}:${d.market}`)?.type === d.type);
   const filteredBestNumber = bestNumber.filter((d) => preferredByKey.get(`${d.gameId}:${d.market}`)?.type === d.type);
   const filteredStaleBook = staleBook.filter((d) => preferredByKey.get(`${d.gameId}:${d.market}`)?.type === d.type);
 
   // Note: any game+market without one of the trio simply won't be present in preferredByKey.
   // Other signal types remain unchanged.
-  return [...filteredDisagreement, ...filteredBestNumber, ...lineMovement, ...filteredStaleBook, ...snapshotMovement];
+  return [...filteredDisagreement, ...filteredRunLinePriceConflict, ...filteredBestNumber, ...lineMovement, ...filteredStaleBook, ...snapshotMovement];
 }

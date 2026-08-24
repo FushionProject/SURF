@@ -1,4 +1,16 @@
 import type { OddsApiGame, SignalCard, SignalCardSource, SurfSignalDetection } from "./types";
+import { getMovementSourcesLabel, getMovementTitle } from "./movementCopy";
+import {
+  DEFAULT_SURF_SPORT_KEY,
+  getSurfSportConfig,
+  isSurfSportKey,
+} from "./sports";
+
+function formatAmericanOdds(value: number): string {
+  const v = Math.round(value);
+  if (!Number.isFinite(v) || v === 0) return "";
+  return v > 0 ? `+${v}` : `${v}`;
+}
 
 const MAX_SIGNALS_PER_GAME = 3;
 const MAX_TOTAL_SIGNALS = 12;
@@ -69,8 +81,16 @@ function importanceScore(d: SurfSignalDetection): number {
 }
 
 export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): SignalCard {
+  const sportKey = isSurfSportKey(game.sport_key) ? game.sport_key : DEFAULT_SURF_SPORT_KEY;
+  const sport = getSurfSportConfig(sportKey);
+  const league = sport.league;
   if (d.type === "BOOK_DISAGREEMENT") {
-    const title = d.market === "spreads" ? "Spread gap across books" : "Total gap across books";
+    const title =
+      d.market === "spreads"
+        ? league === "MLB"
+          ? "Run line mismatch"
+          : "Spread gap across books"
+        : "Total gap across books";
 
     const detail =
       d.lowPoint != null && d.highPoint != null
@@ -79,7 +99,9 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
 
     const insight =
       d.market === "spreads"
-        ? "A wide split usually means uncertainty or fast action."
+        ? league === "MLB"
+          ? "Books aren’t aligned on the run line number."
+          : "A wide split usually means uncertainty or fast action."
         : "A wide split usually means uncertainty or a moving total.";
 
     const sources = buildSources([
@@ -95,7 +117,9 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
       id: signalId(d),
       game: {
         id: game.id,
-        league: "NBA",
+        league,
+        sportKey,
+        sportLabel: sport.label,
         homeTeam: game.home_team,
         awayTeam: game.away_team,
       },
@@ -110,47 +134,85 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
     };
   }
 
-  if (d.type === "SNAPSHOT_MOVEMENT") {
-    const baseline = d.baselinePoint;
-    const moved = d.movedPoint ?? d.selection?.point;
-
-    const label =
-      d.market === "spreads"
-        ? `${d.selection?.team ?? game.home_team} spread:`
-        : "Total:";
+  if (d.type === "RUN_LINE_PRICE_CONFLICT") {
+    const pc = d.priceConflict;
+    const absLine = pc?.absLine;
+    const plus = pc?.plus;
+    const minus = pc?.minus;
 
     const detail =
-      baseline != null && moved != null
-        ? `${label} ${formatNumber(baseline)} → ${formatNumber(moved)}`
-        : moved != null
-          ? `${label} ${formatNumber(moved)}`
-          : "—";
+      plus && minus
+        ? `${formatNumber(plus.point)} (${formatAmericanOdds(plus.price)}) vs ${formatNumber(minus.point)} (${formatAmericanOdds(minus.price)})`
+        : "—";
 
-    const trending = baseline != null && moved != null ? moved - baseline : 0;
-    const insight =
-      d.market === "totals"
-        ? trending > 0
-          ? "Market trending higher."
-          : trending < 0
-            ? "Market trending lower."
-            : "Market is moving."
-        : trending > 0
-          ? "Market is moving toward the home side."
-          : trending < 0
-            ? "Market is moving away from the home side."
-            : "Market is moving.";
-
-    const title = d.movementSeverity === "SHARP_MOVEMENT" ? "Sharp movement" : "Line moved";
     const sources = buildSources([
-      baseline != null ? { label: "Open", book: "Market", value: `${formatNumber(baseline)}` } : undefined,
-      moved != null ? { label: "Now", book: "Market", value: `${formatNumber(moved)}` } : undefined,
+      plus ? { label: `${formatNumber(plus.point)}`, book: plus.book.title, value: `${formatAmericanOdds(plus.price)}` } : undefined,
+      minus ? { label: `${formatNumber(minus.point)}`, book: minus.book.title, value: `${formatAmericanOdds(minus.price)}` } : undefined,
     ]);
 
     return {
       id: signalId(d),
       game: {
         id: game.id,
-        league: "NBA",
+        league,
+        sportKey,
+        sportLabel: sport.label,
+        homeTeam: game.home_team,
+        awayTeam: game.away_team,
+      },
+      signalType: "Run Line Price Conflict",
+      market: "spreads",
+      title: "Run line price conflict",
+      detail,
+      insight: "Pricing inefficiency: same run line, meaningfully different prices across books.",
+      sources,
+      commenceTime: d.commenceTime,
+      gap: pc?.delta,
+    };
+  }
+
+  if (d.type === "SNAPSHOT_MOVEMENT") {
+    const baseline = d.baselinePoint;
+    const moved = d.movedPoint ?? d.selection?.point;
+
+    const label = d.market === "spreads" ? `${d.selection?.team ?? game.home_team} spread:` : "Total:";
+
+    const detail =
+      baseline != null && moved != null
+        ? `Recent tracked movement: ${label} ${formatNumber(baseline)} → ${formatNumber(moved)}`
+        : moved != null
+          ? `Recent tracked movement: ${label} ${formatNumber(moved)}`
+          : "—";
+
+    const trending = baseline != null && moved != null ? moved - baseline : 0;
+    const insight =
+      d.market === "totals"
+        ? trending > 0
+          ? "Tracked movement suggests books have been adjusting higher."
+          : trending < 0
+            ? "Tracked movement suggests books have been adjusting lower."
+            : "Recent movement suggests the market is still adjusting."
+        : trending > 0
+          ? "Tracked movement suggests books have been adjusting toward the home side."
+          : trending < 0
+            ? "Tracked movement suggests books have been adjusting away from the home side."
+            : "Recent movement suggests the market is still adjusting.";
+
+    const title = getMovementTitle({ movementAbs: safeAbsDiff(baseline, moved) });
+
+    const labels = getMovementSourcesLabel({ confidence: "tracked" });
+    const sources = buildSources([
+      baseline != null ? { label: labels.start, book: "Market", value: `${formatNumber(baseline)}` } : undefined,
+      moved != null ? { label: labels.now, book: "Market", value: `${formatNumber(moved)}` } : undefined,
+    ]);
+
+    return {
+      id: signalId(d),
+      game: {
+        id: game.id,
+        league,
+        sportKey,
+        sportLabel: sport.label,
         homeTeam: game.home_team,
         awayTeam: game.away_team,
       },
@@ -192,7 +254,9 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
       id: signalId(d),
       game: {
         id: game.id,
-        league: "NBA",
+        league,
+        sportKey,
+        sportLabel: sport.label,
         homeTeam: game.home_team,
         awayTeam: game.away_team,
       },
@@ -218,31 +282,36 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
 
     const detail =
       baseline != null && moved != null
-        ? `${label} ${formatNumber(baseline)} → ${formatNumber(moved)}`
+        ? `Recent tracked movement: ${label} ${formatNumber(baseline)} → ${formatNumber(moved)}`
         : moved != null
-          ? `${label} ${formatNumber(moved)}`
+          ? `Recent tracked movement: ${label} ${formatNumber(moved)}`
           : "—";
 
-    const insight = "This game is seeing strong movement across books.";
+    const insight = "Tracked movement suggests books are still adjusting.";
 
+    const labels = getMovementSourcesLabel({ confidence: "tracked" });
     const sources = buildSources([
+      baseline != null ? { label: labels.start, book: "Market", value: `${formatNumber(baseline)}` } : undefined,
       d.movedBook && moved != null
-        ? { label: "Now", book: d.movedBook.title, value: `${formatNumber(moved)}` }
-        : undefined,
-      baseline != null ? { label: "Open", book: "Market", value: `${formatNumber(baseline)}` } : undefined,
+        ? { label: labels.now, book: d.movedBook.title, value: `${formatNumber(moved)}` }
+        : moved != null
+          ? { label: labels.now, book: "Market", value: `${formatNumber(moved)}` }
+          : undefined,
     ]);
 
     return {
       id: signalId(d),
       game: {
         id: game.id,
-        league: "NBA",
+        league,
+        sportKey,
+        sportLabel: sport.label,
         homeTeam: game.home_team,
         awayTeam: game.away_team,
       },
       signalType: "Line Movement",
       market: d.market,
-      title: "Line moved",
+      title: getMovementTitle({ movementAbs: safeAbsDiff(baseline, moved) }),
       detail,
       insight,
       sources,
@@ -290,7 +359,9 @@ export function formatSignalCard(d: SurfSignalDetection, game: OddsApiGame): Sig
     id: signalId(d),
     game: {
       id: game.id,
-      league: "NBA",
+      league,
+      sportKey,
+      sportLabel: sport.label,
       homeTeam: game.home_team,
       awayTeam: game.away_team,
     },
