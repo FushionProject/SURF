@@ -132,6 +132,51 @@ export type SignalCardValueOption = {
   price?: string;
 };
 
+export type TrackedBookLineMove = {
+  bookKey: string;
+  bookTitle: string;
+  fromPoint: number;
+  toPoint: number;
+  delta: number;
+  previousObservedAt: number;
+  observedAt: number;
+  providerUpdatedAt?: number;
+};
+
+export type MarketTapeEvent = {
+  id: string;
+  game: {
+    id: string;
+    sportKey: SurfSportKey;
+    sportLabel: SurfSportLabel;
+    league: SurfLeague;
+    homeTeam: string;
+    awayTeam: string;
+    commenceTime: string;
+  };
+  market: SurfMarketType;
+  selectionName: string;
+  direction: "up" | "down";
+  startedAt: number;
+  lastMovedAt: number;
+  startConsensus?: number;
+  currentConsensus?: number;
+  currentRange: number;
+  booksInSample: number;
+  movedBooks: TrackedBookLineMove[];
+  heldBooks: string[];
+  confidence: "tracked" | "confirmed";
+  snapshotsCompared: number;
+  overnightWindowKey?: string;
+};
+
+export type TrackedMarketEvidence = {
+  confidence: MarketTapeEvent["confidence"];
+  movedBooks: TrackedBookLineMove[];
+  heldBooks: string[];
+  snapshotsCompared: number;
+};
+
 export type SignalCard = {
   id: string;
   game: {
@@ -165,6 +210,7 @@ export type SignalCard = {
   isTopSignal?: boolean;
   topBadge?: string;
   topReason?: "gap" | "movement" | "disagreement";
+  trackedMarket?: TrackedMarketEvidence;
 };
 
 export type OvernightMarketMove = {
@@ -186,6 +232,9 @@ export type OvernightMarketMove = {
   observedFrom: number;
   lastMovedAt: number;
   observations: number;
+  bookMoves: TrackedBookLineMove[];
+  heldBooks: string[];
+  confidence: MarketTapeEvent["confidence"];
 };
 
 export type OvernightMarketSummary = {

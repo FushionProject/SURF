@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import type { OddsApiGame } from "@/lib/surf/types";
+import type { MarketTapeEvent, OddsApiGame } from "@/lib/surf/types";
 import type { SignalCard } from "@/lib/surf/types";
 import type { SurfSignalDetection } from "@/lib/surf/types";
 import { formatSignalCards } from "@/lib/surf/format";
@@ -22,11 +22,10 @@ import {
 } from "@/lib/surf/signalCopy";
 import { getMLBSignalStrengthFromDetections } from "@/lib/surf/mlbSignalStrength";
 import { getDemoSurfFeed, isSurfDemoMode } from "@/lib/surf/demoData";
-import { getOvernightMarketSummary, recordOvernightMarkets } from "@/lib/surf/overnightMarket";
+import { getOvernightMarketSummary } from "@/lib/surf/overnightMarket";
+import { getMarketTapeEvents, recordMarketTapeSnapshot } from "@/lib/surf/marketTape";
+import { isOvernightCapture, overnightWindowKey } from "@/lib/surf/feedSchedule";
 import {
-  DEFAULT_SURF_SPORT_KEY,
-  getSurfSportConfig,
-  isSurfSportKey,
   isNflSport,
   parseRequestedSport,
   SURF_SPORT_KEYS,
@@ -46,8 +45,6 @@ const CORE_BOOKMAKER_KEYS = new Set([
   "fanatics",
   "betrivers",
 ]);
-
-const TOP_SIGNAL_THRESHOLD = 1.5;
 
 type SignalLifecycleEntry = {
   signature: string;
@@ -71,6 +68,7 @@ function signalSignature(signal: SignalCard): string {
     detail: signal.detail,
     sources: signal.sources,
     valueOptions: signal.valueOptions,
+    trackedMarket: signal.trackedMarket,
   });
 }
 
@@ -86,8 +84,8 @@ function addSignalLifecycle(signals: SignalCard[], now: number): SignalCard[] {
     const changed = Boolean(previous && previous.signature !== signature);
     const entry: SignalLifecycleEntry = {
       signature,
-      detectedAt: previous?.detectedAt ?? now,
-      signalChangedAt: changed ? now : (previous?.signalChangedAt ?? now),
+      detectedAt: previous?.detectedAt ?? signal.detectedAt ?? now,
+      signalChangedAt: changed ? now : (previous?.signalChangedAt ?? signal.signalChangedAt ?? now),
       lastSeenAt: now,
     };
     SIGNAL_LIFECYCLE_STORE.set(signal.id, entry);
@@ -171,67 +169,75 @@ function collapseMLBSignalsByGame(signals: SignalCard[], debug?: boolean): Signa
   });
 }
 
-function roundToHalf(value: number): number {
-  return Math.round(value * 2) / 2;
-}
-
 function parseMode(value: string | null): NbaRefreshMode {
   if (value === "fixed15") return "fixed15";
   if (value === "manual") return "manual";
   return "dynamic";
 }
 
-function formatNumber(value: number): string {
-  const v = roundToHalf(value);
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v}`;
+function formatTapePoint(value: number, market: MarketTapeEvent["market"]): string {
+  if (market === "totals") return `${value}`;
+  return value > 0 ? `+${value}` : `${value}`;
 }
 
-function asStrongContextMovementCards(games: OddsApiGame[]): SignalCard[] {
-  const ctx = computeGameMarketContext(games);
-  const out: SignalCard[] = [];
+function feedSnapshotDetections(detections: SurfSignalDetection[]): SurfSignalDetection[] {
+  return detections.filter((detection) => {
+    if (detection.type === "RUN_LINE_PRICE_CONFLICT") return detection.booksInSample >= 2;
+    return detection.type === "BOOK_DISAGREEMENT" && detection.booksInSample >= 4 && detection.range >= 1;
+  });
+}
 
-  for (const g of games) {
-    const gc = ctx[g.id];
-    const pick =
-      (gc?.totals && typeof gc.totals.delta === "number" ? { market: "totals" as const, c: gc.totals } : undefined) ??
-      (gc?.spreads && typeof gc.spreads.delta === "number" ? { market: "spreads" as const, c: gc.spreads } : undefined);
+function marketTapeCards(events: MarketTapeEvent[], now: number): SignalCard[] {
+  return events.map((event) => {
+    const moved = event.movedBooks[0]!;
+    const marketLabel = event.market === "totals" ? "total" : "spread";
+    const direction = event.direction === "up" ? "higher" : "lower";
+    const actor = event.movedBooks.length >= 2 ? `${event.movedBooks.length} books` : moved.bookTitle;
+    const heldCopy = event.heldBooks.length > 0
+      ? `${event.heldBooks.slice(0, 2).join(" and ")} did not make the same move during this window.`
+      : "Every tracked book in the current sample participated in the move.";
+    const lineMovement = Math.max(...event.movedBooks.map((book) => Math.abs(book.delta)));
 
-    if (!pick) continue;
-    const open = pick.c.openLine;
-    const current = pick.c.currentLine;
-    if (typeof open !== "number" || !Number.isFinite(open)) continue;
-    if (typeof current !== "number" || !Number.isFinite(current)) continue;
-
-    const lineMovement = Math.abs(current - open);
-    if (!Number.isFinite(lineMovement) || lineMovement < TOP_SIGNAL_THRESHOLD) continue;
-
-    const label = pick.market === "totals" ? "Total:" : "Spread:";
-    const detail = `${label} ${formatNumber(open)} → ${formatNumber(current)}`;
-    const sportKey = isSurfSportKey(g.sport_key) ? g.sport_key : DEFAULT_SURF_SPORT_KEY;
-    const sport = getSurfSportConfig(sportKey);
-
-    out.push({
-      id: `CTX_MOVEMENT:${g.id}:${pick.market}`,
+    return {
+      id: event.id,
       game: {
-        id: g.id,
-        league: sport.league,
-        sportKey,
-        sportLabel: sport.label,
-        homeTeam: g.home_team,
-        awayTeam: g.away_team,
+        id: event.game.id,
+        league: event.game.league,
+        sportKey: event.game.sportKey,
+        sportLabel: event.game.sportLabel,
+        homeTeam: event.game.homeTeam,
+        awayTeam: event.game.awayTeam,
       },
       signalType: "Market Movement",
-      market: pick.market,
-      title: "Market moved",
-      detail,
-      insight: "Tracked move from open to current consensus.",
-      commenceTime: g.commence_time,
+      market: event.market,
+      title: `${actor} moved the ${marketLabel} ${direction}`,
+      detail: `${formatTapePoint(moved.fromPoint, event.market)} → ${formatTapePoint(moved.toPoint, event.market)}`,
+      insight: heldCopy,
+      sources: event.movedBooks.slice(0, 2).map((book) => ({
+        label: "Tracked move",
+        book: book.bookTitle,
+        value: `${formatTapePoint(book.fromPoint, event.market)} → ${formatTapePoint(book.toPoint, event.market)}`,
+      })),
+      commenceTime: event.game.commenceTime,
       lineMovement,
-    });
-  }
-
-  return out;
+      recentMovementAbs: lineMovement,
+      recentMovementMinutes: Math.max(1, Math.round((event.lastMovedAt - event.startedAt) / 60_000)),
+      lastMovedAt: event.lastMovedAt,
+      detectedAt: event.startedAt,
+      signalChangedAt: event.lastMovedAt,
+      lastSeenAt: now,
+      status: "active",
+      strengthScore: Math.min(100, Math.round((lineMovement / 2) * 100) + (event.confidence === "confirmed" ? 15 : 0)),
+      isTopSignal: event.confidence === "confirmed" || lineMovement >= 1.5,
+      topBadge: event.confidence === "confirmed" ? "CONFIRMED" : "TRACKED",
+      trackedMarket: {
+        confidence: event.confidence,
+        movedBooks: event.movedBooks,
+        heldBooks: event.heldBooks,
+        snapshotsCompared: event.snapshotsCompared,
+      },
+    };
+  });
 }
 
 function pickRecentWindowMinutes(): number {
@@ -509,8 +515,15 @@ async function getLiveSurfFeed(request: Request) {
     ...g,
     bookmakers: (g.bookmakers ?? []).filter((b) => CORE_BOOKMAKER_KEYS.has(normalizeBookmakerKey(b.key))),
   }));
-  recordOvernightMarkets(filteredGames, sportKey, now);
-  const overnight = getOvernightMarketSummary(sportKey, now);
+  const overnightCapture = isOvernightCapture(now);
+  const tapeRecord = recordMarketTapeSnapshot(filteredGames, sportKey, now, {
+    qualificationWindowMs: overnightCapture ? 3 * 60 * 60 * 1000 : 15 * 60 * 1000,
+    mergeWindowMs: overnightCapture ? 3 * 60 * 60 * 1000 : 20 * 60 * 1000,
+    overnightWindowKey: overnightCapture ? overnightWindowKey(now) : undefined,
+  });
+  const tapeEvents = getMarketTapeEvents(sportKey, now);
+  const tapeSignals = marketTapeCards(tapeEvents, now);
+  const overnight = getOvernightMarketSummary(tapeEvents, sportKey, now);
 
   if (isDebug) {
     const includedBooks = new Map<string, string>();
@@ -520,40 +533,11 @@ async function getLiveSurfFeed(request: Request) {
       }
     }
 
-    const { detections, debug } = debugSurfSignals(filteredGames);
+    const { detections: allDetections, debug } = debugSurfSignals(filteredGames);
+    const detections = feedSnapshotDetections(allDetections);
     const signals = formatSignalCards(detections, filteredGames);
-    const contextMoves = asStrongContextMovementCards(filteredGames);
-    const byId = new Set(signals.map((s) => s.id));
-    const mergedSignals = [
-      ...signals,
-      ...contextMoves.filter((s) => !byId.has(s.id)),
-    ];
-    let loggedMovement = false;
-    const taggedSignalsRaw = collapseMLBSignalsByGame(enrichSignals(mergedSignals, filteredGames, detections, true), true).map((s) => {
-      const isTopSignal = Boolean(s.isTopSignal);
-      if (!loggedMovement && (s.signalType === "Line Movement" || s.signalType === "Market Movement")) {
-        loggedMovement = true;
-        console.log(
-          JSON.stringify(
-            {
-              debugMovementSample: {
-                id: s.id,
-                signalType: s.signalType,
-                detail: s.detail,
-                gap: s.gap,
-                lineMovement: s.lineMovement,
-                recentMovementAbs: s.recentMovementAbs,
-                strengthScore: s.strengthScore,
-                isTopSignal,
-              },
-            },
-            null,
-            2
-          )
-        );
-      }
-      return { ...s, isTopSignal };
-    });
+    const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, true), true);
+    const taggedSignalsRaw = [...tapeSignals, ...currentSignals];
     const taggedSignals = addSignalLifecycle(taggedSignalsRaw, now);
     console.log(JSON.stringify({ surfDebug: debug }, null, 2));
     console.log(
@@ -578,6 +562,7 @@ async function getLiveSurfFeed(request: Request) {
           surfFeedRenderDebug: {
             filteredGames: filteredGames.length,
             sportKey,
+            tapeRecord,
             cardsByLeague: leagueCounts,
             renderedCards: taggedSignals.length,
           },
@@ -600,16 +585,10 @@ async function getLiveSurfFeed(request: Request) {
   }
 
   // Safety: some responses may omit bookmakers or certain markets.
-  const detections = detectSurfSignals(filteredGames, { debug: isDebug });
+  const detections = feedSnapshotDetections(detectSurfSignals(filteredGames, { debug: isDebug }));
   const signals = formatSignalCards(detections, filteredGames);
-  const contextMoves = asStrongContextMovementCards(filteredGames);
-  const byId = new Set(signals.map((s) => s.id));
-  const mergedSignals = [
-    ...signals,
-    ...contextMoves.filter((s) => !byId.has(s.id)),
-  ];
-  const taggedSignalsRaw = enrichSignals(mergedSignals, filteredGames, detections, isDebug);
-  const taggedSignals = addSignalLifecycle(collapseMLBSignalsByGame(taggedSignalsRaw, isDebug), now);
+  const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, isDebug), isDebug);
+  const taggedSignals = addSignalLifecycle([...tapeSignals, ...currentSignals], now);
   if (isDebug) {
     const leagueCounts = taggedSignals.reduce(
       (acc, s) => {

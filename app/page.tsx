@@ -149,7 +149,7 @@ export default function Home() {
         <div className="surf-shell mx-auto w-full max-w-md px-4 pb-24">
           <SurfAppHeader
             title="Market feed"
-            subtitle="The meaningful changes across books—translated into what they actually mean."
+            subtitle="Verified line moves and meaningful book splits, latest first."
             onRefresh={() => void load("refresh", sport)}
             isRefreshing={isRefreshing}
           />
@@ -204,10 +204,10 @@ export default function Home() {
           <div className="mb-3 flex items-center justify-between px-1">
             <div>
               <div className="text-xs font-semibold text-[color:var(--surf-ink-75)]">
-                {visibleSignals.length} meaningful {visibleSignals.length === 1 ? "change" : "changes"}
+                {visibleSignals.length} market {visibleSignals.length === 1 ? "event" : "events"}
               </div>
               <div className="mt-0.5 text-[10px] text-[color:var(--surf-ink-35)]">
-                Latest first · verified across major books
+                Tracked moves and current book splits
               </div>
             </div>
             {sinceLastVisit != null && sinceLastVisit > 0 ? (
@@ -230,7 +230,7 @@ export default function Home() {
             <div className="rounded-[22px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] p-6 text-center">
               <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">The market is quiet</div>
               <p className="mx-auto mt-2 max-w-xs text-xs leading-5 text-[color:var(--surf-ink-45)]">
-                No meaningful {sportLabel} changes were detected in this window. Games still shows the latest lines.
+                No qualified {sportLabel} market events were detected in this window. Games still shows the latest lines and summaries.
               </p>
             </div>
           ) : (

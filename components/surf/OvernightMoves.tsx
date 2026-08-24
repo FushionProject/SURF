@@ -11,11 +11,6 @@ function formatPoint(value: number, market: OvernightMarketMove["market"]): stri
   return value > 0 ? `+${value}` : `${value}`;
 }
 
-function formatMove(value: number): string {
-  const magnitude = Math.abs(value);
-  return `${magnitude} ${magnitude === 1 ? "point" : "points"}`;
-}
-
 function lastMoveTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString("en-US", {
     timeZone: SURF_TIME_ZONE,
@@ -25,11 +20,12 @@ function lastMoveTime(timestamp: number): string {
 }
 
 function moveExplanation(move: OvernightMarketMove): string {
-  if (Math.abs(move.netMovement) >= 1) {
-    const direction = move.netMovement > 0 ? "higher" : "lower";
-    return `Consensus finished ${formatMove(move.netMovement)} ${direction} than the overnight start.`;
+  const moved = move.bookMoves.slice(0, 2).map((book) => book.bookTitle).join(" and ");
+  const held = move.heldBooks.slice(0, 2).join(" and ");
+  if (move.confidence === "confirmed") {
+    return `${moved} made matching moves${held ? `; ${held} did not make the same move` : ""}.`;
   }
-  return `Consensus covered a ${formatMove(move.largestSwing)} range, then returned near its starting number.`;
+  return `Surf observed ${moved} at both numbers across separate snapshots${held ? `; ${held} did not match the move` : ""}.`;
 }
 
 export function OvernightMoves({ summary }: Props) {
@@ -45,7 +41,7 @@ export function OvernightMoves({ summary }: Props) {
           <div>
             <div className="text-sm font-semibold text-[color:var(--surf-ink-90)]">{title}</div>
             <div className="mt-1 text-[11px] text-[color:var(--surf-ink-45)]">
-              {summary.windowLabel} · Significant consensus changes only
+              {summary.windowLabel} · Verified book movement only
             </div>
           </div>
           <div className="rounded-full bg-[color:var(--surf-primary)]/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-primary)]">
@@ -58,7 +54,7 @@ export function OvernightMoves({ summary }: Props) {
         <div className="px-5 py-4">
           <div className="text-xs font-semibold text-[color:var(--surf-ink-70)]">No major overnight moves {summary.isActive ? "yet" : "detected"}</div>
           <p className="mt-1 text-[11px] leading-5 text-[color:var(--surf-ink-45)]">
-            Surf only adds a line here after consensus moves at least {summary.minimumMove} point.
+            A one-point book move qualifies on its own. A half-point move needs confirmation from another book.
           </p>
         </div>
       ) : (
@@ -66,6 +62,8 @@ export function OvernightMoves({ summary }: Props) {
           {summary.moves.map((move) => {
             const away = getTeamAbbrev(move.game.awayTeam) ?? move.game.awayTeam;
             const home = getTeamAbbrev(move.game.homeTeam) ?? move.game.homeTeam;
+            const primary = move.bookMoves.slice().sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+            if (!primary) return null;
             return (
               <div key={move.id} className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
@@ -74,14 +72,19 @@ export function OvernightMoves({ summary }: Props) {
                       {away} <span className="font-normal text-[color:var(--surf-ink-35)]">at</span> {home}
                     </div>
                     <div className="mt-1 text-[10px] text-[color:var(--surf-ink-40)]">
-                      {move.market === "spreads" ? `${move.selectionName} spread` : "Game total"} · Last changed {lastMoveTime(move.lastMovedAt)} CT
+                      {primary.bookTitle} · {move.market === "spreads" ? `${move.selectionName} spread` : "Game total"} · {lastMoveTime(move.lastMovedAt)} CT
                     </div>
                   </div>
                   <div className="shrink-0 text-right font-mono text-sm font-semibold text-[color:var(--surf-positive)]">
-                    {formatPoint(move.startPoint, move.market)} <span className="text-[color:var(--surf-ink-35)]">→</span> {formatPoint(move.currentPoint, move.market)}
+                    {formatPoint(primary.fromPoint, move.market)} <span className="text-[color:var(--surf-ink-35)]">→</span> {formatPoint(primary.toPoint, move.market)}
                   </div>
                 </div>
-                <p className="mt-2 text-[11px] leading-5 text-[color:var(--surf-ink-55)]">{moveExplanation(move)}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="rounded-full bg-[color:var(--surf-fill-05)] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-[color:var(--surf-ink-55)]">
+                    {move.confidence === "confirmed" ? "Confirmed" : "Tracked"}
+                  </span>
+                  <p className="text-[11px] leading-5 text-[color:var(--surf-ink-55)]">{moveExplanation(move)}</p>
+                </div>
               </div>
             );
           })}
