@@ -19,7 +19,12 @@ import {
   type OfferSlot,
 } from "@/lib/surf/opportunities";
 import { getSurfSportConfig, type SurfLeague, type SurfSportKey, type SurfSportLabel } from "@/lib/surf/sports";
-import type { OddsApiGame, SurfMarketType, SurfSignalDetection } from "@/lib/surf/types";
+import type {
+  GamePredictionMarketConsensus,
+  OddsApiGame,
+  SurfMarketType,
+  SurfSignalDetection,
+} from "@/lib/surf/types";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { getTeamLogo } from "@/lib/teamLogos";
 
@@ -39,6 +44,7 @@ type GamesResponse = {
   >;
   marketAverage: Record<string, GameMarketAverage>;
   injuries: NflInjuryFeed;
+  predictionMarketConsensus?: Record<string, GamePredictionMarketConsensus>;
   dataSource?: "demo" | "fallback";
   dataNotice?: string;
 };
@@ -124,6 +130,43 @@ function TeamIdentity({ name, league, side }: { name: string; league: SurfLeague
       </div>
       <div className="mt-0.5 font-mono text-[10px] font-semibold tracking-[0.12em] text-[color:var(--surf-ink-40)]">{abbrev}</div>
     </div>
+  );
+}
+
+function PredictionMarketConsensusStrip({
+  consensus,
+}: {
+  consensus: GamePredictionMarketConsensus | undefined;
+}) {
+  if (!consensus) return null;
+  const away = getTeamAbbrev(consensus.awayTeam) ?? consensus.awayTeam;
+  const home = getTeamAbbrev(consensus.homeTeam) ?? consensus.homeTeam;
+  const awayProbability = Math.round(consensus.awayProbability * 100);
+  const homeProbability = 100 - awayProbability;
+  const sourceLabel = consensus.sources.map((source) => source.label).join(" + ");
+
+  return (
+    <section className="mt-5 rounded-[16px] border border-[color:var(--surf-primary)]/15 bg-[rgba(var(--surf-primary-rgb),0.055)] px-3.5 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[color:var(--surf-primary)]">
+            Prediction market consensus
+          </div>
+          <div className="mt-0.5 text-[8px] text-[color:var(--surf-ink-30)]">Market-implied · not a forecast</div>
+        </div>
+        <div className="text-[8px] font-medium text-[color:var(--surf-ink-35)]">{sourceLabel}</div>
+      </div>
+      <div className="mt-2.5 grid grid-cols-2 divide-x divide-[color:var(--surf-line-08)] rounded-xl border border-[color:var(--surf-line-06)] bg-black/10">
+        <div className="flex items-center justify-between gap-2 px-3 py-2">
+          <span className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{away}</span>
+          <span className="font-mono text-sm font-semibold text-[color:var(--surf-ink-85)]">{awayProbability}%</span>
+        </div>
+        <div className="flex items-center justify-between gap-2 px-3 py-2">
+          <span className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{home}</span>
+          <span className="font-mono text-sm font-semibold text-[color:var(--surf-ink-85)]">{homeProbability}%</span>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -515,6 +558,8 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
           </div>
           <TeamIdentity name={game.home_team} league={config.league} side="home" />
         </div>
+
+        <PredictionMarketConsensusStrip consensus={data.predictionMarketConsensus?.[game.id]} />
 
         <section className="mt-5">
           <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">

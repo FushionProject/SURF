@@ -27,15 +27,33 @@ the server and must never use a `NEXT_PUBLIC_` prefix.
 - NFL regular season (the explicit default): The Odds API sport key
   `americanfootball_nfl`
 - NFL preseason: `americanfootball_nfl_preseason`
-- NBA: `basketball_nba`
 - MLB: `baseball_mlb`
 
-All four are explicit choices in the Main, Top, and Games views. An invalid sport
-query returns a 400 response; routes do not silently substitute NBA.
+NBA route support remains in the codebase, but it is hidden and blocked from
+provider polling for the launch. The visible product choices are NFL preseason,
+NFL, and MLB. An invalid sport query returns a 400 response; routes do not
+silently substitute another league.
 
-NFL injury context is reserved for API-Sports. Until `API_SPORTS_KEY` and an
-audited provider team-ID mapping are available, the UI shows an unavailable state
-and never invents injury records.
+NFL injury context comes from API-Sports and requires `API_SPORTS_KEY` plus the
+audited provider team-ID mapping. Missing or partial coverage is shown honestly;
+Surf never invents injury records.
+
+## Prediction markets
+
+Surf reads public Kalshi and Polymarket winner-market data. Games may show one
+compact market-implied consensus row, and Signals only surfaces qualified buys
+at or above the configured cash threshold. The default is `$50,000`.
+
+Kalshi public trades are anonymous, so Surf labels them as a large trade or
+buying burst. Polymarket public trades can be grouped by wallet. Neither is
+described as sharp money or a pick. Set `SURF_PREDICTION_MARKETS_ENABLED=false`
+for a full provider kill switch.
+
+Before a paid production launch, confirm commercial display and derived-data
+rights under the then-current terms for both providers. The current two-minute
+cache and in-memory deduplication are suitable for this horizon build; a
+multi-instance deployment should move event identity and lifecycle state to a
+shared durable store.
 
 ## SURF demo mode
 

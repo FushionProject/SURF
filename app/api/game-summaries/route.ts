@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import type { OddsApiGame, SurfSignalDetection } from "@/lib/surf/types";
+import type { GamePredictionMarketConsensus, OddsApiGame, SurfSignalDetection } from "@/lib/surf/types";
 import { detectSurfSignals } from "@/lib/surf/signals";
 import { getNbaOddsSnapshot } from "@/lib/surf/nbaOddsScheduler";
 import type { NbaRefreshMode } from "@/lib/surf/nbaOddsScheduler";
@@ -18,6 +18,7 @@ import { computeMarketAverage, updateGameHistory } from "@/lib/surf/marketAverag
 import { getDemoGameSummaries, isSurfDemoMode } from "@/lib/surf/demoData";
 import { getNflInjuryFeed, type NflInjuryFeed } from "@/lib/surf/injuries";
 import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
+import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
 import {
   isNflSport,
   parseRequestedSport,
@@ -124,6 +125,7 @@ export type GameSummariesResponse = {
   currentMedianPriceSnapshot: Record<string, { spreads?: { home?: number; away?: number }; totals?: { over?: number; under?: number } }>;
   coreBooksIncluded: Array<{ key: string; title: string }>;
   injuries: NflInjuryFeed;
+  predictionMarketConsensus: Record<string, GamePredictionMarketConsensus>;
 };
 
 type NbaHistoricalOpenEntry = {
@@ -669,7 +671,10 @@ async function getLiveGameSummaries(request: Request) {
     );
   }
 
-  const injuries = await getNflInjuryFeed(filteredGames, sportKey);
+  const [injuries, predictionMarketSnapshot] = await Promise.all([
+    getNflInjuryFeed(filteredGames, sportKey),
+    getPredictionMarketSnapshot(filteredGames, sportKey, now),
+  ]);
 
   const payload: GameSummariesResponse = {
     sportKey,
@@ -687,6 +692,7 @@ async function getLiveGameSummaries(request: Request) {
     currentMedianPriceSnapshot,
     coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
     injuries,
+    predictionMarketConsensus: predictionMarketSnapshot.consensusByGame,
   };
 
   if (isDebug) {
@@ -698,6 +704,8 @@ async function getLiveGameSummaries(request: Request) {
             payloadCount: payload.count,
             sportKey,
             injuryStatus: isNfl ? injuries.status : "not_applicable",
+            predictionMarketProviders: predictionMarketSnapshot.providers,
+            predictionMarketGames: Object.keys(predictionMarketSnapshot.consensusByGame).length,
           },
         },
         null,

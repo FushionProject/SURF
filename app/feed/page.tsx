@@ -37,6 +37,7 @@ async function fetchSurfFeed(sport: SurfSportKey): Promise<SurfFeedResponse> {
 }
 
 function signalEventTime(signal: SignalCard, fallback?: number | null): number {
+  if (signal.whaleActivity) return signal.whaleActivity.occurredAt;
   if (signal.opportunity && typeof signal.lastSeenAt === "number") return signal.lastSeenAt;
   if (
     (signal.signalType === "Line Movement" || signal.signalType === "Market Movement") &&
@@ -48,7 +49,7 @@ function signalEventTime(signal: SignalCard, fallback?: number | null): number {
 }
 
 function isVerifiedEvent(signal: SignalCard): boolean {
-  return Boolean(signal.opportunity || signal.marketHorizon || signal.trackedMarket);
+  return Boolean(signal.opportunity || signal.marketHorizon || signal.trackedMarket || signal.whaleActivity);
 }
 
 function signalChangeTime(signal: SignalCard): number {
@@ -161,7 +162,7 @@ export default function Home() {
         <div className="surf-shell mx-auto w-full max-w-md px-4 pb-24">
           <SurfAppHeader
             title="Signals"
-            subtitle="Only current advantages with an exact book, number, and market comparison."
+            subtitle="Only market activity and opportunities worth noticing."
             onRefresh={() => void load("refresh", sport)}
             isRefreshing={isRefreshing}
           />
@@ -196,10 +197,10 @@ export default function Home() {
           <div className="mb-3 flex items-center justify-between px-1">
             <div>
               <div className="text-xs font-semibold text-[color:var(--surf-ink-75)]">
-                {visibleSignals.length} current {visibleSignals.length === 1 ? "opportunity" : "opportunities"}
+                {visibleSignals.length} current {visibleSignals.length === 1 ? "signal" : "signals"}
               </div>
               <div className="mt-0.5 text-[10px] text-[color:var(--surf-ink-35)]">
-                Strictly qualified across the available books
+                Strictly qualified across sportsbooks and prediction markets
               </div>
             </div>
             {sinceLastVisit != null && sinceLastVisit > 0 ? (

@@ -48,6 +48,7 @@ export type SurfSignalTypeLabel =
   | "Consensus Shift"
   | "Key Number Cross"
   | "Market Resolution"
+  | "Whale Activity"
   | "Stale Book";
 
 export type SurfMarketType = "spreads" | "totals";
@@ -264,6 +265,43 @@ export type MarketOpportunityEvidence = {
   };
 };
 
+export type PredictionMarketVenue = "kalshi" | "polymarket";
+
+export type PredictionMarketConsensusSource = {
+  venue: PredictionMarketVenue;
+  label: "Kalshi" | "Polymarket";
+  awayProbability: number;
+  homeProbability: number;
+  observedAt: number;
+  volume24hUsd?: number;
+};
+
+export type GamePredictionMarketConsensus = {
+  gameId: string;
+  awayTeam: string;
+  homeTeam: string;
+  awayProbability: number;
+  homeProbability: number;
+  observedAt: number;
+  sources: PredictionMarketConsensusSource[];
+};
+
+export type WhaleActivityEvidence = {
+  venue: PredictionMarketVenue;
+  venueLabel: "Kalshi" | "Polymarket";
+  activityKind: "wallet_buy" | "large_trade" | "buying_burst";
+  outcomeTeam: string;
+  committedUsd: number;
+  contracts: number;
+  averagePrice: number;
+  tradeCount: number;
+  occurredAt: number;
+  priceImpactPercentagePoints?: number;
+  participantLabel?: string;
+  isAnonymous: boolean;
+  sourceUrl: string;
+};
+
 export type SignalCard = {
   id: string;
   game: {
@@ -300,6 +338,7 @@ export type SignalCard = {
   trackedMarket?: TrackedMarketEvidence;
   marketHorizon?: MarketHorizonEvidence;
   opportunity?: MarketOpportunityEvidence;
+  whaleActivity?: WhaleActivityEvidence;
 };
 
 export type OvernightHorizonSummary = {

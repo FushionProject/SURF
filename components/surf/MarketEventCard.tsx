@@ -12,6 +12,7 @@ type Props = {
 };
 
 function eventTime(card: SignalCard): number | undefined {
+  if (card.whaleActivity) return card.whaleActivity.occurredAt;
   if (card.opportunity && typeof card.lastSeenAt === "number") return card.lastSeenAt;
   if ((card.trackedMarket || card.marketHorizon) && typeof card.lastMovedAt === "number") return card.lastMovedAt;
   return card.signalChangedAt ?? card.detectedAt ?? card.lastSeenAt;
@@ -29,6 +30,7 @@ function relativeTime(timestamp: number | undefined, now: number): string {
 
 function timingLabel(card: SignalCard, now: number): string {
   const timestamp = eventTime(card);
+  if (card.whaleActivity) return `Filled ${relativeTime(timestamp, now).toLowerCase()}`;
   if (card.opportunity) return `Verified ${relativeTime(timestamp, now).toLowerCase()}`;
   if (card.marketHorizon) return `Changed ${relativeTime(timestamp, now).toLowerCase()}`;
   if (card.trackedMarket) return `Moved ${relativeTime(timestamp, now).toLowerCase()}`;
@@ -42,6 +44,7 @@ function gameTime(value: string): string {
 }
 
 function badge(card: SignalCard): string {
+  if (card.whaleActivity) return "Whale activity";
   if (card.opportunity?.isMiddle) return "Line middle";
   if (card.opportunity?.kind === "favorite_split") return "Favorite split";
   if (card.opportunity?.kind === "key_number") return `Key ${card.opportunity.keyNumber} value`;
@@ -168,7 +171,8 @@ export function MarketEventCard({ card, now }: Props) {
   const tracked = card.trackedMarket;
   const horizon = card.marketHorizon;
   const opportunity = card.opportunity;
-  const verified = Boolean(opportunity || tracked || horizon);
+  const whale = card.whaleActivity;
+  const verified = Boolean(opportunity || tracked || horizon || whale);
 
   return (
     <article className="rounded-[20px] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)] px-4 py-4 shadow-[var(--surf-card-shadow)]">
@@ -180,7 +184,7 @@ export function MarketEventCard({ card, now }: Props) {
         </div>
         <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-ink-40)]">
           <span className={`h-1.5 w-1.5 rounded-full ${verified ? "bg-[color:var(--surf-positive)]" : "bg-[color:var(--surf-neutral)]"}`} />
-          {opportunity ? "Live quote" : verified ? "Verified" : "Snapshot"}
+          {whale ? (whale.venue === "polymarket" ? "On-chain" : "Public trade") : opportunity ? "Live quote" : verified ? "Verified" : "Snapshot"}
         </div>
       </div>
 
@@ -202,10 +206,44 @@ export function MarketEventCard({ card, now }: Props) {
       </h2>
       <SignalStrength
         score={card.strengthScore}
-        measure={opportunity ? "opportunity value" : horizon ? "event relevance" : "market magnitude"}
+        measure={whale ? "activity size" : opportunity ? "opportunity value" : horizon ? "event relevance" : "market magnitude"}
       />
 
-      {opportunity ? (
+      {whale ? (
+        <div className="mt-3">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-[color:var(--surf-primary)]/15 bg-[rgba(var(--surf-primary-rgb),0.055)] px-3 py-2.5">
+            <div>
+              <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-ink-35)]">Execution</div>
+              <div className="mt-1 text-[10px] text-[color:var(--surf-ink-55)]">
+                {whale.venueLabel} · {whale.tradeCount} {whale.tradeCount === 1 ? "fill" : "fills"}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-sm font-semibold text-[color:var(--surf-positive)]">{Math.round(whale.averagePrice * 100)}¢</div>
+              <div className="mt-0.5 text-[8px] text-[color:var(--surf-ink-35)]">average entry</div>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3 text-[10px] leading-4 text-[color:var(--surf-ink-40)]">
+            <span>{whale.isAnonymous ? "Anonymous public flow" : `Wallet ${whale.participantLabel ?? "tracked"}`}</span>
+            {whale.priceImpactPercentagePoints != null ? (
+              <span className="shrink-0 font-mono text-[color:var(--surf-ink-55)]">
+                {whale.priceImpactPercentagePoints > 0 ? "+" : ""}{whale.priceImpactPercentagePoints.toFixed(1)} pts during fills
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-[color:var(--surf-line-06)] pt-3">
+            <span className="text-[9px] text-[color:var(--surf-ink-35)]">Large activity, not a prediction.</span>
+            <a
+              href={whale.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[9px] font-semibold text-[color:var(--surf-primary)] hover:underline"
+            >
+              View market
+            </a>
+          </div>
+        </div>
+      ) : opportunity ? (
         <div className="mt-3">
           <div className="border-l-2 border-[color:var(--surf-primary)] pl-3">
             <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-ink-35)]">Why it is worth a look</div>
