@@ -570,6 +570,13 @@ export default function GamesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const scheduledGameAt = useMemo(() => {
+    const now = Date.now();
+    const future = (data?.games ?? [])
+      .map((game) => new Date(game.commence_time).getTime())
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp >= now);
+    return future.length > 0 ? Math.min(...future) : undefined;
+  }, [data]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -606,7 +613,7 @@ export default function GamesPage() {
       timer = window.setTimeout(async () => {
         await load("refresh", sport);
         if (!cancelled) scheduleNext();
-      }, nextRefreshDelayMs(Date.now()));
+      }, nextRefreshDelayMs(Date.now(), scheduledGameAt));
     };
 
     scheduleNext();
@@ -614,7 +621,7 @@ export default function GamesPage() {
       cancelled = true;
       if (timer != null) window.clearTimeout(timer);
     };
-  }, [load, sport, sportSynced]);
+  }, [load, scheduledGameAt, sport, sportSynced]);
 
   const sportLabel = getSurfSportConfig(sport).label;
 

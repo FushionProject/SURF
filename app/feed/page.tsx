@@ -22,6 +22,7 @@ type SurfFeedResponse = {
   sportKey?: SurfSportKey;
   sportLabel?: SurfSportLabel;
   generatedAt?: number;
+  nextGameAt?: number;
   overnight?: OvernightMarketSummary;
   overnightHorizon?: OvernightHorizonSummary;
   dataSource?: "demo" | "fallback";
@@ -65,6 +66,14 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [lastVisitAt, setLastVisitAt] = useState<number | null>(null);
+  const scheduledGameAt = useMemo(() => {
+    if (data?.nextGameAt != null && Number.isFinite(data.nextGameAt)) return data.nextGameAt;
+    const now = Date.now();
+    const future = (data?.signals ?? [])
+      .map((signal) => new Date(signal.commenceTime).getTime())
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp >= now);
+    return future.length > 0 ? Math.min(...future) : undefined;
+  }, [data]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -80,7 +89,7 @@ export default function Home() {
       setError(null);
       setUpdatedAt(Date.now());
     } catch {
-      setError("Surf could not reach the market feed right now.");
+      setError("Surf could not reach market signals right now.");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -102,7 +111,7 @@ export default function Home() {
       timer = window.setTimeout(async () => {
         await load("refresh", sport);
         if (!cancelled) scheduleNext();
-      }, nextRefreshDelayMs(Date.now()));
+      }, nextRefreshDelayMs(Date.now(), scheduledGameAt));
     };
 
     scheduleNext();
@@ -110,7 +119,7 @@ export default function Home() {
       cancelled = true;
       if (timer != null) window.clearTimeout(timer);
     };
-  }, [load, sport, sportSynced]);
+  }, [load, scheduledGameAt, sport, sportSynced]);
 
   useEffect(() => {
     if (!data || visitRecorded.current) return;
@@ -151,7 +160,7 @@ export default function Home() {
       <div className="surf-content">
         <div className="surf-shell mx-auto w-full max-w-md px-4 pb-24">
           <SurfAppHeader
-            title="Worth noticing"
+            title="Signals"
             subtitle="Only current advantages with an exact book, number, and market comparison."
             onRefresh={() => void load("refresh", sport)}
             isRefreshing={isRefreshing}
@@ -177,7 +186,7 @@ export default function Home() {
                 Market check schedule
               </div>
               <div className="text-[10px] font-semibold text-[color:var(--surf-ink-45)]">
-                {refreshScheduleLabel(scheduleTimestamp)} · CT
+                {refreshScheduleLabel(scheduleTimestamp, scheduledGameAt)} · CT
               </div>
             </div>
           ) : null}
@@ -206,7 +215,7 @@ export default function Home() {
             </div>
           ) : error ? (
             <div className="rounded-[22px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] p-5">
-              <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">Market feed unavailable</div>
+              <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">Market signals unavailable</div>
               <p className="mt-1 text-xs leading-5 text-[color:var(--surf-ink-45)]">{error}</p>
             </div>
           ) : visibleSignals.length === 0 ? (

@@ -11,7 +11,7 @@ type Item = {
 
 const ITEMS: Item[] = [
   { label: "Games", href: "/games", isActive: (p) => p === "/games" || p.startsWith("/games/") },
-  { label: "Feed", href: "/feed", isActive: (p) => p === "/feed" || p.startsWith("/top") },
+  { label: "Signals", href: "/feed", isActive: (p) => p === "/feed" || p.startsWith("/top") },
 ];
 
 export function SurfBottomNav() {

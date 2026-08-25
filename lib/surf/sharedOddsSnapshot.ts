@@ -1,8 +1,8 @@
 import type { SurfSportKey } from "./sports";
 import type { OddsApiGame } from "./types";
+import { refreshIntervalMs } from "./feedSchedule";
 
 const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
-const SHARED_SNAPSHOT_TTL_MS = 90 * 1000;
 
 type SharedSnapshot = {
   games?: OddsApiGame[];
@@ -27,6 +27,13 @@ function oddsUrl(sportKey: SurfSportKey, apiKey: string): string {
   return url.toString();
 }
 
+function nextGameAt(games: OddsApiGame[], now: number): number | undefined {
+  const future = games
+    .map((game) => new Date(game.commence_time).getTime())
+    .filter((timestamp) => Number.isFinite(timestamp) && timestamp >= now);
+  return future.length > 0 ? Math.min(...future) : undefined;
+}
+
 export async function getSharedOddsSnapshot(options: {
   sportKey: SurfSportKey;
   apiKey: string;
@@ -38,7 +45,7 @@ export async function getSharedOddsSnapshot(options: {
     !options.force &&
     existing?.games &&
     existing.fetchedAt != null &&
-    now - existing.fetchedAt < SHARED_SNAPSHOT_TTL_MS
+    now - existing.fetchedAt < refreshIntervalMs(now, nextGameAt(existing.games, now))
   ) {
     return { games: existing.games, fetchedAt: existing.fetchedAt, reused: true };
   }

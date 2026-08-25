@@ -1,10 +1,14 @@
 export const SURF_TIME_ZONE = "America/Chicago";
-export const DAYTIME_REFRESH_MS = 2 * 60 * 1000;
+export const QUIET_REFRESH_MS = 5 * 60 * 1000;
+export const APPROACHING_REFRESH_MS = 3 * 60 * 1000;
+export const GAME_WINDOW_REFRESH_MS = 2 * 60 * 1000;
 export const OVERNIGHT_REFRESH_MS = 60 * 60 * 1000;
 
 const OVERNIGHT_START_HOUR = 22;
 const OVERNIGHT_END_HOUR = 6;
 const MORNING_RECAP_END_HOUR = 12;
+const APPROACHING_WINDOW_MS = 24 * 60 * 60 * 1000;
+const GAME_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 export type CentralClock = {
   year: number;
@@ -72,22 +76,35 @@ export function overnightWindowKey(timestamp: number): string {
   return `${startDate.year}-${month}-${day}`;
 }
 
-export function refreshIntervalMs(timestamp: number): number {
-  return isOvernight(timestamp) ? OVERNIGHT_REFRESH_MS : DAYTIME_REFRESH_MS;
+function timeUntilNextGame(timestamp: number, nextGameAt?: number): number | undefined {
+  if (nextGameAt == null || !Number.isFinite(nextGameAt)) return undefined;
+  const until = nextGameAt - timestamp;
+  return until >= 0 ? until : undefined;
 }
 
-export function nextRefreshDelayMs(timestamp: number): number {
-  const currentMode = isOvernight(timestamp);
-  const interval = refreshIntervalMs(timestamp);
+export function refreshIntervalMs(timestamp: number, nextGameAt?: number): number {
+  const until = timeUntilNextGame(timestamp, nextGameAt);
+  if (until != null && until <= GAME_WINDOW_MS) return GAME_WINDOW_REFRESH_MS;
+  if (isOvernight(timestamp)) return OVERNIGHT_REFRESH_MS;
+  if (until != null && until <= APPROACHING_WINDOW_MS) return APPROACHING_REFRESH_MS;
+  return QUIET_REFRESH_MS;
+}
 
-  // Stop at a schedule boundary instead of letting an hourly timer run past
-  // the 6 AM closing snapshot. The loop is bounded to 60 checks overnight.
+export function nextRefreshDelayMs(timestamp: number, nextGameAt?: number): number {
+  const interval = refreshIntervalMs(timestamp, nextGameAt);
+
+  // Stop at schedule boundaries so the next timer immediately adopts a faster
+  // game window or the morning/overnight cadence.
   for (let delay = 60_000; delay < interval; delay += 60_000) {
-    if (isOvernight(timestamp + delay) !== currentMode) return delay;
+    if (refreshIntervalMs(timestamp + delay, nextGameAt) !== interval) return delay;
   }
   return interval;
 }
 
-export function refreshScheduleLabel(timestamp: number): string {
-  return isOvernight(timestamp) ? "Hourly overnight" : "Every 2 minutes";
+export function refreshScheduleLabel(timestamp: number, nextGameAt?: number): string {
+  const interval = refreshIntervalMs(timestamp, nextGameAt);
+  if (interval === GAME_WINDOW_REFRESH_MS) return "Every 2 min · game window";
+  if (interval === APPROACHING_REFRESH_MS) return "Every 3 min · game day";
+  if (interval === OVERNIGHT_REFRESH_MS) return "Hourly overnight";
+  return "Every 5 min · quiet market";
 }

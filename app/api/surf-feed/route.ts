@@ -199,6 +199,13 @@ function formatAmericanPrice(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
 
+function nextGameAt(games: OddsApiGame[], now: number): number | undefined {
+  const future = games
+    .map((game) => new Date(game.commence_time).getTime())
+    .filter((timestamp) => Number.isFinite(timestamp) && timestamp >= now);
+  return future.length > 0 ? Math.min(...future) : undefined;
+}
+
 function opportunityPoint(opportunity: MarketOpportunity): string {
   if (opportunity.market === "totals") return `${opportunity.point}`;
   return opportunity.point > 0 ? `+${opportunity.point}` : `${opportunity.point}`;
@@ -863,6 +870,7 @@ async function getLiveSurfFeed(request: Request) {
       sportKey,
       sportLabel: sportConfig.label,
       generatedAt: now,
+      nextGameAt: nextGameAt(filteredGames, now),
       overnight,
       overnightHorizon,
       debug,
@@ -910,6 +918,7 @@ async function getLiveSurfFeed(request: Request) {
     sportKey,
     sportLabel: sportConfig.label,
     generatedAt: now,
+    nextGameAt: nextGameAt(filteredGames, now),
     overnight,
     overnightHorizon,
     signals: taggedSignals.slice().sort((a, b) => {
