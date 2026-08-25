@@ -6,6 +6,11 @@ export const SURF_SPORT_KEYS = [
 ] as const;
 
 export type SurfSportKey = (typeof SURF_SPORT_KEYS)[number];
+export const SURF_ENABLED_SPORT_KEYS = [
+  "americanfootball_nfl_preseason",
+  "americanfootball_nfl",
+  "baseball_mlb",
+] as const satisfies readonly SurfSportKey[];
 export type SurfLeague = "NFL" | "NBA" | "MLB";
 export type SurfSportLabel = "NFL Preseason" | SurfLeague;
 
@@ -53,7 +58,7 @@ export const SURF_SPORTS: readonly SurfSportConfig[] = [
 // Keep NBA route/data support intact while it is intentionally hidden from
 // the launch UI. This prevents off-season polling without deleting the work.
 export const SURF_VISIBLE_SPORTS = SURF_SPORTS.filter(
-  (sport) => sport.key !== "basketball_nba",
+  (sport) => SURF_ENABLED_SPORT_KEYS.some((enabled) => enabled === sport.key),
 );
 
 const SURF_SPORT_BY_KEY = new Map<SurfSportKey, SurfSportConfig>(
@@ -66,6 +71,10 @@ export function isSurfSportKey(value: unknown): value is SurfSportKey {
 
 export function isSurfVisibleSportKey(value: unknown): value is SurfSportKey {
   return isSurfSportKey(value) && SURF_VISIBLE_SPORTS.some((sport) => sport.key === value);
+}
+
+export function isSurfEnabledSportKey(value: unknown): value is SurfSportKey {
+  return isSurfSportKey(value) && SURF_ENABLED_SPORT_KEYS.some((sport) => sport === value);
 }
 
 export function getSurfSportConfig(sportKey: SurfSportKey): SurfSportConfig {
@@ -88,6 +97,6 @@ export function parseRequestedSport(value: string | null):
     return { ok: true, sportKey, config: getSurfSportConfig(sportKey) };
   }
 
-  if (!isSurfSportKey(value)) return { ok: false, value };
+  if (!isSurfEnabledSportKey(value)) return { ok: false, value };
   return { ok: true, sportKey: value, config: getSurfSportConfig(value) };
 }

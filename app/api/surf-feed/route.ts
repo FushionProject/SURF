@@ -44,7 +44,7 @@ import {
   getSurfSportConfig,
   isNflSport,
   parseRequestedSport,
-  SURF_SPORT_KEYS,
+  SURF_ENABLED_SPORT_KEYS,
   type SurfSportKey,
 } from "@/lib/surf/sports";
 
@@ -690,7 +690,7 @@ async function getLiveSurfFeed(request: Request) {
     return NextResponse.json(
       {
         error: `Unsupported sport: ${requestedSport.value}`,
-        allowedSports: SURF_SPORT_KEYS,
+        allowedSports: SURF_ENABLED_SPORT_KEYS,
       },
       { status: 400 }
     );
