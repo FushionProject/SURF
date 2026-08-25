@@ -21,7 +21,9 @@ function oddsUrl(sportKey: SurfSportKey, apiKey: string): string {
   const url = new URL(`${ODDS_API_BASE}/sports/${sportKey}/odds`);
   url.searchParams.set("apiKey", apiKey);
   url.searchParams.set("regions", "us");
-  url.searchParams.set("markets", "spreads,totals");
+  // Moneylines are especially useful in baseball, where the price is the line.
+  // Keep NFL at two requested markets so MLB support does not increase NFL quota use.
+  url.searchParams.set("markets", sportKey === "baseball_mlb" ? "h2h,spreads,totals" : "spreads,totals");
   url.searchParams.set("oddsFormat", "american");
   url.searchParams.set("dateFormat", "iso");
   return url.toString();

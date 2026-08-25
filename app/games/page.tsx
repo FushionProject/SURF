@@ -137,6 +137,7 @@ function movementLabel(mode: SurfMarketType, open: number | undefined, current: 
 
 function opportunityTag(opportunity: MarketOpportunity | undefined): string | undefined {
   if (!opportunity) return undefined;
+  if (opportunity.kind === "favorite_split") return "Favorite split";
   if (opportunity.kind === "key_number") return `Key ${opportunity.keyNumber}`;
   if (opportunity.kind === "best_price") return "Best price";
   return `${opportunity.lineEdge} pt better`;
@@ -153,7 +154,9 @@ function BestOfferTile({
 }) {
   const selection = offer ? getTeamAbbrev(offer.selection) ?? offer.selection : "—";
   const line = offer
-    ? offer.market === "spreads"
+    ? offer.market === "h2h"
+      ? `${selection} ${american(offer.price)}`
+      : offer.market === "spreads"
       ? `${selection} ${signed(offer.point)}`
       : `${offer.selection} ${plain(offer.point)}`
     : "Not posted";
@@ -170,14 +173,16 @@ function BestOfferTile({
         ) : null}
       </div>
       <div className="mt-1.5 truncate font-mono text-[16px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
-        {line}{offer?.price != null ? ` (${american(offer.price)})` : ""}
+        {line}{offer?.market !== "h2h" && offer?.price != null ? ` (${american(offer.price)})` : ""}
       </div>
       <div className="mt-1 truncate text-[9px] font-medium text-[color:var(--surf-ink-50)]">
         {offer ? offer.bookTitle : "Waiting for sportsbook lines"}
       </div>
       {offer ? (
         <div className="mt-1 text-[8px] text-[color:var(--surf-ink-30)]">
-          Midpoint {offer.market === "spreads" ? signed(offer.consensusPoint) : plain(offer.consensusPoint)} · {offer.booksCompared} books
+          {offer.market === "h2h"
+            ? `Median ${american(offer.consensusPrice)}`
+            : `Midpoint ${offer.market === "spreads" ? signed(offer.consensusPoint) : plain(offer.consensusPoint)}`} · {offer.booksCompared} books
         </div>
       ) : null}
     </div>
@@ -520,6 +525,12 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
             <div className="text-[8px] font-medium text-[color:var(--surf-ink-30)]">Not a pick</div>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
+            {config.league === "MLB" ? (
+              <>
+                <BestOfferTile label="Away moneyline" offer={board.offers.awayMoneyline} opportunity={opportunitiesBySlot.get("awayMoneyline")} />
+                <BestOfferTile label="Home moneyline" offer={board.offers.homeMoneyline} opportunity={opportunitiesBySlot.get("homeMoneyline")} />
+              </>
+            ) : null}
             <BestOfferTile label={`Away ${spreadName}`} offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} />
             <BestOfferTile label={`Home ${spreadName}`} offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} />
             <BestOfferTile label="Over" offer={board.offers.over} opportunity={opportunitiesBySlot.get("over")} />

@@ -51,6 +51,7 @@ export type SurfSignalTypeLabel =
   | "Stale Book";
 
 export type SurfMarketType = "spreads" | "totals";
+export type SurfOpportunityMarketType = SurfMarketType | "h2h";
 
 export type SurfSelection = {
   market: SurfMarketType;
@@ -242,21 +243,25 @@ export type TrackedMarketEvidence = {
 };
 
 export type MarketOpportunityEvidence = {
-  kind: "best_line" | "best_price" | "key_number";
+  kind: "best_line" | "best_price" | "key_number" | "favorite_split";
   isMiddle?: boolean;
   middleWidth?: number;
   score: number;
   reason: string;
   selection: string;
   bookTitle: string;
-  point: number;
+  point?: number;
   price?: number;
-  consensusPoint: number;
+  consensusPoint?: number;
   consensusPrice?: number;
   lineEdge: number;
   priceEdgePercentagePoints?: number;
   keyNumber?: number;
   booksCompared: number;
+  favoriteSplit?: {
+    away: { team: string; bookTitle: string; price: number; opponentPrice: number; booksFavoring: number };
+    home: { team: string; bookTitle: string; price: number; opponentPrice: number; booksFavoring: number };
+  };
 };
 
 export type SignalCard = {
@@ -270,7 +275,7 @@ export type SignalCard = {
     awayTeam: string;
   };
   signalType: SurfSignalTypeLabel;
-  market?: SurfMarketType;
+  market?: SurfOpportunityMarketType;
   title: string;
   detail: string;
   insight: string;

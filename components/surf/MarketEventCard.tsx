@@ -43,6 +43,7 @@ function gameTime(value: string): string {
 
 function badge(card: SignalCard): string {
   if (card.opportunity?.isMiddle) return "Line middle";
+  if (card.opportunity?.kind === "favorite_split") return "Favorite split";
   if (card.opportunity?.kind === "key_number") return `Key ${card.opportunity.keyNumber} value`;
   if (card.opportunity?.kind === "best_price") return "Best price";
   if (card.opportunity?.kind === "best_line") return "Best line";
@@ -233,10 +234,17 @@ export function MarketEventCard({ card, now }: Props) {
             </summary>
             <ul className="mt-2 space-y-1.5 text-[10px] leading-4 text-[color:var(--surf-ink-45)]">
               <li>• {opportunity.booksCompared} sportsbooks were compared in the current snapshot.</li>
-              {opportunity.isMiddle && opportunity.middleWidth != null ? (
+              {opportunity.kind === "favorite_split" && opportunity.favoriteSplit ? (
+                <>
+                  <li>• {opportunity.favoriteSplit.away.booksFavoring} books favor {selectionLabel(opportunity.favoriteSplit.away.team)}; {opportunity.favoriteSplit.home.booksFavoring} favor {selectionLabel(opportunity.favoriteSplit.home.team)}.</li>
+                  <li>• This compares current prices only; it does not claim that a sportsbook just moved.</li>
+                </>
+              ) : opportunity.isMiddle && opportunity.middleWidth != null ? (
                 <li>• The best opposite-side numbers leave a {opportunity.middleWidth}-point window.</li>
+              ) : card.market === "h2h" ? (
+                <li>• The market median price is {opportunity.consensusPrice != null ? (opportunity.consensusPrice > 0 ? `+${opportunity.consensusPrice}` : opportunity.consensusPrice) : "unavailable"}.</li>
               ) : (
-                <li>• The market midpoint is {card.market === "spreads" && opportunity.consensusPoint > 0 ? "+" : ""}{opportunity.consensusPoint}.</li>
+                <li>• The market midpoint is {card.market === "spreads" && (opportunity.consensusPoint ?? 0) > 0 ? "+" : ""}{opportunity.consensusPoint}.</li>
               )}
               {opportunity.kind === "best_price" && opportunity.priceEdgePercentagePoints != null ? (
                 <li>• The estimated price advantage is {opportunity.priceEdgePercentagePoints.toFixed(1)} implied-probability points.</li>

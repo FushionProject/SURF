@@ -5,6 +5,7 @@ import type {
   MarketTapeEvent,
   OddsApiGame,
   OvernightHorizonSummary,
+  SurfOpportunityMarketType,
 } from "@/lib/surf/types";
 import type { SignalCard } from "@/lib/surf/types";
 import type { SurfSignalDetection } from "@/lib/surf/types";
@@ -207,8 +208,18 @@ function nextGameAt(games: OddsApiGame[], now: number): number | undefined {
 }
 
 function opportunityPoint(opportunity: MarketOpportunity): string {
+  if (opportunity.market === "h2h") {
+    return opportunity.price != null ? formatAmericanPrice(opportunity.price) : "—";
+  }
+  if (opportunity.point == null) return "—";
   if (opportunity.market === "totals") return `${opportunity.point}`;
   return opportunity.point > 0 ? `+${opportunity.point}` : `${opportunity.point}`;
+}
+
+function opportunityQuote(opportunity: MarketOpportunity): string {
+  const point = opportunityPoint(opportunity);
+  if (opportunity.market === "h2h" || opportunity.price == null) return point;
+  return `${point} (${formatAmericanPrice(opportunity.price)})`;
 }
 
 function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: number): SignalCard[] {
@@ -217,7 +228,7 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
     .flatMap((board) => {
       const game = byId.get(board.gameId);
       if (!game) return [];
-      const grouped = new Map<"spreads" | "totals", MarketOpportunity[]>();
+      const grouped = new Map<SurfOpportunityMarketType, MarketOpportunity[]>();
       for (const opportunity of board.opportunities) {
         const group = grouped.get(opportunity.market) ?? [];
         group.push(opportunity);
@@ -229,11 +240,15 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
         const focus = ranked[0];
         const firstSide = market === "spreads"
           ? opportunities.find((opportunity) => opportunity.slot === "awaySpread")
-          : opportunities.find((opportunity) => opportunity.slot === "over");
+          : market === "totals"
+            ? opportunities.find((opportunity) => opportunity.slot === "over")
+            : undefined;
         const secondSide = market === "spreads"
           ? opportunities.find((opportunity) => opportunity.slot === "homeSpread")
-          : opportunities.find((opportunity) => opportunity.slot === "under");
-        const rawMiddleWidth = firstSide && secondSide
+          : market === "totals"
+            ? opportunities.find((opportunity) => opportunity.slot === "under")
+            : undefined;
+        const rawMiddleWidth = firstSide?.point != null && secondSide?.point != null
           ? market === "spreads"
             ? firstSide.point + secondSide.point
             : secondSide.point - firstSide.point
@@ -244,12 +259,19 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
         const isMiddle = middleWidth != null && firstSide != null && secondSide != null;
         const selection = getTeamAbbrev(focus.selection) ?? focus.selection;
         const currentLine = opportunityPoint(focus);
-        const marketLine = market === "spreads" && focus.consensusPoint > 0
-          ? `+${focus.consensusPoint}`
-          : `${focus.consensusPoint}`;
-        const currentPrice = focus.price != null ? ` (${formatAmericanPrice(focus.price)})` : "";
+        const marketLine = market === "h2h"
+          ? focus.consensusPrice != null
+            ? formatAmericanPrice(focus.consensusPrice)
+            : "—"
+          : market === "spreads" && (focus.consensusPoint ?? 0) > 0
+            ? `+${focus.consensusPoint}`
+            : `${focus.consensusPoint ?? "—"}`;
+        const currentPrice = market !== "h2h" && focus.price != null ? ` (${formatAmericanPrice(focus.price)})` : "";
+        const favoriteSplit = focus.kind === "favorite_split" ? focus.favoriteSplit : undefined;
         const title =
-          isMiddle
+          favoriteSplit
+            ? `Books disagree on the MLB favorite`
+          : isMiddle
             ? `${middleWidth}-point middle available: ${getTeamAbbrev(firstSide!.selection) ?? firstSide!.selection} ${opportunityPoint(firstSide!)} / ${getTeamAbbrev(secondSide!.selection) ?? secondSide!.selection} ${opportunityPoint(secondSide!)}`
           : focus.kind === "key_number"
             ? `${selection} ${currentLine} crosses NFL key number ${focus.keyNumber}`
@@ -259,15 +281,21 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
         const reason = isMiddle
           ? `${firstSide!.bookTitle} and ${secondSide!.bookTitle} leave a ${middleWidth}-point window between opposite sides. Prices and limits still determine whether it is usable.`
           : focus.reason;
-        const sources = isMiddle
+        const sources = favoriteSplit
+          ? [favoriteSplit.away, favoriteSplit.home].map((side) => ({
+              label: `${getTeamAbbrev(side.team) ?? side.team} favored`,
+              book: side.bookTitle,
+              value: `${formatAmericanPrice(side.price)} vs ${formatAmericanPrice(side.opponentPrice)}`,
+            }))
+          : isMiddle
           ? [firstSide!, secondSide!].map((opportunity) => ({
               label: getTeamAbbrev(opportunity.selection) ?? opportunity.selection,
               book: opportunity.bookTitle,
-              value: `${opportunityPoint(opportunity)}${opportunity.price != null ? ` (${formatAmericanPrice(opportunity.price)})` : ""}`,
+              value: opportunityQuote(opportunity),
             }))
           : [
-              { label: "Available now", book: focus.bookTitle, value: `${currentLine}${currentPrice}` },
-              { label: "Market midpoint", book: `${focus.booksCompared} books`, value: marketLine },
+              { label: "Available now", book: focus.bookTitle, value: opportunityQuote(focus) },
+              { label: market === "h2h" ? "Market median" : "Market midpoint", book: `${focus.booksCompared} books`, value: marketLine },
             ];
 
         return {
@@ -280,19 +308,25 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
             homeTeam: game.home_team,
             awayTeam: game.away_team,
           },
-          signalType: focus.kind === "best_price" ? "Best Price" as const : "Best Number" as const,
+          signalType: focus.kind === "favorite_split"
+            ? "Book Disagreement" as const
+            : focus.kind === "best_price"
+              ? "Best Price" as const
+              : "Best Number" as const,
           market,
           title,
-          detail: isMiddle ? sources.map((source) => `${source.book} ${source.value}`).join(" · ") : `${focus.bookTitle} ${currentLine}${currentPrice}`,
+          detail: isMiddle || favoriteSplit
+            ? sources.map((source) => `${source.book} ${source.value}`).join(" · ")
+            : `${focus.bookTitle} ${currentLine}${currentPrice}`,
           insight: reason,
           sources,
-          valueOptions: isMiddle
+          valueOptions: isMiddle || favoriteSplit
             ? undefined
             : ranked.slice(0, 2).map((opportunity) => ({
                 selection: opportunity.selection,
                 book: opportunity.bookTitle,
                 line: opportunityPoint(opportunity),
-                price: opportunity.price != null ? formatAmericanPrice(opportunity.price) : undefined,
+                price: opportunity.market !== "h2h" && opportunity.price != null ? formatAmericanPrice(opportunity.price) : undefined,
               })),
           commenceTime: game.commence_time,
           gap: focus.lineEdge > 0 ? focus.lineEdge : undefined,
@@ -319,6 +353,24 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
             priceEdgePercentagePoints: focus.priceEdgePercentagePoints,
             keyNumber: focus.keyNumber,
             booksCompared: focus.booksCompared,
+            favoriteSplit: favoriteSplit
+              ? {
+                  away: {
+                    team: favoriteSplit.away.team,
+                    bookTitle: favoriteSplit.away.bookTitle,
+                    price: favoriteSplit.away.price,
+                    opponentPrice: favoriteSplit.away.opponentPrice,
+                    booksFavoring: favoriteSplit.away.booksFavoring,
+                  },
+                  home: {
+                    team: favoriteSplit.home.team,
+                    bookTitle: favoriteSplit.home.bookTitle,
+                    price: favoriteSplit.home.price,
+                    opponentPrice: favoriteSplit.home.opponentPrice,
+                    booksFavoring: favoriteSplit.home.booksFavoring,
+                  },
+                }
+              : undefined,
           },
         } satisfies SignalCard;
       });
@@ -553,7 +605,8 @@ function enrichSignals(signals: SignalCard[], games: OddsApiGame[], detections: 
 
   return signals.map((s) => {
     const g = byId.get(s.game.id);
-    const market = s.market;
+    // Legacy snapshot enrichment only tracks point-based spread and total markets.
+    const market = s.market === "h2h" ? undefined : s.market;
     const key = g ? marketContextGameKey(g) : undefined;
 
     const gameDetections = detectionsByGame.get(s.game.id) ?? [];
