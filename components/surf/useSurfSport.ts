@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   DEFAULT_SURF_SPORT_KEY,
-  isSurfSportKey,
+  isSurfVisibleSportKey,
   type SurfSportKey,
 } from "@/lib/surf/sports";
 
@@ -19,12 +19,18 @@ export function useSurfSport() {
       const params = new URLSearchParams(window.location.search);
       const requested = params.get("sport");
       const saved = window.localStorage.getItem(SPORT_STORAGE_KEY);
-      const initial = isSurfSportKey(requested)
+      const initial = isSurfVisibleSportKey(requested)
         ? requested
-        : isSurfSportKey(saved)
+        : isSurfVisibleSportKey(saved)
           ? saved
           : DEFAULT_SURF_SPORT_KEY;
 
+      window.localStorage.setItem(SPORT_STORAGE_KEY, initial);
+      if (requested !== initial) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("sport", initial);
+        window.history.replaceState(null, "", url.toString());
+      }
       setSport(initial);
       setSportSynced(true);
     }, 0);
@@ -33,11 +39,12 @@ export function useSurfSport() {
   }, []);
 
   const selectSport = useCallback((next: SurfSportKey) => {
-    setSport(next);
-    window.localStorage.setItem(SPORT_STORAGE_KEY, next);
+    const visible = isSurfVisibleSportKey(next) ? next : DEFAULT_SURF_SPORT_KEY;
+    setSport(visible);
+    window.localStorage.setItem(SPORT_STORAGE_KEY, visible);
 
     const url = new URL(window.location.href);
-    url.searchParams.set("sport", next);
+    url.searchParams.set("sport", visible);
     window.history.replaceState(null, "", url.toString());
   }, []);
 

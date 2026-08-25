@@ -1,6 +1,6 @@
 "use client";
 
-import { SURF_SPORTS, type SurfSportKey } from "@/lib/surf/sports";
+import { SURF_VISIBLE_SPORTS, type SurfSportKey } from "@/lib/surf/sports";
 
 type Props = {
   value: SurfSportKey;
@@ -11,8 +11,8 @@ type Props = {
 export function SportSelector({ value, onChange, disabled = false }: Props) {
   return (
     <div className="mb-4">
-      <div className="grid w-full grid-cols-4 rounded-full border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-03)] p-1">
-          {SURF_SPORTS.map((sport) => (
+      <div className="grid w-full grid-cols-3 rounded-full border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-03)] p-1">
+          {SURF_VISIBLE_SPORTS.map((sport) => (
             <button
               key={sport.key}
               type="button"

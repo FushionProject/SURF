@@ -50,12 +50,22 @@ export const SURF_SPORTS: readonly SurfSportConfig[] = [
   },
 ] as const;
 
+// Keep NBA route/data support intact while it is intentionally hidden from
+// the launch UI. This prevents off-season polling without deleting the work.
+export const SURF_VISIBLE_SPORTS = SURF_SPORTS.filter(
+  (sport) => sport.key !== "basketball_nba",
+);
+
 const SURF_SPORT_BY_KEY = new Map<SurfSportKey, SurfSportConfig>(
   SURF_SPORTS.map((sport) => [sport.key, sport])
 );
 
 export function isSurfSportKey(value: unknown): value is SurfSportKey {
   return typeof value === "string" && SURF_SPORT_BY_KEY.has(value as SurfSportKey);
+}
+
+export function isSurfVisibleSportKey(value: unknown): value is SurfSportKey {
+  return isSurfSportKey(value) && SURF_VISIBLE_SPORTS.some((sport) => sport.key === value);
 }
 
 export function getSurfSportConfig(sportKey: SurfSportKey): SurfSportConfig {
