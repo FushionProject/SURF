@@ -6,7 +6,7 @@ import type {
   PredictionMarketVenue,
 } from "./types";
 
-export const DEFAULT_WHALE_THRESHOLD_USD = 50_000;
+export const DEFAULT_WHALE_THRESHOLD_USD = 10_000;
 export const WHALE_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 export const WHALE_BURST_WINDOW_MS = 90 * 1000;
 

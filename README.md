@@ -42,7 +42,7 @@ Surf never invents injury records.
 
 Surf reads public Kalshi and Polymarket winner-market data. Games may show one
 compact market-implied consensus row, and Signals only surfaces qualified buys
-at or above the configured cash threshold. The default is `$50,000`.
+at or above the configured cash threshold. The default is `$10,000`.
 
 Kalshi public trades are anonymous, so Surf labels them as a large trade or
 buying burst. Polymarket public trades can be grouped by wallet. Neither is

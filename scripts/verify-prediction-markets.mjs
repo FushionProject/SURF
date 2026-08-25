@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 import {
   aggregateKalshiWhaleBuys,
   aggregatePolymarketWhaleBuys,
+  DEFAULT_WHALE_THRESHOLD_USD,
   matchKalshiWinnerMarkets,
   matchPolymarketWinnerMarkets,
   mergePredictionConsensus,
 } from "../lib/surf/predictionMarketCore.ts";
+
+assert.equal(DEFAULT_WHALE_THRESHOLD_USD, 10_000, "the launch whale threshold should be $10K cash committed");
 
 const NOW = Date.parse("2026-08-24T18:00:00Z");
 const COMMENCE = "2026-08-29T23:00:00Z";

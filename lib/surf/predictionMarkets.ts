@@ -119,8 +119,8 @@ async function fetchKalshiTrades(
   const tickers = matched
     .flatMap((market) => market.selections.map((selection) => selection.providerMarketId))
     .filter((ticker, index, all) => all.indexOf(ticker) === index)
-    // A $50K buy cannot exist in a 24-hour window with fewer than 50K
-    // contracts of total volume because every contract costs at most $1.
+    // A qualifying buy cannot exist in a 24-hour window with fewer contracts
+    // than the cash threshold because every contract costs at most $1.
     .filter((ticker) => Number(rawByTicker.get(ticker)?.volume_24h_fp ?? 0) >= thresholdUsd);
 
   const trades: KalshiTrade[] = [];
