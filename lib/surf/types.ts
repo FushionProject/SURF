@@ -43,6 +43,10 @@ export type SurfSignalTypeLabel =
   | "Best Number"
   | "Line Movement"
   | "Market Movement"
+  | "Price Pressure"
+  | "Consensus Shift"
+  | "Key Number Cross"
+  | "Market Resolution"
   | "Stale Book";
 
 export type SurfMarketType = "spreads" | "totals";
@@ -132,6 +136,110 @@ export type SignalCardValueOption = {
   price?: string;
 };
 
+export type TrackedBookLineMove = {
+  bookKey: string;
+  bookTitle: string;
+  fromPoint: number;
+  toPoint: number;
+  delta: number;
+  previousObservedAt: number;
+  observedAt: number;
+  providerUpdatedAt?: number;
+};
+
+export type MarketTapeEvent = {
+  id: string;
+  game: {
+    id: string;
+    sportKey: SurfSportKey;
+    sportLabel: SurfSportLabel;
+    league: SurfLeague;
+    homeTeam: string;
+    awayTeam: string;
+    commenceTime: string;
+  };
+  market: SurfMarketType;
+  selectionName: string;
+  direction: "up" | "down";
+  startedAt: number;
+  lastMovedAt: number;
+  startConsensus?: number;
+  currentConsensus?: number;
+  currentRange: number;
+  booksInSample: number;
+  movedBooks: TrackedBookLineMove[];
+  heldBooks: string[];
+  confidence: "tracked" | "confirmed";
+  snapshotsCompared: number;
+  overnightWindowKey?: string;
+};
+
+export type MarketHorizonEventKind =
+  | "price_pressure"
+  | "consensus_shift"
+  | "key_number_cross"
+  | "market_resolution";
+
+export type TrackedBookPriceMove = {
+  bookKey: string;
+  bookTitle: string;
+  selectionName: string;
+  point: number;
+  fromPrice: number;
+  toPrice: number;
+  impliedProbabilityDelta: number;
+  previousObservedAt: number;
+  observedAt: number;
+  providerUpdatedAt?: number;
+};
+
+export type MarketHorizonBestNumber = {
+  selection: string;
+  bookKey: string;
+  bookTitle: string;
+  point: number;
+  price?: number;
+};
+
+export type MarketHorizonEvent = {
+  id: string;
+  kind: MarketHorizonEventKind;
+  game: MarketTapeEvent["game"];
+  market: SurfMarketType;
+  selectionName: string;
+  observedAt: number;
+  confidence: "tracked" | "confirmed";
+  usefulnessScore: number;
+  usefulnessReasons: string[];
+  booksInSample: number;
+  previousConsensus?: number;
+  currentConsensus?: number;
+  previousRange?: number;
+  currentRange?: number;
+  keyNumber?: number;
+  favoriteFlip?: boolean;
+  lineMoves: TrackedBookLineMove[];
+  priceMoves: TrackedBookPriceMove[];
+  bestNumbers: MarketHorizonBestNumber[];
+  overnightWindowKey?: string;
+};
+
+export type MarketHorizonEvidence = {
+  kind: MarketHorizonEventKind;
+  confidence: MarketHorizonEvent["confidence"];
+  usefulnessScore: number;
+  usefulnessReasons: string[];
+  facts: Array<{ label: string; value: string }>;
+  advancedFacts: string[];
+};
+
+export type TrackedMarketEvidence = {
+  confidence: MarketTapeEvent["confidence"];
+  movedBooks: TrackedBookLineMove[];
+  heldBooks: string[];
+  snapshotsCompared: number;
+};
+
 export type SignalCard = {
   id: string;
   game: {
@@ -165,6 +273,16 @@ export type SignalCard = {
   isTopSignal?: boolean;
   topBadge?: string;
   topReason?: "gap" | "movement" | "disagreement";
+  trackedMarket?: TrackedMarketEvidence;
+  marketHorizon?: MarketHorizonEvidence;
+};
+
+export type OvernightHorizonSummary = {
+  windowKey: string;
+  windowLabel: string;
+  isActive: boolean;
+  isMorningRecap: boolean;
+  cards: SignalCard[];
 };
 
 export type OvernightMarketMove = {
@@ -186,6 +304,9 @@ export type OvernightMarketMove = {
   observedFrom: number;
   lastMovedAt: number;
   observations: number;
+  bookMoves: TrackedBookLineMove[];
+  heldBooks: string[];
+  confidence: MarketTapeEvent["confidence"];
 };
 
 export type OvernightMarketSummary = {

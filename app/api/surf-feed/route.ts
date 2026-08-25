@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
-import type { OddsApiGame } from "@/lib/surf/types";
+import type {
+  MarketHorizonEvent,
+  MarketTapeEvent,
+  OddsApiGame,
+  OvernightHorizonSummary,
+} from "@/lib/surf/types";
 import type { SignalCard } from "@/lib/surf/types";
 import type { SurfSignalDetection } from "@/lib/surf/types";
 import { formatSignalCards } from "@/lib/surf/format";
@@ -22,12 +27,18 @@ import {
 } from "@/lib/surf/signalCopy";
 import { getMLBSignalStrengthFromDetections } from "@/lib/surf/mlbSignalStrength";
 import { getDemoSurfFeed, isSurfDemoMode } from "@/lib/surf/demoData";
-import { getNflInjuryFeed } from "@/lib/surf/injuries";
-import { getOvernightMarketSummary, recordOvernightMarkets } from "@/lib/surf/overnightMarket";
+import { getOvernightMarketSummary } from "@/lib/surf/overnightMarket";
+import { getMarketTapeEvents, recordMarketTapeSnapshot } from "@/lib/surf/marketTape";
+import { getMarketHorizonEvents, recordMarketHorizonSnapshot } from "@/lib/surf/marketHorizon";
 import {
-  DEFAULT_SURF_SPORT_KEY,
-  getSurfSportConfig,
-  isSurfSportKey,
+  isMorningRecap,
+  isOvernight,
+  isOvernightCapture,
+  overnightWindowKey,
+} from "@/lib/surf/feedSchedule";
+import { getTeamAbbrev } from "@/lib/teamAbbrevs";
+import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
+import {
   isNflSport,
   parseRequestedSport,
   SURF_SPORT_KEYS,
@@ -47,8 +58,6 @@ const CORE_BOOKMAKER_KEYS = new Set([
   "fanatics",
   "betrivers",
 ]);
-
-const TOP_SIGNAL_THRESHOLD = 1.5;
 
 type SignalLifecycleEntry = {
   signature: string;
@@ -72,6 +81,8 @@ function signalSignature(signal: SignalCard): string {
     detail: signal.detail,
     sources: signal.sources,
     valueOptions: signal.valueOptions,
+    trackedMarket: signal.trackedMarket,
+    marketHorizon: signal.marketHorizon,
   });
 }
 
@@ -87,8 +98,8 @@ function addSignalLifecycle(signals: SignalCard[], now: number): SignalCard[] {
     const changed = Boolean(previous && previous.signature !== signature);
     const entry: SignalLifecycleEntry = {
       signature,
-      detectedAt: previous?.detectedAt ?? now,
-      signalChangedAt: changed ? now : (previous?.signalChangedAt ?? now),
+      detectedAt: previous?.detectedAt ?? signal.detectedAt ?? now,
+      signalChangedAt: changed ? now : (previous?.signalChangedAt ?? signal.signalChangedAt ?? now),
       lastSeenAt: now,
     };
     SIGNAL_LIFECYCLE_STORE.set(signal.id, entry);
@@ -172,67 +183,220 @@ function collapseMLBSignalsByGame(signals: SignalCard[], debug?: boolean): Signa
   });
 }
 
-function roundToHalf(value: number): number {
-  return Math.round(value * 2) / 2;
-}
-
 function parseMode(value: string | null): NbaRefreshMode {
   if (value === "fixed15") return "fixed15";
   if (value === "manual") return "manual";
   return "dynamic";
 }
 
-function formatNumber(value: number): string {
-  const v = roundToHalf(value);
-  const sign = v > 0 ? "+" : "";
-  return `${sign}${v}`;
+function formatTapePoint(value: number, market: MarketTapeEvent["market"]): string {
+  if (market === "totals") return `${value}`;
+  return value > 0 ? `+${value}` : `${value}`;
 }
 
-function asStrongContextMovementCards(games: OddsApiGame[]): SignalCard[] {
-  const ctx = computeGameMarketContext(games);
-  const out: SignalCard[] = [];
+function formatAmericanPrice(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
+}
 
-  for (const g of games) {
-    const gc = ctx[g.id];
-    const pick =
-      (gc?.totals && typeof gc.totals.delta === "number" ? { market: "totals" as const, c: gc.totals } : undefined) ??
-      (gc?.spreads && typeof gc.spreads.delta === "number" ? { market: "spreads" as const, c: gc.spreads } : undefined);
+function horizonSignalType(kind: MarketHorizonEvent["kind"]): SignalCard["signalType"] {
+  if (kind === "price_pressure") return "Price Pressure";
+  if (kind === "key_number_cross") return "Key Number Cross";
+  if (kind === "market_resolution") return "Market Resolution";
+  return "Consensus Shift";
+}
 
-    if (!pick) continue;
-    const open = pick.c.openLine;
-    const current = pick.c.currentLine;
-    if (typeof open !== "number" || !Number.isFinite(open)) continue;
-    if (typeof current !== "number" || !Number.isFinite(current)) continue;
+function marketHorizonCards(events: MarketHorizonEvent[], now: number): SignalCard[] {
+  return events.map((event) => {
+    const marketLabel = event.market === "spreads" ? "spread" : "total";
+    const firstLineMove = event.lineMoves[0];
+    const firstPriceMove = event.priceMoves[0];
+    const selection = getTeamAbbrev(event.selectionName) ?? event.selectionName;
+    const rangeClosed =
+      event.previousRange != null && event.currentRange != null
+        ? Math.round((event.previousRange - event.currentRange) * 2) / 2
+        : undefined;
 
-    const lineMovement = Math.abs(current - open);
-    if (!Number.isFinite(lineMovement) || lineMovement < TOP_SIGNAL_THRESHOLD) continue;
+    const title = (() => {
+      if (event.kind === "price_pressure") {
+        const actor = event.priceMoves.length >= 2 ? `${event.priceMoves.length} books` : firstPriceMove?.bookTitle ?? "A book";
+        return `${actor} tightened the price on ${selection}`;
+      }
+      if (event.kind === "key_number_cross") {
+        return event.favoriteFlip
+          ? "The market changed favorites"
+          : `The spread crossed NFL key number ${event.keyNumber}`;
+      }
+      if (event.kind === "market_resolution") {
+        return `Books closed a ${rangeClosed ?? "meaningful"}-point ${marketLabel} split`;
+      }
+      return `The ${marketLabel} consensus moved`;
+    })();
 
-    const label = pick.market === "totals" ? "Total:" : "Spread:";
-    const detail = `${label} ${formatNumber(open)} → ${formatNumber(current)}`;
-    const sportKey = isSurfSportKey(g.sport_key) ? g.sport_key : DEFAULT_SURF_SPORT_KEY;
-    const sport = getSurfSportConfig(sportKey);
+    const detail = (() => {
+      if (event.kind === "price_pressure" && firstPriceMove) {
+        return `${formatAmericanPrice(firstPriceMove.fromPrice)} → ${formatAmericanPrice(firstPriceMove.toPrice)} at ${firstPriceMove.point}`;
+      }
+      if (event.kind === "market_resolution") {
+        return `Range ${event.previousRange ?? "—"} → ${event.currentRange ?? "—"}`;
+      }
+      return `${event.previousConsensus != null ? formatTapePoint(event.previousConsensus, event.market) : "—"} → ${
+        event.currentConsensus != null ? formatTapePoint(event.currentConsensus, event.market) : "—"
+      }`;
+    })();
 
-    out.push({
-      id: `CTX_MOVEMENT:${g.id}:${pick.market}`,
+    const insight = (() => {
+      if (event.kind === "price_pressure") {
+        return `The ${marketLabel} stayed put while the cost changed—a real price adjustment, not a projected move.`;
+      }
+      if (event.kind === "key_number_cross") {
+        return event.favoriteFlip
+          ? "The tracked consensus moved through zero, changing which team the market favors."
+          : `${event.keyNumber} is a key NFL margin; crossing it changes the number available on both sides.`;
+      }
+      if (event.kind === "market_resolution") {
+        return "A previously meaningful book split closed, so the outlier is no longer available."
+      }
+      return `${event.booksInSample} books were sampled and ${event.currentConsensus != null ? formatTapePoint(event.currentConsensus, event.market) : "the new number"} is now the supported consensus.`;
+    })();
+
+    const sources = event.kind === "price_pressure"
+      ? event.priceMoves.slice(0, 2).map((move) => ({
+          label: "Price moved",
+          book: move.bookTitle,
+          value: `${formatAmericanPrice(move.fromPrice)} → ${formatAmericanPrice(move.toPrice)}`,
+        }))
+      : event.lineMoves.slice(0, 2).map((move) => ({
+          label: "Line moved",
+          book: move.bookTitle,
+          value: `${formatTapePoint(move.fromPoint, event.market)} → ${formatTapePoint(move.toPoint, event.market)}`,
+        }));
+    const evidenceMoves = event.kind === "price_pressure" ? event.priceMoves : event.lineMoves;
+    const providerTimesVerified =
+      evidenceMoves.length > 0 && evidenceMoves.every((move) => move.providerUpdatedAt != null);
+
+    return {
+      id: event.id,
       game: {
-        id: g.id,
-        league: sport.league,
-        sportKey,
-        sportLabel: sport.label,
-        homeTeam: g.home_team,
-        awayTeam: g.away_team,
+        id: event.game.id,
+        league: event.game.league,
+        sportKey: event.game.sportKey,
+        sportLabel: event.game.sportLabel,
+        homeTeam: event.game.homeTeam,
+        awayTeam: event.game.awayTeam,
+      },
+      signalType: horizonSignalType(event.kind),
+      market: event.market,
+      title,
+      detail,
+      insight,
+      sources,
+      valueOptions: event.bestNumbers.map((option) => ({
+        selection: option.selection,
+        book: option.bookTitle,
+        line: formatTapePoint(option.point, event.market),
+        price: option.price != null ? formatAmericanPrice(option.price) : undefined,
+      })),
+      commenceTime: event.game.commenceTime,
+      lineMovement:
+        event.previousConsensus != null && event.currentConsensus != null
+          ? Math.abs(event.currentConsensus - event.previousConsensus)
+          : undefined,
+      recentMovementAbs:
+        firstPriceMove != null
+          ? Math.abs(firstPriceMove.impliedProbabilityDelta) * 100
+          : firstLineMove != null
+            ? Math.abs(firstLineMove.delta)
+            : undefined,
+      lastMovedAt: event.observedAt,
+      detectedAt: event.observedAt,
+      signalChangedAt: event.observedAt,
+      lastSeenAt: now,
+      status: "active",
+      strengthScore: event.usefulnessScore,
+      isTopSignal: event.usefulnessScore >= 80,
+      topBadge: event.kind.replaceAll("_", " ").toUpperCase(),
+      marketHorizon: {
+        kind: event.kind,
+        confidence: event.confidence,
+        usefulnessScore: event.usefulnessScore,
+        usefulnessReasons: event.usefulnessReasons,
+        facts: sources.map((source) => ({ label: `${source.book} · ${source.label}`, value: source.value })),
+        advancedFacts: [
+          `${event.booksInSample} books in the current sample.`,
+          ...event.usefulnessReasons,
+          providerTimesVerified
+            ? "Sportsbook update timestamps advanced for the recorded evidence."
+            : "Evidence was observed across separate Surf snapshots.",
+        ],
+      },
+    };
+  });
+}
+
+function tapeEventSupersededByHorizon(
+  tapeEvent: MarketTapeEvent,
+  horizonEvents: MarketHorizonEvent[],
+): boolean {
+  return horizonEvents.some(
+    (event) =>
+      event.kind !== "price_pressure" &&
+      event.game.id === tapeEvent.game.id &&
+      event.market === tapeEvent.market &&
+      Math.abs(event.observedAt - tapeEvent.lastMovedAt) <= 5 * 60 * 1000,
+  );
+}
+
+function marketTapeCards(events: MarketTapeEvent[], now: number): SignalCard[] {
+  return events.map((event) => {
+    const moved = event.movedBooks[0]!;
+    const marketLabel = event.market === "totals" ? "total" : "spread";
+    const direction = event.direction === "up" ? "higher" : "lower";
+    const actor = event.movedBooks.length >= 2 ? `${event.movedBooks.length} books` : moved.bookTitle;
+    const heldCopy = event.heldBooks.length > 0
+      ? `${event.heldBooks.slice(0, 2).join(" and ")} did not make the same move during this window.`
+      : "Every tracked book in the current sample participated in the move.";
+    const lineMovement = Math.max(...event.movedBooks.map((book) => Math.abs(book.delta)));
+
+    return {
+      id: event.id,
+      game: {
+        id: event.game.id,
+        league: event.game.league,
+        sportKey: event.game.sportKey,
+        sportLabel: event.game.sportLabel,
+        homeTeam: event.game.homeTeam,
+        awayTeam: event.game.awayTeam,
       },
       signalType: "Market Movement",
-      market: pick.market,
-      title: "Market moved",
-      detail,
-      insight: "Tracked move from open to current consensus.",
-      commenceTime: g.commence_time,
+      market: event.market,
+      title: `${actor} moved the ${marketLabel} ${direction}`,
+      detail: `${formatTapePoint(moved.fromPoint, event.market)} → ${formatTapePoint(moved.toPoint, event.market)}`,
+      insight: heldCopy,
+      sources: event.movedBooks.slice(0, 2).map((book) => ({
+        label: "Tracked move",
+        book: book.bookTitle,
+        value: `${formatTapePoint(book.fromPoint, event.market)} → ${formatTapePoint(book.toPoint, event.market)}`,
+      })),
+      commenceTime: event.game.commenceTime,
       lineMovement,
-    });
-  }
-
-  return out;
+      recentMovementAbs: lineMovement,
+      recentMovementMinutes: Math.max(1, Math.round((event.lastMovedAt - event.startedAt) / 60_000)),
+      lastMovedAt: event.lastMovedAt,
+      detectedAt: event.startedAt,
+      signalChangedAt: event.lastMovedAt,
+      lastSeenAt: now,
+      status: "active",
+      strengthScore: Math.min(100, Math.round((lineMovement / 2) * 100) + (event.confidence === "confirmed" ? 15 : 0)),
+      isTopSignal: event.confidence === "confirmed" || lineMovement >= 1.5,
+      topBadge: event.confidence === "confirmed" ? "CONFIRMED" : "TRACKED",
+      trackedMarket: {
+        confidence: event.confidence,
+        movedBooks: event.movedBooks,
+        heldBooks: event.heldBooks,
+        snapshotsCompared: event.snapshotsCompared,
+      },
+    };
+  });
 }
 
 function pickRecentWindowMinutes(): number {
@@ -510,8 +674,45 @@ async function getLiveSurfFeed(request: Request) {
     ...g,
     bookmakers: (g.bookmakers ?? []).filter((b) => CORE_BOOKMAKER_KEYS.has(normalizeBookmakerKey(b.key))),
   }));
-  recordOvernightMarkets(filteredGames, sportKey, now);
-  const overnight = getOvernightMarketSummary(sportKey, now);
+  const overnightCapture = isOvernightCapture(now);
+  const tapeRecord = recordMarketTapeSnapshot(filteredGames, sportKey, now, {
+    qualificationWindowMs: overnightCapture ? 3 * 60 * 60 * 1000 : 15 * 60 * 1000,
+    mergeWindowMs: overnightCapture ? 3 * 60 * 60 * 1000 : 20 * 60 * 1000,
+    overnightWindowKey: overnightCapture ? overnightWindowKey(now) : undefined,
+  });
+  const horizonRecord = recordMarketHorizonSnapshot(filteredGames, sportKey, now, {
+    qualificationWindowMs: overnightCapture ? 3 * 60 * 60 * 1000 : 15 * 60 * 1000,
+    mergeWindowMs: overnightCapture ? 3 * 60 * 60 * 1000 : 20 * 60 * 1000,
+    overnightWindowKey: overnightCapture ? overnightWindowKey(now) : undefined,
+  });
+  const tapeEvents = getMarketTapeEvents(sportKey, now);
+  const horizonEvents = getMarketHorizonEvents(sportKey, now);
+  const horizonSignals = marketHorizonCards(horizonEvents, now);
+  const tapeSignals = marketTapeCards(
+    tapeEvents.filter((event) => !tapeEventSupersededByHorizon(event, horizonEvents)),
+    now,
+  );
+  const eventSignals = [...horizonSignals, ...tapeSignals];
+  const overnight = getOvernightMarketSummary(tapeEvents, sportKey, now);
+  const activeOvernightWindow = overnightWindowKey(now);
+  const overnightEventIds = new Set([
+    ...horizonEvents
+      .filter((event) => event.overnightWindowKey === activeOvernightWindow)
+      .map((event) => event.id),
+    ...tapeEvents
+      .filter((event) => event.overnightWindowKey === activeOvernightWindow)
+      .map((event) => event.id),
+  ]);
+  const overnightHorizon: OvernightHorizonSummary = {
+    windowKey: activeOvernightWindow,
+    windowLabel: "10 PM–6 AM CT",
+    isActive: isOvernight(now),
+    isMorningRecap: isMorningRecap(now),
+    cards: eventSignals
+      .filter((signal) => overnightEventIds.has(signal.id))
+      .sort((a, b) => (b.strengthScore ?? 0) - (a.strengthScore ?? 0))
+      .slice(0, 5),
+  };
 
   if (isDebug) {
     const includedBooks = new Map<string, string>();
@@ -521,42 +722,12 @@ async function getLiveSurfFeed(request: Request) {
       }
     }
 
-    const { detections, debug } = debugSurfSignals(filteredGames);
+    const { detections: allDetections, debug } = debugSurfSignals(filteredGames);
+    const detections = usefulFeedSnapshotDetections(allDetections, sportKey);
     const signals = formatSignalCards(detections, filteredGames);
-    const contextMoves = asStrongContextMovementCards(filteredGames);
-    const byId = new Set(signals.map((s) => s.id));
-    const mergedSignals = [
-      ...signals,
-      ...contextMoves.filter((s) => !byId.has(s.id)),
-    ];
-    let loggedMovement = false;
-    const taggedSignalsRaw = collapseMLBSignalsByGame(enrichSignals(mergedSignals, filteredGames, detections, true), true).map((s) => {
-      const isTopSignal = Boolean(s.isTopSignal);
-      if (!loggedMovement && (s.signalType === "Line Movement" || s.signalType === "Market Movement")) {
-        loggedMovement = true;
-        console.log(
-          JSON.stringify(
-            {
-              debugMovementSample: {
-                id: s.id,
-                signalType: s.signalType,
-                detail: s.detail,
-                gap: s.gap,
-                lineMovement: s.lineMovement,
-                recentMovementAbs: s.recentMovementAbs,
-                strengthScore: s.strengthScore,
-                isTopSignal,
-              },
-            },
-            null,
-            2
-          )
-        );
-      }
-      return { ...s, isTopSignal };
-    });
+    const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, true), true);
+    const taggedSignalsRaw = [...eventSignals, ...currentSignals];
     const taggedSignals = addSignalLifecycle(taggedSignalsRaw, now);
-    const injuries = await getNflInjuryFeed(filteredGames, sportKey);
     console.log(JSON.stringify({ surfDebug: debug }, null, 2));
     console.log(
       JSON.stringify(
@@ -580,6 +751,8 @@ async function getLiveSurfFeed(request: Request) {
           surfFeedRenderDebug: {
             filteredGames: filteredGames.length,
             sportKey,
+            tapeRecord,
+            horizonRecord,
             cardsByLeague: leagueCounts,
             renderedCards: taggedSignals.length,
           },
@@ -595,25 +768,21 @@ async function getLiveSurfFeed(request: Request) {
       sportKey,
       sportLabel: sportConfig.label,
       generatedAt: now,
-      injuries,
       overnight,
+      overnightHorizon,
       debug,
       coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
     });
   }
 
   // Safety: some responses may omit bookmakers or certain markets.
-  const detections = detectSurfSignals(filteredGames, { debug: isDebug });
+  const detections = usefulFeedSnapshotDetections(
+    detectSurfSignals(filteredGames, { debug: isDebug }),
+    sportKey,
+  );
   const signals = formatSignalCards(detections, filteredGames);
-  const contextMoves = asStrongContextMovementCards(filteredGames);
-  const byId = new Set(signals.map((s) => s.id));
-  const mergedSignals = [
-    ...signals,
-    ...contextMoves.filter((s) => !byId.has(s.id)),
-  ];
-  const taggedSignalsRaw = enrichSignals(mergedSignals, filteredGames, detections, isDebug);
-  const taggedSignals = addSignalLifecycle(collapseMLBSignalsByGame(taggedSignalsRaw, isDebug), now);
-  const injuries = await getNflInjuryFeed(filteredGames, sportKey);
+  const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, isDebug), isDebug);
+  const taggedSignals = addSignalLifecycle([...eventSignals, ...currentSignals], now);
   if (isDebug) {
     const leagueCounts = taggedSignals.reduce(
       (acc, s) => {
@@ -644,8 +813,8 @@ async function getLiveSurfFeed(request: Request) {
     sportKey,
     sportLabel: sportConfig.label,
     generatedAt: now,
-    injuries,
     overnight,
+    overnightHorizon,
     signals: taggedSignals.slice().sort((a, b) => {
       const as = typeof a.strengthScore === "number" && Number.isFinite(a.strengthScore) ? a.strengthScore : 0;
       const bs = typeof b.strengthScore === "number" && Number.isFinite(b.strengthScore) ? b.strengthScore : 0;

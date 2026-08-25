@@ -15,9 +15,6 @@ export function SurfAppHeader({ title, subtitle, onRefresh, isRefreshing = false
           <div className="mb-5 flex items-center gap-2">
             <span className="text-sm font-semibold tracking-tight text-[color:var(--surf-ink-solid)]">Surf</span>
             <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--surf-primary)]" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--surf-ink-45)]">
-              Market intelligence
-            </span>
           </div>
           <h1 className="text-[28px] font-semibold leading-none tracking-[-0.04em] text-[color:var(--surf-ink-solid)]">
             {title}
