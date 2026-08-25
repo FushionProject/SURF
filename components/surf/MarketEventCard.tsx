@@ -18,23 +18,38 @@ function eventTime(card: SignalCard): number | undefined {
   return card.signalChangedAt ?? card.detectedAt ?? card.lastSeenAt;
 }
 
-function relativeTime(timestamp: number | undefined, now: number): string {
-  if (!timestamp || !Number.isFinite(timestamp)) return "New";
-  const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function localTimestamp(timestamp: number | undefined, now: number): string | undefined {
+  if (!timestamp || !Number.isFinite(timestamp)) return undefined;
+  const event = new Date(timestamp);
+  const reference = new Date(now);
+  if (Number.isNaN(event.getTime()) || Number.isNaN(reference.getTime())) return undefined;
+
+  const time = event.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+  const isToday = event.getFullYear() === reference.getFullYear()
+    && event.getMonth() === reference.getMonth()
+    && event.getDate() === reference.getDate();
+  if (isToday) return `at ${time}`;
+
+  const date = event.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${date} at ${time}`;
 }
 
 function timingLabel(card: SignalCard, now: number): string {
-  const timestamp = eventTime(card);
-  if (card.whaleActivity) return `Filled ${relativeTime(timestamp, now).toLowerCase()}`;
-  if (card.opportunity) return `Verified ${relativeTime(timestamp, now).toLowerCase()}`;
-  if (card.marketHorizon) return `Changed ${relativeTime(timestamp, now).toLowerCase()}`;
-  if (card.trackedMarket) return `Moved ${relativeTime(timestamp, now).toLowerCase()}`;
-  return `Observed ${relativeTime(timestamp, now).toLowerCase()}`;
+  const timestamp = localTimestamp(eventTime(card), now);
+  const verb = card.whaleActivity
+    ? "Filled"
+    : card.opportunity
+      ? "Verified"
+      : card.marketHorizon
+        ? "Changed"
+        : card.trackedMarket
+          ? "Moved"
+          : "Observed";
+  return timestamp ? `${verb} ${timestamp}` : verb;
 }
 
 function gameTime(value: string): string {
