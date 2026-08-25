@@ -127,12 +127,12 @@ function TeamIdentity({ name, league, side }: { name: string; league: SurfLeague
   );
 }
 
-function movementLabel(mode: SurfMarketType, open: number | undefined, current: number | undefined): string {
+function movementLabel(mode: SurfMarketType, open: number | undefined, current: number | undefined, spreadName = "spread"): string {
   if (typeof open !== "number" || typeof current !== "number") return "Awaiting movement history";
   const delta = Math.round((current - open) * 2) / 2;
   if (delta === 0) return "Holding at the opener";
   if (mode === "totals") return delta > 0 ? `Total moved up ${Math.abs(delta)} pts` : `Total moved down ${Math.abs(delta)} pts`;
-  return `Home spread moved ${delta > 0 ? "+" : ""}${delta} pts`;
+  return `Home ${spreadName} moved ${delta > 0 ? "+" : ""}${delta} pts`;
 }
 
 function opportunityTag(opportunity: MarketOpportunity | undefined): string | undefined {
@@ -200,6 +200,7 @@ function MarketMovementChart({
   history,
   observedAt,
   homeAbbrev,
+  spreadName,
 }: {
   mode: SurfMarketType;
   open: number | undefined;
@@ -207,6 +208,7 @@ function MarketMovementChart({
   history: MarketAverageHistoryPoint[];
   observedAt: number;
   homeAbbrev: string;
+  spreadName: string;
 }) {
   const rawId = useId();
   const gradientId = `market-fill-${rawId.replace(/:/g, "")}`;
@@ -264,7 +266,7 @@ function MarketMovementChart({
 
   return (
     <div className="relative overflow-hidden rounded-[18px] border border-[color:var(--surf-line-08)] bg-black/15 px-3 pb-2 pt-1.5">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[138px] w-full" role="img" aria-label={`${mode === "spreads" ? "Spread" : "Total"} movement from open to now`}>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[138px] w-full" role="img" aria-label={`${mode === "spreads" ? spreadName : "total"} movement from open to now`}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={lineColor} stopOpacity="0.28" />
@@ -312,7 +314,7 @@ function MarketMovementChart({
         </text>
       </svg>
       <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-[color:var(--surf-line-06)] bg-[color:var(--surf-surface)]/80 px-2.5 py-1 text-[9px] font-medium text-[color:var(--surf-ink-40)] backdrop-blur">
-        {mode === "spreads" ? `${homeAbbrev} spread` : "Consensus O/U"}
+        {mode === "spreads" ? `${homeAbbrev} ${spreadName}` : "Consensus O/U"}
       </div>
     </div>
   );
@@ -469,6 +471,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
   const current = data.currentMedianSnapshot[game.id] ?? {};
   const opening = data.openingMedianSnapshot[game.id] ?? {};
   const marketHistory = data.marketAverage?.[game.id];
+  const spreadName = config.league === "MLB" ? "run line" : "spread";
   const hasOpportunity = board.opportunities.length > 0;
   const bookCount = board.booksInSample;
   const activeOpen = marketMode === "spreads"
@@ -517,8 +520,8 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
             <div className="text-[8px] font-medium text-[color:var(--surf-ink-30)]">Not a pick</div>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
-            <BestOfferTile label="Away spread" offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} />
-            <BestOfferTile label="Home spread" offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} />
+            <BestOfferTile label={`Away ${spreadName}`} offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} />
+            <BestOfferTile label={`Home ${spreadName}`} offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} />
             <BestOfferTile label="Over" offer={board.offers.over} opportunity={opportunitiesBySlot.get("over")} />
             <BestOfferTile label="Under" offer={board.offers.under} opportunity={opportunitiesBySlot.get("under")} />
           </div>
@@ -528,7 +531,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-45)]">Line movement</div>
-              <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">{movementLabel(marketMode, activeOpen, activeCurrent)}</div>
+              <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">{movementLabel(marketMode, activeOpen, activeCurrent, spreadName)}</div>
             </div>
             <div className="inline-flex rounded-xl border border-[color:var(--surf-line-08)] bg-black/20 p-1" aria-label="Select line history market">
               <button
@@ -539,7 +542,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
                   marketMode === "spreads" ? "bg-[#8b9cff]/15 text-[#aeb8ff]" : "text-[color:var(--surf-ink-40)] hover:text-[color:var(--surf-ink-70)]"
                 }`}
               >
-                Spread
+                {config.league === "MLB" ? "Run line" : "Spread"}
               </button>
               <button
                 type="button"
@@ -553,7 +556,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
               </button>
             </div>
           </div>
-          <MarketMovementChart mode={marketMode} open={activeOpen} current={activeCurrent} history={activeHistory} observedAt={observedAt} homeAbbrev={home} />
+          <MarketMovementChart mode={marketMode} open={activeOpen} current={activeCurrent} history={activeHistory} observedAt={observedAt} homeAbbrev={home} spreadName={spreadName} />
         </section>
       </div>
 
