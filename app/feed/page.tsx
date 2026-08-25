@@ -12,7 +12,7 @@ import { SurfFooter } from "@/components/surf/SurfFooter";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import { isOvernight, nextRefreshDelayMs, refreshScheduleLabel } from "@/lib/surf/feedSchedule";
 import { getSurfSportConfig, type SurfSportKey, type SurfSportLabel } from "@/lib/surf/sports";
-import type { OvernightHorizonSummary, OvernightMarketSummary, SignalCard } from "@/lib/surf/types";
+import type { OvernightMarketSummary, SignalCard } from "@/lib/surf/types";
 
 const LAST_VISIT_KEY = "surf:lastFeedVisitAt";
 
@@ -24,7 +24,6 @@ type SurfFeedResponse = {
   generatedAt?: number;
   nextGameAt?: number;
   overnight?: OvernightMarketSummary;
-  overnightHorizon?: OvernightHorizonSummary;
   dataSource?: "demo" | "fallback";
   dataNotice?: string;
 };
@@ -192,7 +191,7 @@ export default function Home() {
             </div>
           ) : null}
 
-          <OvernightMoves summary={data?.overnight} horizon={data?.overnightHorizon} />
+          <OvernightMoves summary={data?.overnight} sportKey={sport} />
 
           <div className="mb-3 flex items-center justify-between px-1">
             <div>

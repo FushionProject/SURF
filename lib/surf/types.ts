@@ -341,14 +341,6 @@ export type SignalCard = {
   whaleActivity?: WhaleActivityEvidence;
 };
 
-export type OvernightHorizonSummary = {
-  windowKey: string;
-  windowLabel: string;
-  isActive: boolean;
-  isMorningRecap: boolean;
-  cards: SignalCard[];
-};
-
 export type OvernightMarketMove = {
   id: string;
   game: {

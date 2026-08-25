@@ -4,7 +4,6 @@ import type {
   MarketHorizonEvent,
   MarketTapeEvent,
   OddsApiGame,
-  OvernightHorizonSummary,
   SurfOpportunityMarketType,
 } from "@/lib/surf/types";
 import type { SignalCard } from "@/lib/surf/types";
@@ -33,12 +32,7 @@ import { getMarketTapeEvents, recordMarketTapeSnapshot } from "@/lib/surf/market
 import { getMarketHorizonEvents, recordMarketHorizonSnapshot } from "@/lib/surf/marketHorizon";
 import { buildOpportunityBoards, type MarketOpportunity } from "@/lib/surf/opportunities";
 import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
-import {
-  isMorningRecap,
-  isOvernight,
-  isOvernightCapture,
-  overnightWindowKey,
-} from "@/lib/surf/feedSchedule";
+import { isOvernightCapture, overnightWindowKey } from "@/lib/surf/feedSchedule";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
 import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
@@ -859,16 +853,6 @@ async function getLiveSurfFeed(request: Request) {
   const supportingMarketSignals = [...horizonSignals, ...tapeSignals];
   const currentOpportunitySignals = opportunityCards(filteredGames, sportKey, now);
   const overnight = getOvernightMarketSummary(tapeEvents, sportKey, now);
-  const activeOvernightWindow = overnightWindowKey(now);
-  const overnightHorizon: OvernightHorizonSummary = {
-    windowKey: activeOvernightWindow,
-    windowLabel: "10 PM–6 AM CT",
-    isActive: isOvernight(now),
-    isMorningRecap: isMorningRecap(now),
-    cards: currentOpportunitySignals
-      .sort((a, b) => (b.strengthScore ?? 0) - (a.strengthScore ?? 0))
-      .slice(0, 5),
-  };
 
   if (isDebug) {
     const includedBooks = new Map<string, string>();
@@ -928,7 +912,6 @@ async function getLiveSurfFeed(request: Request) {
       generatedAt: now,
       nextGameAt: nextGameAt(filteredGames, now),
       overnight,
-      overnightHorizon,
       predictionMarkets: predictionMarketSnapshot.providers,
       debug,
       coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
@@ -980,7 +963,6 @@ async function getLiveSurfFeed(request: Request) {
     generatedAt: now,
     nextGameAt: nextGameAt(filteredGames, now),
     overnight,
-    overnightHorizon,
     predictionMarkets: predictionMarketSnapshot.providers,
     signals: taggedSignals.slice().sort((a, b) => {
       const as = typeof a.strengthScore === "number" && Number.isFinite(a.strengthScore) ? a.strengthScore : 0;
