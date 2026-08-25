@@ -20,6 +20,7 @@ import {
 import { getSurfSportConfig, type SurfLeague, type SurfSportKey, type SurfSportLabel } from "@/lib/surf/sports";
 import type { OddsApiGame, SurfMarketType, SurfSignalDetection } from "@/lib/surf/types";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
+import { getTeamPrimaryRgb } from "@/lib/teamColors";
 import { getTeamLogo } from "@/lib/teamLogos";
 
 type LineSnapshot = Record<string, { spreads?: number; totals?: number }>;
@@ -88,14 +89,22 @@ function marketAge(timestamp: number | undefined, now: number): string {
 function TeamMark({ name, league, compact = false }: { name: string; league: SurfLeague; compact?: boolean }) {
   const logo = getTeamLogo(name, league);
   const abbrev = getTeamAbbrev(name) ?? name.slice(0, 3).toUpperCase();
+  const teamRgb = getTeamPrimaryRgb(name, league);
 
   return (
     <div
       className={`relative flex shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_30px_rgba(0,0,0,0.28)] ${
         compact ? "h-9 w-9" : "h-[68px] w-[68px]"
       }`}
+      style={{
+        borderColor: `rgba(${teamRgb},0.24)`,
+        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 30px rgba(0,0,0,0.28), 0 0 24px rgba(${teamRgb},0.10)`,
+      }}
     >
-      <div className="absolute inset-1 rounded-[16px] bg-[radial-gradient(circle_at_50%_20%,rgba(var(--surf-primary-rgb),0.12),transparent_68%)]" />
+      <div
+        className="absolute inset-1 rounded-[16px]"
+        style={{ backgroundImage: `radial-gradient(circle at 50% 20%, rgba(${teamRgb},0.24), transparent 68%)` }}
+      />
       {logo ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -467,6 +476,8 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
   const [marketMode, setMarketMode] = useState<SurfMarketType>("spreads");
   const config = getSurfSportConfig(data.sportKey);
   const home = getTeamAbbrev(game.home_team) ?? game.home_team;
+  const awayTeamRgb = getTeamPrimaryRgb(game.away_team, config.league);
+  const homeTeamRgb = getTeamPrimaryRgb(game.home_team, config.league);
   const board = useMemo(() => buildGameOfferBoard(game, data.sportKey, observedAt), [data.sportKey, game, observedAt]);
   const opportunitiesBySlot = useMemo(
     () => new Map<OfferSlot, MarketOpportunity>(board.opportunities.map((opportunity) => [opportunity.slot, opportunity])),
@@ -488,8 +499,18 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
 
   return (
     <article className="relative overflow-hidden rounded-[26px] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)] shadow-[var(--surf-card-shadow)]">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_20%_0%,rgba(var(--surf-primary-rgb),0.14),transparent_48%),radial-gradient(circle_at_84%_8%,rgba(139,92,246,0.12),transparent_44%)]" />
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[color:var(--surf-primary)]/50 to-transparent" />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-36"
+        style={{
+          backgroundImage: `radial-gradient(circle at 20% 0%, rgba(${awayTeamRgb},0.28), transparent 50%), radial-gradient(circle at 84% 8%, rgba(${homeTeamRgb},0.28), transparent 48%)`,
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-x-8 top-0 h-px"
+        style={{
+          backgroundImage: `linear-gradient(to right, transparent, rgba(${awayTeamRgb},0.72), rgba(${homeTeamRgb},0.72), transparent)`,
+        }}
+      />
 
       <div className="relative px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
         <div className="flex items-center justify-between gap-3">
