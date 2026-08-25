@@ -41,6 +41,7 @@ export type SurfSignalTypeLabel =
   | "Book Disagreement"
   | "Run Line Price Conflict"
   | "Best Number"
+  | "Best Price"
   | "Line Movement"
   | "Market Movement"
   | "Price Pressure"
@@ -240,6 +241,24 @@ export type TrackedMarketEvidence = {
   snapshotsCompared: number;
 };
 
+export type MarketOpportunityEvidence = {
+  kind: "best_line" | "best_price" | "key_number";
+  isMiddle?: boolean;
+  middleWidth?: number;
+  score: number;
+  reason: string;
+  selection: string;
+  bookTitle: string;
+  point: number;
+  price?: number;
+  consensusPoint: number;
+  consensusPrice?: number;
+  lineEdge: number;
+  priceEdgePercentagePoints?: number;
+  keyNumber?: number;
+  booksCompared: number;
+};
+
 export type SignalCard = {
   id: string;
   game: {
@@ -275,6 +294,7 @@ export type SignalCard = {
   topReason?: "gap" | "movement" | "disagreement";
   trackedMarket?: TrackedMarketEvidence;
   marketHorizon?: MarketHorizonEvidence;
+  opportunity?: MarketOpportunityEvidence;
 };
 
 export type OvernightHorizonSummary = {

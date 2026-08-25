@@ -34,7 +34,7 @@ function moveExplanation(move: OvernightMarketMove): string {
 }
 
 function HorizonSummary({ horizon }: { horizon: OvernightHorizonSummary }) {
-  const title = horizon.isActive ? "Overnight horizon" : "Morning horizon";
+  const title = horizon.isActive ? "Overnight opportunities" : "Morning opportunities";
   const badge = horizon.isActive ? "Hourly" : "Morning recap";
 
   return (
@@ -44,7 +44,7 @@ function HorizonSummary({ horizon }: { horizon: OvernightHorizonSummary }) {
           <div>
             <div className="text-sm font-semibold text-[color:var(--surf-ink-90)]">{title}</div>
             <div className="mt-1 text-[11px] text-[color:var(--surf-ink-45)]">
-              {horizon.windowLabel} · Useful verified events only
+              {horizon.windowLabel} · Current qualified advantages only
             </div>
           </div>
           <div className="rounded-full bg-[color:var(--surf-primary)]/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-primary)]">
@@ -55,9 +55,9 @@ function HorizonSummary({ horizon }: { horizon: OvernightHorizonSummary }) {
 
       {horizon.cards.length === 0 ? (
         <div className="px-5 py-4">
-          <div className="text-xs font-semibold text-[color:var(--surf-ink-70)]">No useful overnight events {horizon.isActive ? "yet" : "detected"}</div>
+          <div className="text-xs font-semibold text-[color:var(--surf-ink-70)]">No worthwhile overnight opportunities {horizon.isActive ? "yet" : "detected"}</div>
           <p className="mt-1 text-[11px] leading-5 text-[color:var(--surf-ink-45)]">
-            Surf is checking price pressure, consensus changes, key numbers, and resolved splits. Routine noise stays out.
+            Surf is checking for meaningfully better lines, cheaper prices, and NFL key-number value. Routine differences stay out.
           </p>
         </div>
       ) : (
@@ -74,7 +74,7 @@ function HorizonSummary({ horizon }: { horizon: OvernightHorizonSummary }) {
                     </div>
                     <div className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--surf-ink-65)]">{card.title}</div>
                     <div className="mt-1 text-[10px] text-[color:var(--surf-ink-40)]">
-                      {card.signalType} · {lastMoveTime(card.lastMovedAt ?? card.signalChangedAt ?? 0)} CT
+                      {card.signalType} · verified {lastMoveTime(card.lastSeenAt ?? card.signalChangedAt ?? 0)} CT
                     </div>
                   </div>
                   <div className="shrink-0 text-right font-mono text-sm font-semibold text-[color:var(--surf-positive)]">{card.detail}</div>

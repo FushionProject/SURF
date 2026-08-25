@@ -10,8 +10,8 @@ type Item = {
 };
 
 const ITEMS: Item[] = [
-  { label: "Feed", href: "/", isActive: (p) => p === "/" || p.startsWith("/top") },
   { label: "Games", href: "/games", isActive: (p) => p === "/games" || p.startsWith("/games/") },
+  { label: "Feed", href: "/feed", isActive: (p) => p === "/feed" || p.startsWith("/top") },
 ];
 
 export function SurfBottomNav() {

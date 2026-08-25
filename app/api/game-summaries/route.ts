@@ -17,6 +17,7 @@ import type { GameMarketAverage } from "@/lib/surf/marketAverage";
 import { computeMarketAverage, updateGameHistory } from "@/lib/surf/marketAverage";
 import { getDemoGameSummaries, isSurfDemoMode } from "@/lib/surf/demoData";
 import { getNflInjuryFeed, type NflInjuryFeed } from "@/lib/surf/injuries";
+import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
 import {
   isNflSport,
   parseRequestedSport,
@@ -197,15 +198,9 @@ async function getLiveGameSummaries(request: Request) {
   const isMlb = sportKey === "baseball_mlb";
   const isNba = sportKey === "basketball_nba";
   const isNfl = isNflSport(sportKey);
+  const historicalOddsEnabled = process.env.SURF_ENABLE_HISTORICAL_ODDS === "true";
 
   const refreshMode = parseMode(url.searchParams.get("refreshMode"));
-
-  const oddsUrl = new URL(`${ODDS_API_BASE}/sports/${sportKey}/odds`);
-  oddsUrl.searchParams.set("apiKey", apiKey);
-  oddsUrl.searchParams.set("regions", "us");
-  oddsUrl.searchParams.set("markets", "spreads,totals");
-  oddsUrl.searchParams.set("oddsFormat", "american");
-  oddsUrl.searchParams.set("dateFormat", "iso");
 
   const isDebug = url.searchParams.get("debug") === "1";
 
@@ -215,28 +210,8 @@ async function getLiveGameSummaries(request: Request) {
       return snap.games;
     }
 
-    const res = await fetch(oddsUrl.toString(), {
-      method: "GET",
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`Failed to fetch odds (${res.status}): ${text}`);
-    }
-
-    let raw: unknown;
-    try {
-      raw = await res.json();
-    } catch {
-      throw new Error("Odds API returned invalid JSON");
-    }
-
-    if (!Array.isArray(raw)) {
-      throw new Error("Unexpected Odds API response shape");
-    }
-
-    return raw as OddsApiGame[];
+    const snapshot = await getSharedOddsSnapshot({ sportKey, apiKey });
+    return snapshot.games;
   })().catch((err) => {
     const message = err instanceof Error ? err.message : "Failed to fetch odds";
     throw new Error(message);
@@ -342,7 +317,7 @@ async function getLiveGameSummaries(request: Request) {
 
   // NBA-only: capture a historical-open market-average ONCE per game and cache it.
   // This intentionally avoids calling historical on every refresh.
-  if (isNba) {
+  if (isNba && historicalOddsEnabled) {
     const missingHistoricalOpen = filteredGames.filter((g) => {
       const k = marketContextGameKey(g);
       const cached = NBA_HIST_OPEN_STORE.get(k);
@@ -500,14 +475,14 @@ async function getLiveGameSummaries(request: Request) {
 
   // 2) Historical fallback ONCE per game (only if not-started + soon + not yet captured)
   // If historical fails, keep temporary open and mark captured to avoid credit burn.
-  const needsHistorical = filteredGames.filter((g) => {
+  const needsHistorical = historicalOddsEnabled ? filteredGames.filter((g) => {
     const ck = cacheKey(sportKey, g.id);
     const cached = OPEN_LINE_CACHE.get(ck);
     if (!cached) return false;
     if (cached.openCaptured) return false;
     if (!isSoonNotStarted(g.commence_time, now)) return false;
     return true;
-  });
+  }) : [];
 
   if (needsHistorical.length > 0) {
     try {

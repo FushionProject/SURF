@@ -30,6 +30,8 @@ import { getDemoSurfFeed, isSurfDemoMode } from "@/lib/surf/demoData";
 import { getOvernightMarketSummary } from "@/lib/surf/overnightMarket";
 import { getMarketTapeEvents, recordMarketTapeSnapshot } from "@/lib/surf/marketTape";
 import { getMarketHorizonEvents, recordMarketHorizonSnapshot } from "@/lib/surf/marketHorizon";
+import { buildOpportunityBoards, type MarketOpportunity } from "@/lib/surf/opportunities";
+import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
 import {
   isMorningRecap,
   isOvernight,
@@ -39,13 +41,12 @@ import {
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
 import {
+  getSurfSportConfig,
   isNflSport,
   parseRequestedSport,
   SURF_SPORT_KEYS,
   type SurfSportKey,
 } from "@/lib/surf/sports";
-
-const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
 
 const CORE_BOOKMAKER_KEYS = new Set([
   "draftkings",
@@ -196,6 +197,126 @@ function formatTapePoint(value: number, market: MarketTapeEvent["market"]): stri
 
 function formatAmericanPrice(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
+}
+
+function opportunityPoint(opportunity: MarketOpportunity): string {
+  if (opportunity.market === "totals") return `${opportunity.point}`;
+  return opportunity.point > 0 ? `+${opportunity.point}` : `${opportunity.point}`;
+}
+
+function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: number): SignalCard[] {
+  const byId = new Map(games.map((game) => [game.id, game]));
+  return buildOpportunityBoards(games, sportKey, now)
+    .flatMap((board) => {
+      const game = byId.get(board.gameId);
+      if (!game) return [];
+      const grouped = new Map<"spreads" | "totals", MarketOpportunity[]>();
+      for (const opportunity of board.opportunities) {
+        const group = grouped.get(opportunity.market) ?? [];
+        group.push(opportunity);
+        grouped.set(opportunity.market, group);
+      }
+
+      return [...grouped.entries()].map(([market, opportunities]) => {
+        const ranked = opportunities.slice().sort((a, b) => b.score - a.score);
+        const focus = ranked[0];
+        const firstSide = market === "spreads"
+          ? opportunities.find((opportunity) => opportunity.slot === "awaySpread")
+          : opportunities.find((opportunity) => opportunity.slot === "over");
+        const secondSide = market === "spreads"
+          ? opportunities.find((opportunity) => opportunity.slot === "homeSpread")
+          : opportunities.find((opportunity) => opportunity.slot === "under");
+        const rawMiddleWidth = firstSide && secondSide
+          ? market === "spreads"
+            ? firstSide.point + secondSide.point
+            : secondSide.point - firstSide.point
+          : undefined;
+        const middleWidth = rawMiddleWidth != null && rawMiddleWidth > 0
+          ? Math.round(rawMiddleWidth * 2) / 2
+          : undefined;
+        const isMiddle = middleWidth != null && firstSide != null && secondSide != null;
+        const selection = getTeamAbbrev(focus.selection) ?? focus.selection;
+        const currentLine = opportunityPoint(focus);
+        const marketLine = market === "spreads" && focus.consensusPoint > 0
+          ? `+${focus.consensusPoint}`
+          : `${focus.consensusPoint}`;
+        const currentPrice = focus.price != null ? ` (${formatAmericanPrice(focus.price)})` : "";
+        const title =
+          isMiddle
+            ? `${middleWidth}-point middle available: ${getTeamAbbrev(firstSide!.selection) ?? firstSide!.selection} ${opportunityPoint(firstSide!)} / ${getTeamAbbrev(secondSide!.selection) ?? secondSide!.selection} ${opportunityPoint(secondSide!)}`
+          : focus.kind === "key_number"
+            ? `${selection} ${currentLine} crosses NFL key number ${focus.keyNumber}`
+            : focus.kind === "best_price"
+              ? `Best ${selection} price: ${formatAmericanPrice(focus.price ?? 0)}`
+              : `Best ${selection} number: ${currentLine}`;
+        const reason = isMiddle
+          ? `${firstSide!.bookTitle} and ${secondSide!.bookTitle} leave a ${middleWidth}-point window between opposite sides. Prices and limits still determine whether it is usable.`
+          : focus.reason;
+        const sources = isMiddle
+          ? [firstSide!, secondSide!].map((opportunity) => ({
+              label: getTeamAbbrev(opportunity.selection) ?? opportunity.selection,
+              book: opportunity.bookTitle,
+              value: `${opportunityPoint(opportunity)}${opportunity.price != null ? ` (${formatAmericanPrice(opportunity.price)})` : ""}`,
+            }))
+          : [
+              { label: "Available now", book: focus.bookTitle, value: `${currentLine}${currentPrice}` },
+              { label: "Market midpoint", book: `${focus.booksCompared} books`, value: marketLine },
+            ];
+
+        return {
+          id: `feed:${focus.id}`,
+          game: {
+            id: game.id,
+            league: getSurfSportConfig(sportKey).league,
+            sportKey,
+            sportLabel: getSurfSportConfig(sportKey).label,
+            homeTeam: game.home_team,
+            awayTeam: game.away_team,
+          },
+          signalType: focus.kind === "best_price" ? "Best Price" as const : "Best Number" as const,
+          market,
+          title,
+          detail: isMiddle ? sources.map((source) => `${source.book} ${source.value}`).join(" · ") : `${focus.bookTitle} ${currentLine}${currentPrice}`,
+          insight: reason,
+          sources,
+          valueOptions: isMiddle
+            ? undefined
+            : ranked.slice(0, 2).map((opportunity) => ({
+                selection: opportunity.selection,
+                book: opportunity.bookTitle,
+                line: opportunityPoint(opportunity),
+                price: opportunity.price != null ? formatAmericanPrice(opportunity.price) : undefined,
+              })),
+          commenceTime: game.commence_time,
+          gap: focus.lineEdge > 0 ? focus.lineEdge : undefined,
+          detectedAt: now,
+          signalChangedAt: now,
+          lastSeenAt: now,
+          status: "active" as const,
+          strengthScore: isMiddle ? Math.min(100, focus.score + Math.min(8, middleWidth * 3)) : focus.score,
+          isTopSignal: true,
+          topBadge: isMiddle ? "LINE MIDDLE" : focus.kind.replaceAll("_", " ").toUpperCase(),
+          opportunity: {
+            kind: focus.kind,
+            isMiddle,
+            middleWidth,
+            score: isMiddle ? Math.min(100, focus.score + Math.min(8, middleWidth * 3)) : focus.score,
+            reason,
+            selection: focus.selection,
+            bookTitle: focus.bookTitle,
+            point: focus.point,
+            price: focus.price,
+            consensusPoint: focus.consensusPoint,
+            consensusPrice: focus.consensusPrice,
+            lineEdge: focus.lineEdge,
+            priceEdgePercentagePoints: focus.priceEdgePercentagePoints,
+            keyNumber: focus.keyNumber,
+            booksCompared: focus.booksCompared,
+          },
+        } satisfies SignalCard;
+      });
+    })
+    .sort((a, b) => (b.strengthScore ?? 0) - (a.strengthScore ?? 0));
 }
 
 function horizonSignalType(kind: MarketHorizonEvent["kind"]): SignalCard["signalType"] {
@@ -580,16 +701,6 @@ async function getLiveSurfFeed(request: Request) {
   const isDebug = url.searchParams.get("debug") === "1";
   const refreshMode = parseMode(url.searchParams.get("refreshMode"));
 
-  const buildOddsUrl = (requestedKey: SurfSportKey) => {
-    const u = new URL(`${ODDS_API_BASE}/sports/${requestedKey}/odds`);
-    u.searchParams.set("apiKey", apiKey);
-    u.searchParams.set("regions", "us");
-    u.searchParams.set("markets", "spreads,totals");
-    u.searchParams.set("oddsFormat", "american");
-    u.searchParams.set("dateFormat", "iso");
-    return u;
-  };
-
   let schedulerMeta: Awaited<ReturnType<typeof getNbaOddsSnapshot>>["meta"] | undefined;
   const games: OddsApiGame[] = await (async () => {
     if (sportKey === "basketball_nba") {
@@ -598,18 +709,8 @@ async function getLiveSurfFeed(request: Request) {
       return snapshot.games;
     }
 
-    const response = await fetch(buildOddsUrl(sportKey).toString(), {
-      method: "GET",
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new Error(`Failed to fetch ${sportConfig.label} odds (${response.status}): ${body}`);
-    }
-
-    const raw: unknown = await response.json().catch(() => null);
-    if (!Array.isArray(raw)) throw new Error(`Unexpected ${sportConfig.label} odds response shape`);
-    return raw as OddsApiGame[];
+    const snapshot = await getSharedOddsSnapshot({ sportKey, apiKey });
+    return snapshot.games;
   })();
 
   if (isDebug && schedulerMeta) {
@@ -692,24 +793,16 @@ async function getLiveSurfFeed(request: Request) {
     tapeEvents.filter((event) => !tapeEventSupersededByHorizon(event, horizonEvents)),
     now,
   );
-  const eventSignals = [...horizonSignals, ...tapeSignals];
+  const supportingMarketSignals = [...horizonSignals, ...tapeSignals];
+  const currentOpportunitySignals = opportunityCards(filteredGames, sportKey, now);
   const overnight = getOvernightMarketSummary(tapeEvents, sportKey, now);
   const activeOvernightWindow = overnightWindowKey(now);
-  const overnightEventIds = new Set([
-    ...horizonEvents
-      .filter((event) => event.overnightWindowKey === activeOvernightWindow)
-      .map((event) => event.id),
-    ...tapeEvents
-      .filter((event) => event.overnightWindowKey === activeOvernightWindow)
-      .map((event) => event.id),
-  ]);
   const overnightHorizon: OvernightHorizonSummary = {
     windowKey: activeOvernightWindow,
     windowLabel: "10 PM–6 AM CT",
     isActive: isOvernight(now),
     isMorningRecap: isMorningRecap(now),
-    cards: eventSignals
-      .filter((signal) => overnightEventIds.has(signal.id))
+    cards: currentOpportunitySignals
       .sort((a, b) => (b.strengthScore ?? 0) - (a.strengthScore ?? 0))
       .slice(0, 5),
   };
@@ -726,7 +819,7 @@ async function getLiveSurfFeed(request: Request) {
     const detections = usefulFeedSnapshotDetections(allDetections, sportKey);
     const signals = formatSignalCards(detections, filteredGames);
     const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, true), true);
-    const taggedSignalsRaw = [...eventSignals, ...currentSignals];
+    const taggedSignalsRaw = currentOpportunitySignals;
     const taggedSignals = addSignalLifecycle(taggedSignalsRaw, now);
     console.log(JSON.stringify({ surfDebug: debug }, null, 2));
     console.log(
@@ -753,6 +846,8 @@ async function getLiveSurfFeed(request: Request) {
             sportKey,
             tapeRecord,
             horizonRecord,
+            supportingMarketEventsSuppressed: supportingMarketSignals.length,
+            snapshotSignalsSuppressed: currentSignals.length,
             cardsByLeague: leagueCounts,
             renderedCards: taggedSignals.length,
           },
@@ -782,7 +877,7 @@ async function getLiveSurfFeed(request: Request) {
   );
   const signals = formatSignalCards(detections, filteredGames);
   const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, isDebug), isDebug);
-  const taggedSignals = addSignalLifecycle([...eventSignals, ...currentSignals], now);
+  const taggedSignals = addSignalLifecycle(currentOpportunitySignals, now);
   if (isDebug) {
     const leagueCounts = taggedSignals.reduce(
       (acc, s) => {
@@ -798,6 +893,8 @@ async function getLiveSurfFeed(request: Request) {
           surfFeedRenderDebug: {
             filteredGames: filteredGames.length,
             sportKey,
+            supportingMarketEventsSuppressed: supportingMarketSignals.length,
+            snapshotSignalsSuppressed: currentSignals.length,
             cardsByLeague: leagueCounts,
             renderedCards: taggedSignals.length,
           },

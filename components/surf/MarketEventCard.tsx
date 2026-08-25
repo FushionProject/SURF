@@ -12,6 +12,7 @@ type Props = {
 };
 
 function eventTime(card: SignalCard): number | undefined {
+  if (card.opportunity && typeof card.lastSeenAt === "number") return card.lastSeenAt;
   if ((card.trackedMarket || card.marketHorizon) && typeof card.lastMovedAt === "number") return card.lastMovedAt;
   return card.signalChangedAt ?? card.detectedAt ?? card.lastSeenAt;
 }
@@ -28,6 +29,7 @@ function relativeTime(timestamp: number | undefined, now: number): string {
 
 function timingLabel(card: SignalCard, now: number): string {
   const timestamp = eventTime(card);
+  if (card.opportunity) return `Verified ${relativeTime(timestamp, now).toLowerCase()}`;
   if (card.marketHorizon) return `Changed ${relativeTime(timestamp, now).toLowerCase()}`;
   if (card.trackedMarket) return `Moved ${relativeTime(timestamp, now).toLowerCase()}`;
   return `Observed ${relativeTime(timestamp, now).toLowerCase()}`;
@@ -40,6 +42,10 @@ function gameTime(value: string): string {
 }
 
 function badge(card: SignalCard): string {
+  if (card.opportunity?.isMiddle) return "Line middle";
+  if (card.opportunity?.kind === "key_number") return `Key ${card.opportunity.keyNumber} value`;
+  if (card.opportunity?.kind === "best_price") return "Best price";
+  if (card.opportunity?.kind === "best_line") return "Best line";
   if (card.marketHorizon?.kind === "price_pressure") return "Price pressure";
   if (card.marketHorizon?.kind === "consensus_shift") return "Consensus shift";
   if (card.marketHorizon?.kind === "key_number_cross") return "Key number";
@@ -105,10 +111,9 @@ function strengthTier(score: number): { dots: 1 | 3 | 4 | 5; label: "Quiet" | "M
   return { dots: 1, label: "Quiet" };
 }
 
-function SignalStrength({ score, relevance = false }: { score: number | undefined; relevance?: boolean }) {
+function SignalStrength({ score, measure = "market magnitude" }: { score: number | undefined; measure?: string }) {
   if (typeof score !== "number" || !Number.isFinite(score)) return null;
   const tier = strengthTier(Math.max(0, Math.min(100, Math.round(score))));
-  const measure = relevance ? "event relevance" : "market magnitude";
 
   return (
     <div
@@ -161,7 +166,8 @@ export function MarketEventCard({ card, now }: Props) {
   const home = getTeamAbbrev(card.game.homeTeam) ?? card.game.homeTeam;
   const tracked = card.trackedMarket;
   const horizon = card.marketHorizon;
-  const verified = Boolean(tracked || horizon);
+  const opportunity = card.opportunity;
+  const verified = Boolean(opportunity || tracked || horizon);
 
   return (
     <article className="rounded-[20px] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)] px-4 py-4 shadow-[var(--surf-card-shadow)]">
@@ -173,7 +179,7 @@ export function MarketEventCard({ card, now }: Props) {
         </div>
         <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-ink-40)]">
           <span className={`h-1.5 w-1.5 rounded-full ${verified ? "bg-[color:var(--surf-positive)]" : "bg-[color:var(--surf-neutral)]"}`} />
-          {verified ? "Verified" : "Snapshot"}
+          {opportunity ? "Live quote" : verified ? "Verified" : "Snapshot"}
         </div>
       </div>
 
@@ -193,9 +199,53 @@ export function MarketEventCard({ card, now }: Props) {
       <h2 className="mt-3 text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[color:var(--surf-ink-solid)]">
         {headline(card)}
       </h2>
-      <SignalStrength score={card.strengthScore} relevance={Boolean(horizon)} />
+      <SignalStrength
+        score={card.strengthScore}
+        measure={opportunity ? "opportunity value" : horizon ? "event relevance" : "market magnitude"}
+      />
 
-      {horizon ? (
+      {opportunity ? (
+        <div className="mt-3">
+          <div className="border-l-2 border-[color:var(--surf-primary)] pl-3">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-ink-35)]">Why it is worth a look</div>
+            <p className="mt-1 text-[11px] leading-5 text-[color:var(--surf-ink-60)]">{opportunity.reason}</p>
+          </div>
+
+          {card.sources && card.sources.length > 0 ? (
+            <div className="mt-3 divide-y divide-[color:var(--surf-line-06)] rounded-xl border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)]">
+              {card.sources.slice(0, 2).map((source) => (
+                <div key={`${source.label}:${source.book}`} className="flex items-center justify-between gap-4 px-3 py-2.5">
+                  <div>
+                    <div className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{source.label}</div>
+                    <div className="mt-0.5 text-[9px] text-[color:var(--surf-ink-35)]">{source.book}</div>
+                  </div>
+                  <div className="font-mono text-sm font-semibold text-[color:var(--surf-positive)]">{source.value}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {card.valueOptions && card.valueOptions.length > 1 ? <BestCurrentNumbers options={card.valueOptions} /> : null}
+
+          <details className="mt-3 border-t border-[color:var(--surf-line-06)] pt-3">
+            <summary className="cursor-pointer list-none text-[10px] font-semibold text-[color:var(--surf-primary)] marker:hidden">
+              Evidence &amp; method <span aria-hidden="true">＋</span>
+            </summary>
+            <ul className="mt-2 space-y-1.5 text-[10px] leading-4 text-[color:var(--surf-ink-45)]">
+              <li>• {opportunity.booksCompared} sportsbooks were compared in the current snapshot.</li>
+              {opportunity.isMiddle && opportunity.middleWidth != null ? (
+                <li>• The best opposite-side numbers leave a {opportunity.middleWidth}-point window.</li>
+              ) : (
+                <li>• The market midpoint is {card.market === "spreads" && opportunity.consensusPoint > 0 ? "+" : ""}{opportunity.consensusPoint}.</li>
+              )}
+              {opportunity.kind === "best_price" && opportunity.priceEdgePercentagePoints != null ? (
+                <li>• The estimated price advantage is {opportunity.priceEdgePercentagePoints.toFixed(1)} implied-probability points.</li>
+              ) : null}
+              <li>• This ranks available market value, not the probability that the selection wins.</li>
+            </ul>
+          </details>
+        </div>
+      ) : horizon ? (
         <div className="mt-3">
           <div className="border-l-2 border-[color:var(--surf-primary)] pl-3">
             <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-ink-35)]">Why it matters</div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { DemoDataNotice } from "@/components/surf/DemoDataNotice";
 import { InjuryConnectionNotice } from "@/components/surf/InjuryConnectionNotice";
@@ -10,6 +10,14 @@ import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
 import { SurfFooter } from "@/components/surf/SurfFooter";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import type { NflInjury, NflInjuryFeed } from "@/lib/surf/injuries";
+import { nextRefreshDelayMs } from "@/lib/surf/feedSchedule";
+import type { GameMarketAverage, MarketAverageHistoryPoint } from "@/lib/surf/marketAverage";
+import {
+  buildGameOfferBoard,
+  type BestMarketOffer,
+  type MarketOpportunity,
+  type OfferSlot,
+} from "@/lib/surf/opportunities";
 import { getSurfSportConfig, type SurfLeague, type SurfSportKey, type SurfSportLabel } from "@/lib/surf/sports";
 import type { OddsApiGame, SurfMarketType, SurfSignalDetection } from "@/lib/surf/types";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
@@ -29,6 +37,7 @@ type GamesResponse = {
     string,
     { spreads?: { home?: number; away?: number }; totals?: { over?: number; under?: number } }
   >;
+  marketAverage: Record<string, GameMarketAverage>;
   injuries: NflInjuryFeed;
   dataSource?: "demo" | "fallback";
   dataNotice?: string;
@@ -67,6 +76,14 @@ function gameTime(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function marketAge(timestamp: number | undefined, now: number): string {
+  if (timestamp == null || !Number.isFinite(timestamp)) return "Update time unavailable";
+  const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
+  if (minutes < 1) return "Market updated just now";
+  if (minutes < 60) return `Market updated ${minutes}m ago`;
+  return `Market updated ${Math.floor(minutes / 60)}h ago`;
 }
 
 function TeamMark({ name, league, compact = false }: { name: string; league: SurfLeague; compact?: boolean }) {
@@ -118,25 +135,105 @@ function movementLabel(mode: SurfMarketType, open: number | undefined, current: 
   return `Home spread moved ${delta > 0 ? "+" : ""}${delta} pts`;
 }
 
+function opportunityTag(opportunity: MarketOpportunity | undefined): string | undefined {
+  if (!opportunity) return undefined;
+  if (opportunity.kind === "key_number") return `Key ${opportunity.keyNumber}`;
+  if (opportunity.kind === "best_price") return "Best price";
+  return `${opportunity.lineEdge} pt better`;
+}
+
+function BestOfferTile({
+  label,
+  offer,
+  opportunity,
+}: {
+  label: string;
+  offer: BestMarketOffer | undefined;
+  opportunity: MarketOpportunity | undefined;
+}) {
+  const selection = offer ? getTeamAbbrev(offer.selection) ?? offer.selection : "—";
+  const line = offer
+    ? offer.market === "spreads"
+      ? `${selection} ${signed(offer.point)}`
+      : `${offer.selection} ${plain(offer.point)}`
+    : "Not posted";
+  const tag = opportunityTag(opportunity);
+
+  return (
+    <div className="min-w-0 rounded-[16px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-3.5 py-3">
+      <div className="flex min-h-4 items-center justify-between gap-2">
+        <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-[color:var(--surf-ink-35)]">{label}</span>
+        {tag ? (
+          <span className="rounded-full bg-[rgba(var(--surf-primary-rgb),0.12)] px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.07em] text-[color:var(--surf-primary)]">
+            {tag}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-1.5 truncate font-mono text-[16px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
+        {line}{offer?.price != null ? ` (${american(offer.price)})` : ""}
+      </div>
+      <div className="mt-1 truncate text-[9px] font-medium text-[color:var(--surf-ink-50)]">
+        {offer ? offer.bookTitle : "Waiting for sportsbook lines"}
+      </div>
+      {offer ? (
+        <div className="mt-1 text-[8px] text-[color:var(--surf-ink-30)]">
+          Midpoint {offer.market === "spreads" ? signed(offer.consensusPoint) : plain(offer.consensusPoint)} · {offer.booksCompared} books
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function historyValue(point: MarketAverageHistoryPoint, mode: SurfMarketType): number | null {
+  return mode === "spreads" ? point.spreadAvg : point.totalAvg;
+}
+
+function chartClock(timestamp: number | undefined): string {
+  if (timestamp == null || !Number.isFinite(timestamp)) return "NOW";
+  return new Date(timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 function MarketMovementChart({
   mode,
   open,
   current,
+  history,
+  observedAt,
   homeAbbrev,
 }: {
   mode: SurfMarketType;
   open: number | undefined;
   current: number | undefined;
+  history: MarketAverageHistoryPoint[];
+  observedAt: number;
   homeAbbrev: string;
 }) {
   const rawId = useId();
   const gradientId = `market-fill-${rawId.replace(/:/g, "")}`;
   const lineColor = mode === "totals" ? "var(--surf-primary)" : "#8b9cff";
-  const hasOpen = typeof open === "number" && Number.isFinite(open);
-  const hasCurrent = typeof current === "number" && Number.isFinite(current);
-  const chartOpen = hasOpen ? open : hasCurrent ? current : undefined;
-  const chartCurrent = hasCurrent ? current : hasOpen ? open : undefined;
-  const values = [chartOpen, chartCurrent].filter((value): value is number => typeof value === "number");
+  const tracked = history
+    .map((point) => ({ timestamp: new Date(point.timestamp).getTime(), value: historyValue(point, mode) }))
+    .filter((point): point is { timestamp: number; value: number } => Number.isFinite(point.timestamp) && typeof point.value === "number" && Number.isFinite(point.value))
+    .reduce<Array<{ timestamp: number; value: number }>>((points, point) => {
+      const last = points.at(-1);
+      if (last?.value === point.value) {
+        points[points.length - 1] = point;
+      } else {
+        points.push(point);
+      }
+      return points;
+    }, []);
+  const chartPoints = tracked.slice();
+  if (chartPoints.length === 0 && typeof current === "number" && Number.isFinite(current)) {
+    chartPoints.push({ timestamp: observedAt, value: current });
+  }
+  if (chartPoints.length >= 1 && typeof open === "number" && Number.isFinite(open) && chartPoints[0].value !== open) {
+    chartPoints.unshift({ timestamp: chartPoints[0].timestamp - 1, value: open });
+  }
+  if (chartPoints.length >= 1 && typeof current === "number" && Number.isFinite(current) && chartPoints.at(-1)?.value !== current) {
+    chartPoints.push({ timestamp: observedAt, value: current });
+  }
+  const values = chartPoints.map((point) => point.value);
   const width = 640;
   const height = 152;
   const left = 32;
@@ -149,11 +246,20 @@ function MarketMovementChart({
   const low = min - padding;
   const high = max + padding;
   const y = (value: number) => top + ((high - value) / (high - low)) * (bottom - top);
-  const yOpen = chartOpen == null ? bottom : y(chartOpen);
-  const yCurrent = chartCurrent == null ? bottom : y(chartCurrent);
-  const control = (right - left) * 0.44;
-  const linePath = `M ${left} ${yOpen} C ${left + control} ${yOpen}, ${right - control} ${yCurrent}, ${right} ${yCurrent}`;
-  const areaPath = `${linePath} L ${right} ${bottom + 8} L ${left} ${bottom + 8} Z`;
+  const firstTimestamp = chartPoints[0]?.timestamp;
+  const lastTimestamp = chartPoints.at(-1)?.timestamp;
+  const span = Math.max(1, (lastTimestamp ?? 0) - (firstTimestamp ?? 0));
+  const plotted = chartPoints.map((point, index) => ({
+    ...point,
+    x:
+      chartPoints.length === 1
+        ? width / 2
+        : left + ((point.timestamp - (firstTimestamp ?? point.timestamp)) / span) * (right - left),
+    y: y(point.value),
+    index,
+  }));
+  const linePath = plotted.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const areaPath = plotted.length >= 2 ? `${linePath} L ${plotted.at(-1)?.x ?? right} ${bottom + 8} L ${plotted[0].x} ${bottom + 8} Z` : "";
   const formatter = mode === "spreads" ? signed : plain;
 
   return (
@@ -169,17 +275,28 @@ function MarketMovementChart({
           const gridY = top + (bottom - top) * position;
           return <line key={position} x1={left} x2={right} y1={gridY} y2={gridY} stroke="var(--surf-line-06)" strokeWidth="1" strokeDasharray="4 7" />;
         })}
-        {values.length > 0 ? (
+        {plotted.length >= 2 ? (
           <>
             <path d={areaPath} fill={`url(#${gradientId})`} />
             <path d={linePath} fill="none" stroke={lineColor} strokeWidth="3" strokeLinecap="round" />
-            <circle cx={left} cy={yOpen} r="5" fill="var(--surf-surface)" stroke={lineColor} strokeWidth="3" />
-            <circle cx={right} cy={yCurrent} r="6" fill={lineColor} stroke="var(--surf-surface)" strokeWidth="3" />
-            <text x={left} y={Math.max(14, yOpen - 12)} fill="var(--surf-ink-75)" fontSize="12" fontWeight="700">
-              {formatter(chartOpen)}
+            {plotted.slice(1, -1).map((point) => <circle key={`${point.timestamp}:${point.index}`} cx={point.x} cy={point.y} r="3" fill={lineColor} opacity="0.75" />)}
+            <circle cx={plotted[0].x} cy={plotted[0].y} r="5" fill="var(--surf-surface)" stroke={lineColor} strokeWidth="3" />
+            <circle cx={plotted.at(-1)?.x} cy={plotted.at(-1)?.y} r="6" fill={lineColor} stroke="var(--surf-surface)" strokeWidth="3" />
+            <text x={plotted[0].x} y={Math.max(14, plotted[0].y - 12)} fill="var(--surf-ink-75)" fontSize="12" fontWeight="700">
+              {formatter(plotted[0].value)}
             </text>
-            <text x={right} y={Math.max(14, yCurrent - 12)} fill="var(--surf-ink-90)" fontSize="12" fontWeight="700" textAnchor="end">
-              {formatter(chartCurrent)}
+            <text x={plotted.at(-1)?.x} y={Math.max(14, (plotted.at(-1)?.y ?? top) - 12)} fill="var(--surf-ink-90)" fontSize="12" fontWeight="700" textAnchor="end">
+              {formatter(plotted.at(-1)?.value)}
+            </text>
+          </>
+        ) : plotted.length === 1 ? (
+          <>
+            <circle cx={plotted[0].x} cy={plotted[0].y} r="7" fill={lineColor} stroke="var(--surf-surface)" strokeWidth="3" />
+            <text x={width / 2} y={Math.max(14, plotted[0].y - 16)} fill="var(--surf-ink-80)" fontSize="12" fontWeight="700" textAnchor="middle">
+              {formatter(plotted[0].value)}
+            </text>
+            <text x={width / 2} y={bottom + 2} fill="var(--surf-ink-40)" fontSize="11" textAnchor="middle">
+              Tracking begins with this check
             </text>
           </>
         ) : (
@@ -187,11 +304,11 @@ function MarketMovementChart({
             Line history is not available yet
           </text>
         )}
-        <text x={left} y={height - 7} fill="var(--surf-ink-35)" fontSize="10" fontWeight="700" letterSpacing="1.4">
-          OPEN
+        <text x={left} y={height - 7} fill="var(--surf-ink-35)" fontSize="10" fontWeight="700" letterSpacing="1.1">
+          {plotted.length >= 2 ? chartClock(firstTimestamp).toUpperCase() : "FIRST CHECK"}
         </text>
-        <text x={right} y={height - 7} fill="var(--surf-ink-35)" fontSize="10" fontWeight="700" letterSpacing="1.4" textAnchor="end">
-          NOW
+        <text x={right} y={height - 7} fill="var(--surf-ink-35)" fontSize="10" fontWeight="700" letterSpacing="1.1" textAnchor="end">
+          {plotted.length >= 2 ? chartClock(lastTimestamp).toUpperCase() : "NOW"}
         </text>
       </svg>
       <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-[color:var(--surf-line-06)] bg-[color:var(--surf-surface)]/80 px-2.5 py-1 text-[9px] font-medium text-[color:var(--surf-ink-40)] backdrop-blur">
@@ -233,7 +350,7 @@ function InjuryTeam({
           </div>
         </div>
         <span className="rounded-full bg-[color:var(--surf-fill-06)] px-2 py-1 font-mono text-[10px] font-semibold text-[color:var(--surf-ink-55)]">
-          {injuries.length}
+          {isLoading ? "…" : injuries.length}
         </span>
       </div>
 
@@ -276,6 +393,13 @@ function InjuryDrawer({
   const homeInjuries = feed.injuriesByTeam[homeTeam] ?? [];
   const total = awayInjuries.length + homeInjuries.length;
   const isAvailable = feed.status === "available";
+  const awayIsLoading = Boolean(feed.isPartial && feed.missingTeams.includes(awayTeam));
+  const homeIsLoading = Boolean(feed.isPartial && feed.missingTeams.includes(homeTeam));
+  const awayAbbrev = getTeamAbbrev(awayTeam) ?? awayTeam;
+  const homeAbbrev = getTeamAbbrev(homeTeam) ?? homeTeam;
+  const awaySummary = awayIsLoading ? `${awayAbbrev} loading` : `${awayAbbrev} ${awayInjuries.length}`;
+  const homeSummary = homeIsLoading ? `${homeAbbrev} loading` : `${homeAbbrev} ${homeInjuries.length}`;
+  const totalSummary = awayIsLoading || homeIsLoading ? "partial report" : `${total} total`;
 
   return (
     <details className="group border-t border-[color:var(--surf-line-06)] bg-black/[0.08]">
@@ -292,7 +416,9 @@ function InjuryDrawer({
               {isAvailable ? <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--surf-positive)]" /> : null}
             </div>
             <div className="mt-0.5 text-[10px] text-[color:var(--surf-ink-35)]">
-              {isAvailable ? `${total} listed across both teams` : "Verified context is not available yet"}
+              {isAvailable
+                ? `${awaySummary} · ${homeSummary} · ${totalSummary}`
+                : "Verified context is not available yet"}
             </div>
           </div>
         </div>
@@ -312,13 +438,13 @@ function InjuryDrawer({
               teamName={awayTeam}
               league={league}
               injuries={awayInjuries}
-              isLoading={Boolean(feed.isPartial && feed.missingTeams.includes(awayTeam))}
+              isLoading={awayIsLoading}
             />
             <InjuryTeam
               teamName={homeTeam}
               league={league}
               injuries={homeInjuries}
-              isLoading={Boolean(feed.isPartial && feed.missingTeams.includes(homeTeam))}
+              isLoading={homeIsLoading}
             />
           </div>
         ) : (
@@ -331,21 +457,27 @@ function InjuryDrawer({
   );
 }
 
-function GameMarketCard({ game, data }: { game: OddsApiGame; data: GamesResponse }) {
+function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: GamesResponse; observedAt: number }) {
   const [marketMode, setMarketMode] = useState<SurfMarketType>("spreads");
   const config = getSurfSportConfig(data.sportKey);
   const home = getTeamAbbrev(game.home_team) ?? game.home_team;
+  const board = useMemo(() => buildGameOfferBoard(game, data.sportKey, observedAt), [data.sportKey, game, observedAt]);
+  const opportunitiesBySlot = useMemo(
+    () => new Map<OfferSlot, MarketOpportunity>(board.opportunities.map((opportunity) => [opportunity.slot, opportunity])),
+    [board.opportunities],
+  );
   const current = data.currentMedianSnapshot[game.id] ?? {};
   const opening = data.openingMedianSnapshot[game.id] ?? {};
-  const prices = data.currentMedianPriceSnapshot[game.id] ?? {};
-  const spreadPrice = american(prices.spreads?.home);
-  const totalPrice = american(prices.totals?.over);
-  const hasSplit = data.detections.some(
-    (detection) => detection.gameId === game.id && (detection.type === "BOOK_DISAGREEMENT" || detection.type === "STALE_BOOK"),
-  );
-  const bookCount = game.bookmakers?.length ?? 0;
-  const activeOpen = marketMode === "spreads" ? opening.spreads : opening.totals;
-  const activeCurrent = marketMode === "spreads" ? current.spreads : current.totals;
+  const marketHistory = data.marketAverage?.[game.id];
+  const hasOpportunity = board.opportunities.length > 0;
+  const bookCount = board.booksInSample;
+  const activeOpen = marketMode === "spreads"
+    ? marketHistory?.openSpreadAvg ?? opening.spreads
+    : marketHistory?.openTotalAvg ?? opening.totals;
+  const activeCurrent = marketMode === "spreads"
+    ? marketHistory?.currentSpreadAvg ?? current.spreads
+    : marketHistory?.currentTotalAvg ?? current.totals;
+  const activeHistory = marketMode === "spreads" ? marketHistory?.spreadHistory ?? [] : marketHistory?.totalHistory ?? [];
 
   return (
     <article className="relative overflow-hidden rounded-[26px] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)] shadow-[var(--surf-card-shadow)]">
@@ -359,12 +491,12 @@ function GameMarketCard({ game, data }: { game: OddsApiGame; data: GamesResponse
             {gameTime(game.commence_time)}
           </div>
           <div className="flex items-center gap-2">
-            {hasSplit ? (
-              <span className="rounded-full border border-[color:var(--surf-neutral)]/20 bg-[color:var(--surf-neutral)]/10 px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[color:var(--surf-neutral)]">
-                Market split
+            {hasOpportunity ? (
+              <span className="rounded-full border border-[color:var(--surf-primary)]/20 bg-[rgba(var(--surf-primary-rgb),0.1)] px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[color:var(--surf-primary)]">
+                Worth a look
               </span>
             ) : null}
-            <span className="text-[9px] font-medium text-[color:var(--surf-ink-35)]">{bookCount} books</span>
+            <span className="text-[9px] font-medium text-[color:var(--surf-ink-35)]">{marketAge(board.lastUpdatedAt, observedAt)}</span>
           </div>
         </div>
 
@@ -376,28 +508,21 @@ function GameMarketCard({ game, data }: { game: OddsApiGame; data: GamesResponse
           <TeamIdentity name={game.home_team} league={config.league} side="home" />
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-2.5">
-          <div className="rounded-[16px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-3.5 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[8px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-35)]">Home spread</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-[#8b9cff]" />
+        <section className="mt-5">
+          <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-50)]">Best available now</div>
+              <div className="mt-1 text-[9px] text-[color:var(--surf-ink-30)]">Best number first, then best price · {bookCount} books checked</div>
             </div>
-            <div className="mt-1.5 font-mono text-[17px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
-              {home} {signed(current.spreads)}
-            </div>
-            <div className="mt-1 text-[9px] text-[color:var(--surf-ink-35)]">{spreadPrice ? `${spreadPrice} median price` : "Current market median"}</div>
+            <div className="text-[8px] font-medium text-[color:var(--surf-ink-30)]">Not a pick</div>
           </div>
-          <div className="rounded-[16px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-3.5 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[8px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-35)]">Total · O/U</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--surf-primary)]" />
-            </div>
-            <div className="mt-1.5 font-mono text-[17px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
-              {typeof current.totals === "number" ? current.totals : "—"}
-            </div>
-            <div className="mt-1 text-[9px] text-[color:var(--surf-ink-35)]">{totalPrice ? `${totalPrice} over price` : "Current market median"}</div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <BestOfferTile label="Away spread" offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} />
+            <BestOfferTile label="Home spread" offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} />
+            <BestOfferTile label="Over" offer={board.offers.over} opportunity={opportunitiesBySlot.get("over")} />
+            <BestOfferTile label="Under" offer={board.offers.under} opportunity={opportunitiesBySlot.get("under")} />
           </div>
-        </div>
+        </section>
 
         <section className="mt-4 rounded-[20px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] p-3 sm:p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -428,7 +553,7 @@ function GameMarketCard({ game, data }: { game: OddsApiGame; data: GamesResponse
               </button>
             </div>
           </div>
-          <MarketMovementChart mode={marketMode} open={activeOpen} current={activeCurrent} homeAbbrev={home} />
+          <MarketMovementChart mode={marketMode} open={activeOpen} current={activeCurrent} history={activeHistory} observedAt={observedAt} homeAbbrev={home} />
         </section>
       </div>
 
@@ -472,6 +597,25 @@ export default function GamesPage() {
     void load("initial", sport);
   }, [load, sport, sportSynced]);
 
+  useEffect(() => {
+    if (!sportSynced) return;
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const scheduleNext = () => {
+      timer = window.setTimeout(async () => {
+        await load("refresh", sport);
+        if (!cancelled) scheduleNext();
+      }, nextRefreshDelayMs(Date.now()));
+    };
+
+    scheduleNext();
+    return () => {
+      cancelled = true;
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [load, sport, sportSynced]);
+
   const sportLabel = getSurfSportConfig(sport).label;
 
   return (
@@ -480,8 +624,8 @@ export default function GamesPage() {
       <div className="surf-content">
         <div className="surf-shell mx-auto w-full px-4 pb-24" style={{ maxWidth: "52rem" }}>
           <SurfAppHeader
-            title="Games"
-            subtitle="Every matchup, its market story, and the context that can move the number."
+            title="Games at a glance"
+            subtitle="Every matchup, the best available numbers, tracked line history, and injuries."
             onRefresh={() => void load("refresh", sport)}
             isRefreshing={isRefreshing}
           />
@@ -507,7 +651,7 @@ export default function GamesPage() {
                 <span className="h-1 w-1 rounded-full bg-[color:var(--surf-primary)]" />
                 <span className="font-mono text-[10px] font-medium text-[color:var(--surf-ink-35)]">LIVE MARKET</span>
               </div>
-              <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">Consensus lines and verified matchup context</div>
+              <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">Best current offers, honest history, and verified team context</div>
             </div>
             {data ? (
               <div className="rounded-full border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-2.5 py-1 font-mono text-[9px] text-[color:var(--surf-ink-40)]">
@@ -532,7 +676,7 @@ export default function GamesPage() {
           ) : (
             <main className="flex flex-col gap-4">
               {data.games.map((game) => (
-                <GameMarketCard key={game.id} game={game} data={data} />
+                <GameMarketCard key={game.id} game={game} data={data} observedAt={updatedAt ?? 0} />
               ))}
             </main>
           )}
