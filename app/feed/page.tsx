@@ -162,8 +162,6 @@ export default function Home() {
           <SurfAppHeader
             title="Signals"
             subtitle="Only current advantages with an exact book, number, and market comparison."
-            onRefresh={() => void load("refresh", sport)}
-            isRefreshing={isRefreshing}
           />
 
           <SportSelector

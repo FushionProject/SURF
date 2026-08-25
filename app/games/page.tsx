@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { DemoDataNotice } from "@/components/surf/DemoDataNotice";
-import { InjuryConnectionNotice } from "@/components/surf/InjuryConnectionNotice";
 import { SportSelector } from "@/components/surf/SportSelector";
 import { SurfAppHeader } from "@/components/surf/SurfAppHeader";
 import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
@@ -122,7 +121,7 @@ function TeamIdentity({ name, league, side }: { name: string; league: SurfLeague
       <div className="mt-1 max-w-[130px] truncate text-center text-[13px] font-semibold tracking-[-0.02em] text-[color:var(--surf-ink-90)] sm:max-w-[210px] sm:text-sm">
         {name}
       </div>
-      <div className="mt-0.5 font-mono text-[10px] font-semibold tracking-[0.12em] text-[color:var(--surf-ink-40)]">{abbrev}</div>
+      <div className="mt-0.5 text-[10px] font-semibold tracking-[0.12em] text-[color:var(--surf-ink-40)]">{abbrev}</div>
     </div>
   );
 }
@@ -172,7 +171,7 @@ function BestOfferTile({
           </span>
         ) : null}
       </div>
-      <div className="mt-1.5 truncate font-mono text-[16px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
+      <div className="mt-1.5 truncate text-[16px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
         {line}{offer?.market !== "h2h" && offer?.price != null ? ` (${american(offer.price)})` : ""}
       </div>
       <div className="mt-1 truncate text-[9px] font-medium text-[color:var(--surf-ink-50)]">
@@ -356,7 +355,7 @@ function InjuryTeam({
             <div className="mt-0.5 text-[9px] uppercase tracking-[0.13em] text-[color:var(--surf-ink-35)]">Team report</div>
           </div>
         </div>
-        <span className="rounded-full bg-[color:var(--surf-fill-06)] px-2 py-1 font-mono text-[10px] font-semibold text-[color:var(--surf-ink-55)]">
+        <span className="rounded-full bg-[color:var(--surf-fill-06)] px-2 py-1 text-[10px] font-semibold text-[color:var(--surf-ink-55)]">
           {isLoading ? "…" : injuries.length}
         </span>
       </div>
@@ -511,7 +510,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
         <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-8">
           <TeamIdentity name={game.away_team} league={config.league} side="away" />
           <div className="flex h-[68px] items-center">
-            <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/15 px-2.5 py-1 font-mono text-[9px] font-semibold tracking-[0.13em] text-[color:var(--surf-ink-35)]">AT</span>
+            <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/15 px-2.5 py-1 text-[9px] font-semibold tracking-[0.13em] text-[color:var(--surf-ink-35)]">AT</span>
           </div>
           <TeamIdentity name={game.home_team} league={config.league} side="home" />
         </div>
@@ -647,8 +646,6 @@ export default function GamesPage() {
           <SurfAppHeader
             title="Games at a glance"
             subtitle="Every matchup, the best available numbers, tracked line history, and injuries."
-            onRefresh={() => void load("refresh", sport)}
-            isRefreshing={isRefreshing}
           />
 
           <SportSelector
@@ -663,19 +660,17 @@ export default function GamesPage() {
           />
 
           {data?.dataSource ? <DemoDataNotice source={data.dataSource} notice={data.dataNotice} /> : null}
-          <InjuryConnectionNotice sport={sport} injuries={data?.injuries} />
-
           <div className="mb-4 flex items-end justify-between px-1">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--surf-ink-80)]">
                 Upcoming {sportLabel} slate
                 <span className="h-1 w-1 rounded-full bg-[color:var(--surf-primary)]" />
-                <span className="font-mono text-[10px] font-medium text-[color:var(--surf-ink-35)]">LIVE MARKET</span>
+                <span className="text-[10px] font-medium text-[color:var(--surf-ink-35)]">LIVE MARKET</span>
               </div>
               <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">Best current offers, honest history, and verified team context</div>
             </div>
             {data ? (
-              <div className="rounded-full border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-2.5 py-1 font-mono text-[9px] text-[color:var(--surf-ink-40)]">
+              <div className="rounded-full border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-2.5 py-1 text-[9px] text-[color:var(--surf-ink-40)]">
                 {data.count} games
               </div>
             ) : null}
