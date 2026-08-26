@@ -143,8 +143,10 @@ function TeamIdentity({ name, league, side }: { name: string; league: SurfLeague
 
 function PredictionMarketConsensusStrip({
   consensus,
+  league,
 }: {
   consensus: GamePredictionMarketConsensus | undefined;
+  league: SurfLeague;
 }) {
   if (!consensus) return null;
   const away = getTeamAbbrev(consensus.awayTeam) ?? consensus.awayTeam;
@@ -152,26 +154,59 @@ function PredictionMarketConsensusStrip({
   const awayProbability = Math.round(consensus.awayProbability * 100);
   const homeProbability = 100 - awayProbability;
   const sourceLabel = consensus.sources.map((source) => source.label).join(" + ");
+  const awayTeamRgb = getTeamPrimaryRgb(consensus.awayTeam, league);
+  const homeTeamRgb = getTeamPrimaryRgb(consensus.homeTeam, league);
 
   return (
-    <section className="mt-5 rounded-[16px] border border-[color:var(--surf-primary)]/15 bg-[rgba(var(--surf-primary-rgb),0.055)] px-3.5 py-3">
-      <div className="flex items-center justify-between gap-3">
+    <section className="relative overflow-hidden rounded-[18px] border border-[color:var(--surf-line-08)] bg-black/[0.12]">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{
+          backgroundImage: `linear-gradient(to right, rgba(${awayTeamRgb},0.85), rgba(${homeTeamRgb},0.85))`,
+        }}
+      />
+      <div className="flex items-start justify-between gap-4 px-4 pb-3 pt-3.5">
         <div>
-          <div className="text-[9px] font-semibold uppercase tracking-[0.13em] text-[color:var(--surf-primary)]">
-            Prediction market consensus
+          <div className="flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[color:var(--surf-ink-65)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--surf-primary)] shadow-[0_0_10px_rgba(var(--surf-primary-rgb),0.45)]" />
+            Prediction market
           </div>
-          <div className="mt-0.5 text-[8px] text-[color:var(--surf-ink-30)]">Market-implied · not a forecast</div>
+          <div className="mt-1 text-[9px] text-[color:var(--surf-ink-35)]">Market-implied win probability · not a forecast</div>
         </div>
-        <div className="text-[8px] font-medium text-[color:var(--surf-ink-35)]">{sourceLabel}</div>
+        <div className="rounded-full border border-[color:var(--surf-line-06)] bg-white/[0.025] px-2.5 py-1 text-[8px] font-medium text-[color:var(--surf-ink-40)]">
+          {sourceLabel}
+        </div>
       </div>
-      <div className="mt-2.5 grid grid-cols-2 divide-x divide-[color:var(--surf-line-08)] rounded-xl border border-[color:var(--surf-line-06)] bg-black/10">
-        <div className="flex items-center justify-between gap-2 px-3 py-2">
-          <span className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{away}</span>
-          <span className="font-mono text-sm font-semibold text-[color:var(--surf-ink-85)]">{awayProbability}%</span>
+
+      <div className="border-t border-[color:var(--surf-line-06)] px-4 pb-4 pt-3">
+        <div className="mb-2.5 grid grid-cols-2 gap-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{away}</span>
+            <span className="text-[17px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-90)]">{awayProbability}%</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[17px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-90)]">{homeProbability}%</span>
+            <span className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{home}</span>
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-2 px-3 py-2">
-          <span className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{home}</span>
-          <span className="font-mono text-sm font-semibold text-[color:var(--surf-ink-85)]">{homeProbability}%</span>
+
+        <div className="flex h-2 overflow-hidden rounded-full bg-white/[0.04] shadow-[inset_0_1px_2px_rgba(0,0,0,0.45)]">
+          <div
+            className="h-full"
+            style={{
+              width: `${awayProbability}%`,
+              backgroundImage: `linear-gradient(to right, rgba(${awayTeamRgb},0.72), rgba(${awayTeamRgb},1))`,
+              boxShadow: `0 0 16px rgba(${awayTeamRgb},0.34)`,
+            }}
+          />
+          <div
+            className="h-full"
+            style={{
+              width: `${homeProbability}%`,
+              backgroundImage: `linear-gradient(to right, rgba(${homeTeamRgb},1), rgba(${homeTeamRgb},0.72))`,
+              boxShadow: `0 0 16px rgba(${homeTeamRgb},0.34)`,
+            }}
+          />
         </div>
       </div>
     </section>
@@ -198,10 +233,12 @@ function BestOfferTile({
   label,
   offer,
   opportunity,
+  accentRgb,
 }: {
   label: string;
   offer: BestMarketOffer | undefined;
   opportunity: MarketOpportunity | undefined;
+  accentRgb: string;
 }) {
   const selection = offer ? getTeamAbbrev(offer.selection) ?? offer.selection : "—";
   const line = offer
@@ -214,7 +251,16 @@ function BestOfferTile({
   const tag = opportunityTag(opportunity);
 
   return (
-    <div className="min-w-0 rounded-[16px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-3.5 py-3">
+    <div
+      className="relative min-w-0 bg-[color:var(--surf-fill-02)] px-3.5 py-3.5 transition-colors hover:bg-[color:var(--surf-fill-03)]"
+      style={{
+        backgroundImage: `linear-gradient(135deg, rgba(${accentRgb},0.075), transparent 48%)`,
+      }}
+    >
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{ backgroundImage: `linear-gradient(to right, rgba(${accentRgb},0.54), transparent 72%)` }}
+      />
       <div className="flex min-h-4 items-center justify-between gap-2">
         <span className="text-[8px] font-semibold uppercase tracking-[0.14em] text-[color:var(--surf-ink-35)]">{label}</span>
         {tag ? (
@@ -223,14 +269,14 @@ function BestOfferTile({
           </span>
         ) : null}
       </div>
-      <div className="mt-1.5 truncate text-[16px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
+      <div className="mt-2 truncate text-[16px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
         {line}{offer?.market !== "h2h" && offer?.price != null ? ` (${american(offer.price)})` : ""}
       </div>
-      <div className="mt-1 truncate text-[9px] font-medium text-[color:var(--surf-ink-50)]">
+      <div className="mt-1.5 truncate text-[9px] font-medium text-[color:var(--surf-ink-50)]">
         {offer ? offer.bookTitle : "Waiting for sportsbook lines"}
       </div>
       {offer ? (
-        <div className="mt-1 text-[8px] text-[color:var(--surf-ink-30)]">
+        <div className="mt-1.5 text-[8px] text-[color:var(--surf-ink-30)]">
           {offer.market === "h2h"
             ? `Median ${american(offer.consensusPrice)}`
             : `Midpoint ${offer.market === "spreads" ? signed(offer.consensusPoint) : plain(offer.consensusPoint)}`} · {offer.booksCompared} books
@@ -579,61 +625,71 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
           <TeamIdentity name={game.home_team} league={config.league} side="home" />
         </div>
 
-        <PredictionMarketConsensusStrip consensus={data.predictionMarketConsensus?.[game.id]} />
+        <div className="-mx-5 mt-5 border-t border-[color:var(--surf-line-06)] bg-black/[0.075] px-5 pt-5 sm:-mx-6 sm:px-6">
+          <PredictionMarketConsensusStrip
+            consensus={data.predictionMarketConsensus?.[game.id]}
+            league={config.league}
+          />
 
-        <section className="mt-5">
-          <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-50)]">Best available now</div>
-              <div className="mt-1 text-[9px] text-[color:var(--surf-ink-30)]">Best number first, then best price · {bookCount} books checked</div>
+          <section className={data.predictionMarketConsensus?.[game.id] ? "mt-5" : "mt-0"}>
+            <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
+              <div>
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-50)]">
+                  <span className="h-1.5 w-1.5 rounded-sm bg-[color:var(--surf-positive)] shadow-[0_0_9px_color-mix(in_srgb,var(--surf-positive)_45%,transparent)]" />
+                  Best available now
+                </div>
+                <div className="mt-1 text-[9px] text-[color:var(--surf-ink-30)]">Best number first, then best price · {bookCount} books checked</div>
+              </div>
+              <div className="text-[8px] font-medium text-[color:var(--surf-ink-30)]">Not a pick</div>
             </div>
-            <div className="text-[8px] font-medium text-[color:var(--surf-ink-30)]">Not a pick</div>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            {config.league === "MLB" ? (
-              <>
-                <BestOfferTile label="Away moneyline" offer={board.offers.awayMoneyline} opportunity={opportunitiesBySlot.get("awayMoneyline")} />
-                <BestOfferTile label="Home moneyline" offer={board.offers.homeMoneyline} opportunity={opportunitiesBySlot.get("homeMoneyline")} />
-              </>
-            ) : null}
-            <BestOfferTile label={`Away ${spreadName}`} offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} />
-            <BestOfferTile label={`Home ${spreadName}`} offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} />
-            <BestOfferTile label="Over" offer={board.offers.over} opportunity={opportunitiesBySlot.get("over")} />
-            <BestOfferTile label="Under" offer={board.offers.under} opportunity={opportunitiesBySlot.get("under")} />
-          </div>
-        </section>
+            <div className="overflow-hidden rounded-[18px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-line-06)] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+              <div className="grid grid-cols-2 gap-px">
+                {config.league === "MLB" ? (
+                  <>
+                    <BestOfferTile label="Away moneyline" offer={board.offers.awayMoneyline} opportunity={opportunitiesBySlot.get("awayMoneyline")} accentRgb={awayTeamRgb} />
+                    <BestOfferTile label="Home moneyline" offer={board.offers.homeMoneyline} opportunity={opportunitiesBySlot.get("homeMoneyline")} accentRgb={homeTeamRgb} />
+                  </>
+                ) : null}
+                <BestOfferTile label={`Away ${spreadName}`} offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} accentRgb={awayTeamRgb} />
+                <BestOfferTile label={`Home ${spreadName}`} offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} accentRgb={homeTeamRgb} />
+                <BestOfferTile label="Over" offer={board.offers.over} opportunity={opportunitiesBySlot.get("over")} accentRgb="0,229,255" />
+                <BestOfferTile label="Under" offer={board.offers.under} opportunity={opportunitiesBySlot.get("under")} accentRgb="0,229,255" />
+              </div>
+            </div>
+          </section>
 
-        <section className="mt-4 rounded-[20px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] p-3 sm:p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-45)]">Line movement</div>
-              <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">{movementLabel(marketMode, activeOpen, activeCurrent, spreadName)}</div>
+          <section className="mt-4 rounded-[18px] border border-[color:var(--surf-line-08)] bg-black/[0.10] p-3 sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-45)]">Line movement</div>
+                <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">{movementLabel(marketMode, activeOpen, activeCurrent, spreadName)}</div>
+              </div>
+              <div className="inline-flex rounded-xl border border-[color:var(--surf-line-08)] bg-black/20 p-1" aria-label="Select line history market">
+                <button
+                  type="button"
+                  aria-pressed={marketMode === "spreads"}
+                  onClick={() => setMarketMode("spreads")}
+                  className={`rounded-lg px-2.5 py-1.5 text-[9px] font-semibold transition-colors ${
+                    marketMode === "spreads" ? "bg-[#8b9cff]/15 text-[#aeb8ff]" : "text-[color:var(--surf-ink-40)] hover:text-[color:var(--surf-ink-70)]"
+                  }`}
+                >
+                  {config.league === "MLB" ? "Run line" : "Spread"}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={marketMode === "totals"}
+                  onClick={() => setMarketMode("totals")}
+                  className={`rounded-lg px-2.5 py-1.5 text-[9px] font-semibold transition-colors ${
+                    marketMode === "totals" ? "bg-[rgba(var(--surf-primary-rgb),0.13)] text-[color:var(--surf-primary)]" : "text-[color:var(--surf-ink-40)] hover:text-[color:var(--surf-ink-70)]"
+                  }`}
+                >
+                  Total (O/U)
+                </button>
+              </div>
             </div>
-            <div className="inline-flex rounded-xl border border-[color:var(--surf-line-08)] bg-black/20 p-1" aria-label="Select line history market">
-              <button
-                type="button"
-                aria-pressed={marketMode === "spreads"}
-                onClick={() => setMarketMode("spreads")}
-                className={`rounded-lg px-2.5 py-1.5 text-[9px] font-semibold transition-colors ${
-                  marketMode === "spreads" ? "bg-[#8b9cff]/15 text-[#aeb8ff]" : "text-[color:var(--surf-ink-40)] hover:text-[color:var(--surf-ink-70)]"
-                }`}
-              >
-                {config.league === "MLB" ? "Run line" : "Spread"}
-              </button>
-              <button
-                type="button"
-                aria-pressed={marketMode === "totals"}
-                onClick={() => setMarketMode("totals")}
-                className={`rounded-lg px-2.5 py-1.5 text-[9px] font-semibold transition-colors ${
-                  marketMode === "totals" ? "bg-[rgba(var(--surf-primary-rgb),0.13)] text-[color:var(--surf-primary)]" : "text-[color:var(--surf-ink-40)] hover:text-[color:var(--surf-ink-70)]"
-                }`}
-              >
-                Total (O/U)
-              </button>
-            </div>
-          </div>
-          <MarketMovementChart mode={marketMode} open={activeOpen} current={activeCurrent} history={activeHistory} observedAt={observedAt} homeAbbrev={home} spreadName={spreadName} />
-        </section>
+            <MarketMovementChart mode={marketMode} open={activeOpen} current={activeCurrent} history={activeHistory} observedAt={observedAt} homeAbbrev={home} spreadName={spreadName} />
+          </section>
+        </div>
       </div>
 
       <InjuryDrawer feed={data.injuries} awayTeam={game.away_team} homeTeam={game.home_team} league={config.league} />
