@@ -14,6 +14,7 @@ import type { GameMarketAverage, MarketAverageHistoryPoint } from "@/lib/surf/ma
 import {
   buildGameOfferBoard,
   type BestMarketOffer,
+  type GameOfferBoard,
   type MarketOpportunity,
   type OfferSlot,
 } from "@/lib/surf/opportunities";
@@ -21,6 +22,7 @@ import { getSurfSportConfig, type SurfLeague, type SurfSportKey, type SurfSportL
 import type {
   GamePredictionMarketConsensus,
   OddsApiGame,
+  SignalCard,
   SurfMarketType,
   SurfSignalDetection,
 } from "@/lib/surf/types";
@@ -45,6 +47,7 @@ type GamesResponse = {
   marketAverage: Record<string, GameMarketAverage>;
   injuries: NflInjuryFeed;
   predictionMarketConsensus?: Record<string, GamePredictionMarketConsensus>;
+  predictionMarketWhaleSignals?: SignalCard[];
   dataSource?: "demo" | "fallback";
   dataNotice?: string;
 };
@@ -90,6 +93,21 @@ function marketAge(timestamp: number | undefined, now: number): string {
   if (minutes < 1) return "Market updated just now";
   if (minutes < 60) return `Market updated ${minutes}m ago`;
   return `Market updated ${Math.floor(minutes / 60)}h ago`;
+}
+
+function compactMoney(value: number): string {
+  const absolute = Math.abs(value);
+  if (absolute >= 1_000_000) return `$${(absolute / 1_000_000).toFixed(absolute >= 10_000_000 ? 0 : 1)}M`;
+  if (absolute >= 1_000) return `$${(absolute / 1_000).toFixed(absolute >= 100_000 ? 0 : 1)}K`;
+  return `$${Math.round(absolute).toLocaleString("en-US")}`;
+}
+
+function activityAge(timestamp: number, now: number): string {
+  const minutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
 }
 
 function TeamMark({ name, league, compact = false }: { name: string; league: SurfLeague; compact?: boolean }) {
@@ -154,6 +172,9 @@ function PredictionMarketConsensusStrip({
   const awayProbability = Math.round(consensus.awayProbability * 100);
   const homeProbability = 100 - awayProbability;
   const sourceLabel = consensus.sources.map((source) => source.label).join(" + ");
+  const volumeSources = consensus.sources.filter(
+    (source) => typeof source.volume24hUsd === "number" && Number.isFinite(source.volume24hUsd) && source.volume24hUsd > 0,
+  );
   const awayTeamRgb = getTeamPrimaryRgb(consensus.awayTeam, league);
   const homeTeamRgb = getTeamPrimaryRgb(consensus.homeTeam, league);
 
@@ -207,6 +228,164 @@ function PredictionMarketConsensusStrip({
               boxShadow: `0 0 16px rgba(${homeTeamRgb},0.34)`,
             }}
           />
+        </div>
+
+        {volumeSources.length > 0 ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {volumeSources.map((source) => (
+              <div key={source.venue} className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--surf-line-06)] bg-white/[0.025] px-3 py-2.5">
+                <div>
+                  <div className="text-[9px] font-semibold text-[color:var(--surf-ink-55)]">{source.label}</div>
+                  <div className="mt-0.5 text-[8px] text-[color:var(--surf-ink-30)]">
+                    {source.volume24hIsEstimate ? "Estimated cash traded" : "Reported traded volume"}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[12px] font-semibold tracking-[-0.02em] text-[color:var(--surf-ink-85)]">
+                    {source.volume24hIsEstimate ? "≈" : ""}{compactMoney(source.volume24hUsd ?? 0)}
+                  </div>
+                  <div className="mt-0.5 text-[8px] font-medium uppercase tracking-[0.1em] text-[color:var(--surf-ink-30)]">24h volume</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function MarketRead({
+  game,
+  board,
+  consensus,
+  whaleSignals,
+  opening,
+  current,
+  injuries,
+  spreadName,
+  observedAt,
+}: {
+  game: OddsApiGame;
+  board: GameOfferBoard;
+  consensus: GamePredictionMarketConsensus | undefined;
+  whaleSignals: SignalCard[];
+  opening: { spreads?: number; totals?: number };
+  current: { spreads?: number; totals?: number };
+  injuries: NflInjuryFeed;
+  spreadName: string;
+  observedAt: number;
+}) {
+  const qualifiedFlow = whaleSignals
+    .filter((signal) => signal.game.id === game.id && signal.whaleActivity)
+    .sort((a, b) => (b.whaleActivity?.committedUsd ?? 0) - (a.whaleActivity?.committedUsd ?? 0));
+  const largestFlow = qualifiedFlow[0]?.whaleActivity;
+  const topOpportunity = board.opportunities[0];
+  const leadTeam = consensus
+    ? consensus.homeProbability >= consensus.awayProbability
+      ? consensus.homeTeam
+      : consensus.awayTeam
+    : undefined;
+  const leadProbability = consensus
+    ? Math.max(consensus.homeProbability, consensus.awayProbability)
+    : undefined;
+  const leadLabel = leadTeam ? getTeamAbbrev(leadTeam) ?? leadTeam : undefined;
+  const injuryCount = injuries.status === "available"
+    ? (injuries.injuriesByTeam[game.away_team]?.length ?? 0) + (injuries.injuriesByTeam[game.home_team]?.length ?? 0)
+    : undefined;
+  const movementOptions = [
+    typeof opening.spreads === "number" && typeof current.spreads === "number"
+      ? { label: spreadName, delta: current.spreads - opening.spreads }
+      : undefined,
+    typeof opening.totals === "number" && typeof current.totals === "number"
+      ? { label: "total", delta: current.totals - opening.totals }
+      : undefined,
+  ].filter((movement): movement is { label: string; delta: number } => Boolean(movement));
+  const strongestMovement = movementOptions.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0];
+
+  let headline = "The market is still taking shape";
+  let detail = `${board.booksInSample} sportsbooks checked. Surf will surface the first meaningful price, movement, or prediction-market difference.`;
+
+  if (largestFlow) {
+    const activityLabel = largestFlow.activityKind === "buying_burst"
+      ? "buying burst"
+      : largestFlow.activityKind === "wallet_buy"
+        ? "wallet buy"
+        : "large buy";
+    const flowTeam = getTeamAbbrev(largestFlow.outcomeTeam) ?? largestFlow.outcomeTeam;
+    headline = `Large ${largestFlow.venueLabel} flow is backing ${flowTeam}`;
+    detail = `${compactMoney(largestFlow.committedUsd)} ${activityLabel} at ${Math.round(largestFlow.averagePrice * 100)}¢ across ${largestFlow.tradeCount} ${largestFlow.tradeCount === 1 ? "trade" : "trades"}. ${qualifiedFlow.length > 1 ? `${qualifiedFlow.length - 1} more qualified ${qualifiedFlow.length === 2 ? "event" : "events"} are condensed here.` : "Surf found no larger qualified flow for this matchup."}`;
+  } else if (topOpportunity) {
+    headline = `A better number is sitting at ${topOpportunity.bookTitle}`;
+    detail = topOpportunity.reason;
+  } else if (leadLabel && leadProbability != null && leadProbability >= 0.55) {
+    headline = `${leadLabel} has the prediction-market edge`;
+    detail = `${consensus?.sources.map((source) => source.label).join(" and ")} currently imply about ${Math.round(leadProbability * 100)}% for ${leadLabel}. That is market pricing, not Surf's forecast.`;
+  } else if (strongestMovement && Math.abs(strongestMovement.delta) >= 0.5) {
+    headline = `The ${strongestMovement.label} has moved ${Math.abs(strongestMovement.delta)} points`;
+    detail = `The current market is ${strongestMovement.delta > 0 ? "above" : "below"} Surf's tracked opener while the best available numbers remain listed below.`;
+  } else if (leadLabel && leadProbability != null && leadProbability >= 0.505) {
+    headline = `Prediction markets narrowly lean ${leadLabel}`;
+    detail = `${leadLabel} is priced near ${Math.round(leadProbability * 100)}% across ${consensus?.sources.length ?? 0} ${consensus?.sources.length === 1 ? "venue" : "venues"}; sportsbooks are otherwise relatively aligned.`;
+  } else if (consensus) {
+    headline = "Prediction markets are split";
+    detail = `${consensus.sources.map((source) => source.label).join(" and ")} price this matchup almost evenly. No meaningful prediction-market edge has formed yet.`;
+  }
+
+  return (
+    <section className="relative overflow-hidden rounded-[20px] border border-[rgba(var(--surf-primary-rgb),0.2)] bg-[linear-gradient(135deg,rgba(var(--surf-primary-rgb),0.105),rgba(139,92,246,0.055)_48%,rgba(0,0,0,0.08))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)] sm:px-5">
+      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-[rgba(var(--surf-primary-rgb),0.11)] blur-3xl" />
+      <div className="relative">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--surf-primary)]">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[rgba(var(--surf-primary-rgb),0.25)] bg-[rgba(var(--surf-primary-rgb),0.12)]">
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.7">
+                <path d="M3 13.5c2.3 0 2.3-2.7 4.6-2.7s2.3 2.7 4.6 2.7 2.3-2.7 4.6-2.7" strokeLinecap="round" />
+                <path d="M3 8.5c2.3 0 2.3-2.7 4.6-2.7s2.3 2.7 4.6 2.7 2.3-2.7 4.6-2.7" strokeLinecap="round" opacity=".62" />
+              </svg>
+            </span>
+            Surf Market Read
+          </div>
+          <span className="text-[8px] font-medium uppercase tracking-[0.12em] text-[color:var(--surf-ink-30)]">Not a pick</span>
+        </div>
+
+        <h2 className="mt-3 text-[17px] font-semibold leading-6 tracking-[-0.025em] text-[color:var(--surf-ink-solid)]">{headline}</h2>
+        <p className="mt-1.5 max-w-2xl text-[11px] leading-[1.65] text-[color:var(--surf-ink-50)]">{detail}</p>
+
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {largestFlow ? (
+            <a
+              href={largestFlow.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-[rgba(var(--surf-primary-rgb),0.18)] bg-[rgba(var(--surf-primary-rgb),0.09)] px-2.5 py-1.5 text-[8px] font-semibold text-[color:var(--surf-primary)] transition-colors hover:bg-[rgba(var(--surf-primary-rgb),0.15)]"
+            >
+              {compactMoney(largestFlow.committedUsd)} {largestFlow.venueLabel} · {activityAge(largestFlow.occurredAt, observedAt)} ↗
+            </a>
+          ) : null}
+          {leadLabel && leadProbability != null ? (
+            <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/[0.12] px-2.5 py-1.5 text-[8px] font-semibold text-[color:var(--surf-ink-60)]">
+              {Math.round(leadProbability * 100)}% {leadLabel} · prediction markets
+            </span>
+          ) : null}
+          {topOpportunity ? (
+            <span className="rounded-full border border-[color:var(--surf-positive)]/15 bg-[color:var(--surf-positive)]/5 px-2.5 py-1.5 text-[8px] font-semibold text-[color:var(--surf-positive)]">
+              {opportunityTag(topOpportunity)} · {topOpportunity.bookTitle}
+            </span>
+          ) : null}
+          {strongestMovement && Math.abs(strongestMovement.delta) >= 0.5 ? (
+            <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/[0.12] px-2.5 py-1.5 text-[8px] font-semibold text-[color:var(--surf-ink-55)]">
+              {strongestMovement.label} {strongestMovement.delta > 0 ? "+" : ""}{strongestMovement.delta} from open
+            </span>
+          ) : null}
+          <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/[0.12] px-2.5 py-1.5 text-[8px] font-semibold text-[color:var(--surf-ink-55)]">
+            {board.booksInSample} books checked
+          </span>
+          {injuryCount != null ? (
+            <span className="rounded-full border border-[color:var(--surf-negative)]/12 bg-[color:var(--surf-negative)]/5 px-2.5 py-1.5 text-[8px] font-semibold text-[color:var(--surf-ink-55)]">
+              {injuryCount} listed {injuryCount === 1 ? "injury" : "injuries"}
+            </span>
+          ) : null}
         </div>
       </div>
     </section>
@@ -648,12 +827,26 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
         </div>
 
         <div className="-mx-5 mt-5 border-t border-[color:var(--surf-line-06)] bg-black/[0.075] px-5 pt-5 sm:-mx-6 sm:px-6">
-          <PredictionMarketConsensusStrip
+          <MarketRead
+            game={game}
+            board={board}
             consensus={data.predictionMarketConsensus?.[game.id]}
-            league={config.league}
+            whaleSignals={data.predictionMarketWhaleSignals ?? []}
+            opening={opening}
+            current={current}
+            injuries={data.injuries}
+            spreadName={spreadName}
+            observedAt={observedAt}
           />
 
-          <section className={data.predictionMarketConsensus?.[game.id] ? "mt-5" : "mt-0"}>
+          <div className="mt-4">
+            <PredictionMarketConsensusStrip
+              consensus={data.predictionMarketConsensus?.[game.id]}
+              league={config.league}
+            />
+          </div>
+
+          <section className="mt-5">
             <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
               <div>
                 <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-50)]">
@@ -788,8 +981,8 @@ export default function GamesPage() {
       <div className="surf-content">
         <div className="surf-shell mx-auto w-full px-4 pb-24" style={{ maxWidth: "52rem" }}>
           <SurfAppHeader
-            title="Games at a glance"
-            subtitle="Every matchup, the best available numbers, tracked line history, and injuries."
+            title="Catch the moves that matter."
+            subtitle="One clear market read for every matchup—sportsbook prices, prediction-market flow, line movement, and injuries."
           />
 
           <SportSelector
@@ -811,7 +1004,7 @@ export default function GamesPage() {
                 <span className="h-1 w-1 rounded-full bg-[color:var(--surf-primary)]" />
                 <span className="text-[10px] font-medium text-[color:var(--surf-ink-35)]">LIVE MARKET</span>
               </div>
-              <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">Best current offers, honest history, and verified team context</div>
+              <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">The strongest evidence, condensed into one live read per game</div>
             </div>
             {data ? (
               <div className="rounded-full border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-2.5 py-1 text-[9px] text-[color:var(--surf-ink-40)]">

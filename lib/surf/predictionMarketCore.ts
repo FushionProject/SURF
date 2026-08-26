@@ -89,6 +89,7 @@ export type MatchedWinnerMarket = {
   game: OddsApiGame;
   observedAt: number;
   volume24hUsd?: number;
+  volume24hIsEstimate?: boolean;
   selections: [MatchedWinnerSelection, MatchedWinnerSelection];
   sourceUrl: string;
 };
@@ -324,6 +325,7 @@ export function matchKalshiWinnerMarkets(
       game,
       observedAt,
       volume24hUsd,
+      volume24hIsEstimate: true,
       selections: [
         {
           team: game.away_team,
@@ -392,6 +394,7 @@ export function matchPolymarketWinnerMarkets(
         game,
         observedAt,
         volume24hUsd,
+        volume24hIsEstimate: false,
         selections: [
           {
             team: game.away_team,
@@ -434,6 +437,7 @@ export function mergePredictionConsensus(markets: MatchedWinnerMarket[]): Record
       homeProbability: market.selections[1].probability,
       observedAt: market.observedAt,
       volume24hUsd: market.volume24hUsd,
+      volume24hIsEstimate: market.volume24hIsEstimate,
     }));
     const awayProbability = sources.reduce((sum, source) => sum + source.awayProbability, 0) / sources.length;
     const homeProbability = sources.reduce((sum, source) => sum + source.homeProbability, 0) / sources.length;

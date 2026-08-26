@@ -581,6 +581,8 @@ export function getDemoGameSummaries(dataSource: SurfDataSource) {
       coveredTeams: [],
       missingTeams: [],
     },
+    predictionMarketConsensus: {},
+    predictionMarketWhaleSignals: [],
     ...metadata(dataSource),
   };
 }

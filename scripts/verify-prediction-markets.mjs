@@ -49,6 +49,7 @@ assert.equal(kalshiMatched.length, 1, "paired Kalshi winner contracts should mat
 assert.equal(kalshiMatched[0].selections[0].team, "Chicago Bears");
 assert.equal(kalshiMatched[0].selections[1].team, "Tennessee Titans");
 assert.equal(Math.round(kalshiMatched[0].selections[1].probability * 100), 60);
+assert.equal(kalshiMatched[0].volume24hIsEstimate, true, "Kalshi cash volume must be labeled as estimated");
 
 const largeKalshiTrade = {
   trade_id: "kalshi-large",
@@ -121,6 +122,7 @@ const event = {
 };
 const polymarketMatched = matchPolymarketWinnerMarkets([game], [event], NOW);
 assert.equal(polymarketMatched.length, 1, "Polymarket moneyline outcomes should match both Surf teams");
+assert.equal(polymarketMatched[0].volume24hIsEstimate, false, "Polymarket 24-hour USD volume is provider reported");
 
 const polymarketActivities = aggregatePolymarketWhaleBuys(
   [

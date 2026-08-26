@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import type { GamePredictionMarketConsensus, OddsApiGame, SurfSignalDetection } from "@/lib/surf/types";
+import type { GamePredictionMarketConsensus, OddsApiGame, SignalCard, SurfSignalDetection } from "@/lib/surf/types";
 import { detectSurfSignals } from "@/lib/surf/signals";
 import { getNbaOddsSnapshot } from "@/lib/surf/nbaOddsScheduler";
 import type { NbaRefreshMode } from "@/lib/surf/nbaOddsScheduler";
@@ -126,6 +126,7 @@ export type GameSummariesResponse = {
   coreBooksIncluded: Array<{ key: string; title: string }>;
   injuries: NflInjuryFeed;
   predictionMarketConsensus: Record<string, GamePredictionMarketConsensus>;
+  predictionMarketWhaleSignals: SignalCard[];
 };
 
 type NbaHistoricalOpenEntry = {
@@ -693,6 +694,7 @@ async function getLiveGameSummaries(request: Request) {
     coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
     injuries,
     predictionMarketConsensus: predictionMarketSnapshot.consensusByGame,
+    predictionMarketWhaleSignals: predictionMarketSnapshot.whaleSignals,
   };
 
   if (isDebug) {

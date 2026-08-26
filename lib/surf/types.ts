@@ -274,6 +274,7 @@ export type PredictionMarketConsensusSource = {
   homeProbability: number;
   observedAt: number;
   volume24hUsd?: number;
+  volume24hIsEstimate?: boolean;
 };
 
 export type GamePredictionMarketConsensus = {

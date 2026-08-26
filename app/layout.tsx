@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Surf",
-  description: "An NFL-first companion that translates the sports market.",
+  description: "Live sportsbook and prediction-market intelligence. Catch the moves that matter.",
 };
 
 export default function RootLayout({
