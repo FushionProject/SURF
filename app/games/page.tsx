@@ -291,8 +291,13 @@ function historyValue(point: MarketAverageHistoryPoint, mode: SurfMarketType): n
 }
 
 function chartClock(timestamp: number | undefined): string {
-  if (timestamp == null || !Number.isFinite(timestamp)) return "NOW";
+  if (timestamp == null || !Number.isFinite(timestamp)) return "—";
   return new Date(timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function shouldLabelChange(index: number, total: number): boolean {
+  if (index === 0 || index === total - 1 || total <= 6) return true;
+  return index % Math.ceil((total - 1) / 5) === 0;
 }
 
 function MarketMovementChart({
@@ -320,9 +325,7 @@ function MarketMovementChart({
     .filter((point): point is { timestamp: number; value: number } => Number.isFinite(point.timestamp) && typeof point.value === "number" && Number.isFinite(point.value))
     .reduce<Array<{ timestamp: number; value: number }>>((points, point) => {
       const last = points.at(-1);
-      if (last?.value === point.value) {
-        points[points.length - 1] = point;
-      } else {
+      if (last?.value !== point.value) {
         points.push(point);
       }
       return points;
@@ -352,23 +355,28 @@ function MarketMovementChart({
   const y = (value: number) => top + ((high - value) / (high - low)) * (bottom - top);
   const firstTimestamp = chartPoints[0]?.timestamp;
   const lastTimestamp = chartPoints.at(-1)?.timestamp;
-  const span = Math.max(1, (lastTimestamp ?? 0) - (firstTimestamp ?? 0));
+  const timelineEnd = Math.max(lastTimestamp ?? 0, Number.isFinite(observedAt) ? observedAt : 0);
+  const span = Math.max(1, timelineEnd - (firstTimestamp ?? timelineEnd));
   const plotted = chartPoints.map((point, index) => ({
     ...point,
-    x:
-      chartPoints.length === 1
-        ? width / 2
-        : left + ((point.timestamp - (firstTimestamp ?? point.timestamp)) / span) * (right - left),
+    x: left + ((point.timestamp - (firstTimestamp ?? point.timestamp)) / span) * (right - left),
     y: y(point.value),
     index,
   }));
-  const linePath = plotted.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
-  const areaPath = plotted.length >= 2 ? `${linePath} L ${plotted.at(-1)?.x ?? right} ${bottom + 8} L ${plotted[0].x} ${bottom + 8} Z` : "";
+  const linePath = plotted.reduce(
+    (path, point, index) => index === 0 ? `M ${point.x} ${point.y}` : `${path} H ${point.x} V ${point.y}`,
+    "",
+  );
+  const timelinePath = plotted.length > 0 ? `${linePath} H ${right}` : "";
+  const areaPath = plotted.length > 0 ? `${timelinePath} L ${right} ${bottom + 8} L ${plotted[0].x} ${bottom + 8} Z` : "";
   const formatter = mode === "spreads" ? signed : plain;
+  const accessibleTimeline = plotted
+    .map((point, index) => `${index === 0 ? "Open" : chartClock(point.timestamp)} ${formatter(point.value)}`)
+    .join(", ");
 
   return (
     <div className="relative overflow-hidden rounded-[18px] border border-[color:var(--surf-line-08)] bg-black/15 px-3 pb-2 pt-1.5">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[138px] w-full" role="img" aria-label={`${mode === "spreads" ? spreadName : "total"} movement from open to now`}>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[138px] w-full" role="img" aria-label={`${mode === "spreads" ? spreadName : "total"} timeline. ${accessibleTimeline || "Line history is not available yet."}`}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={lineColor} stopOpacity="0.28" />
@@ -379,43 +387,57 @@ function MarketMovementChart({
           const gridY = top + (bottom - top) * position;
           return <line key={position} x1={left} x2={right} y1={gridY} y2={gridY} stroke="var(--surf-line-06)" strokeWidth="1" strokeDasharray="4 7" />;
         })}
-        {plotted.length >= 2 ? (
+        {plotted.length > 0 ? (
           <>
             <path d={areaPath} fill={`url(#${gradientId})`} />
-            <path d={linePath} fill="none" stroke={lineColor} strokeWidth="3" strokeLinecap="round" />
-            {plotted.slice(1, -1).map((point) => <circle key={`${point.timestamp}:${point.index}`} cx={point.x} cy={point.y} r="3" fill={lineColor} opacity="0.75" />)}
-            <circle cx={plotted[0].x} cy={plotted[0].y} r="5" fill="var(--surf-surface)" stroke={lineColor} strokeWidth="3" />
-            <circle cx={plotted.at(-1)?.x} cy={plotted.at(-1)?.y} r="6" fill={lineColor} stroke="var(--surf-surface)" strokeWidth="3" />
+            <path d={timelinePath} fill="none" stroke={lineColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            {plotted.map((point, index) => (
+              <circle
+                key={`${point.timestamp}:${point.index}`}
+                cx={point.x}
+                cy={point.y}
+                r={index === 0 ? 5 : index === plotted.length - 1 ? 6 : 3.5}
+                fill={index === 0 ? "var(--surf-surface)" : lineColor}
+                stroke={index === 0 ? lineColor : index === plotted.length - 1 ? "var(--surf-surface)" : lineColor}
+                strokeWidth={index === 0 || index === plotted.length - 1 ? 3 : 1}
+              >
+                <title>{index === 0 ? `Open ${formatter(point.value)}` : `${chartClock(point.timestamp)} ${formatter(point.value)}`}</title>
+              </circle>
+            ))}
             <text x={plotted[0].x} y={Math.max(14, plotted[0].y - 12)} fill="var(--surf-ink-75)" fontSize="12" fontWeight="700">
               {formatter(plotted[0].value)}
             </text>
-            <text x={plotted.at(-1)?.x} y={Math.max(14, (plotted.at(-1)?.y ?? top) - 12)} fill="var(--surf-ink-90)" fontSize="12" fontWeight="700" textAnchor="end">
-              {formatter(plotted.at(-1)?.value)}
-            </text>
-          </>
-        ) : plotted.length === 1 ? (
-          <>
-            <circle cx={plotted[0].x} cy={plotted[0].y} r="7" fill={lineColor} stroke="var(--surf-surface)" strokeWidth="3" />
-            <text x={width / 2} y={Math.max(14, plotted[0].y - 16)} fill="var(--surf-ink-80)" fontSize="12" fontWeight="700" textAnchor="middle">
-              {formatter(plotted[0].value)}
-            </text>
-            <text x={width / 2} y={bottom + 2} fill="var(--surf-ink-40)" fontSize="11" textAnchor="middle">
-              Tracking begins with this check
-            </text>
+            {plotted.length > 1 ? (
+              <text x={plotted.at(-1)?.x} y={Math.max(14, (plotted.at(-1)?.y ?? top) - 12)} fill="var(--surf-ink-90)" fontSize="12" fontWeight="700" textAnchor="end">
+                {formatter(plotted.at(-1)?.value)}
+              </text>
+            ) : (
+              <text x={width / 2} y={bottom + 1} fill="var(--surf-ink-40)" fontSize="11" textAnchor="middle">
+                No movement since open
+              </text>
+            )}
+            {plotted.map((point, index) => shouldLabelChange(index, plotted.length) ? (
+              <text
+                key={`label:${point.timestamp}:${point.index}`}
+                x={point.x}
+                y={height - 7}
+                fill="var(--surf-ink-35)"
+                fontSize="10"
+                fontWeight="700"
+                letterSpacing="1.1"
+                textAnchor={index === 0 ? "start" : point.x >= right - 28 ? "end" : "middle"}
+              >
+                {index === 0 ? "OPEN" : chartClock(point.timestamp).toUpperCase()}
+              </text>
+            ) : null)}
           </>
         ) : (
           <text x={width / 2} y={height / 2} fill="var(--surf-ink-40)" fontSize="13" textAnchor="middle">
             Line history is not available yet
           </text>
         )}
-        <text x={left} y={height - 7} fill="var(--surf-ink-35)" fontSize="10" fontWeight="700" letterSpacing="1.1">
-          {plotted.length >= 2 ? chartClock(firstTimestamp).toUpperCase() : "FIRST CHECK"}
-        </text>
-        <text x={right} y={height - 7} fill="var(--surf-ink-35)" fontSize="10" fontWeight="700" letterSpacing="1.1" textAnchor="end">
-          {plotted.length >= 2 ? chartClock(lastTimestamp).toUpperCase() : "NOW"}
-        </text>
       </svg>
-      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-[color:var(--surf-line-06)] bg-[color:var(--surf-surface)]/80 px-2.5 py-1 text-[9px] font-medium text-[color:var(--surf-ink-40)] backdrop-blur">
+      <div className="pointer-events-none absolute right-5 top-3 text-[9px] font-medium text-[color:var(--surf-ink-35)]">
         {mode === "spreads" ? `${homeAbbrev} ${spreadName}` : "Consensus O/U"}
       </div>
     </div>
@@ -509,9 +531,9 @@ function InjuryDrawer({
     <details className="group border-t border-[color:var(--surf-line-06)] bg-black/[0.08]">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:content-none sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--surf-neutral)]/20 bg-[color:var(--surf-neutral)]/10 text-[color:var(--surf-neutral)]">
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M9 4h6M12 1v6M6.5 9.5h11v10h-11z" strokeLinecap="round" strokeLinejoin="round" />
+          <div className="flex h-7 w-7 items-center justify-center text-[color:var(--surf-negative)]">
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
             </svg>
           </div>
           <div>
@@ -652,8 +674,8 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
                 ) : null}
                 <BestOfferTile label={`Away ${spreadName}`} offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} accentRgb={awayTeamRgb} />
                 <BestOfferTile label={`Home ${spreadName}`} offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} accentRgb={homeTeamRgb} />
-                <BestOfferTile label="Over" offer={board.offers.over} opportunity={opportunitiesBySlot.get("over")} accentRgb="0,229,255" />
-                <BestOfferTile label="Under" offer={board.offers.under} opportunity={opportunitiesBySlot.get("under")} accentRgb="0,229,255" />
+                <BestOfferTile label="Over" offer={board.offers.over} opportunity={opportunitiesBySlot.get("over")} accentRgb={awayTeamRgb} />
+                <BestOfferTile label="Under" offer={board.offers.under} opportunity={opportunitiesBySlot.get("under")} accentRgb={homeTeamRgb} />
               </div>
             </div>
           </section>
