@@ -88,6 +88,7 @@ export function computeMarketAverage(game: OddsApiGame): { spreadAvg: number | n
 
       if (m.key === "totals") {
         for (const o of m.outcomes ?? []) {
+          if (o.name !== "Over") continue;
           const p = asFinite(o.point);
           if (p == null) continue;
           totalPoints.push(p);
