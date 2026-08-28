@@ -402,6 +402,7 @@ function movementLabel(mode: SurfMarketType, open: number | undefined, current: 
 
 function opportunityTag(opportunity: MarketOpportunity | undefined): string | undefined {
   if (!opportunity) return undefined;
+  if (opportunity.kind === "arbitrage") return "Arbitrage";
   if (opportunity.kind === "favorite_split") return "Favorite split";
   if (opportunity.kind === "key_number") return `Key ${opportunity.keyNumber}`;
   if (opportunity.kind === "best_price") return "Best price";

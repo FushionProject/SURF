@@ -21,7 +21,7 @@ import { getDemoGameSummaries, isSurfDemoMode } from "@/lib/surf/demoData";
 import { getNflInjuryFeed, type NflInjuryFeed } from "@/lib/surf/injuries";
 import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
 import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
-import { isSurfBookmaker } from "@/lib/surf/bookmakers";
+import { filterSurfBookmakers } from "@/lib/surf/bookmakers";
 import {
   isNflSport,
   parseRequestedSport,
@@ -239,7 +239,7 @@ async function getLiveGameSummaries(request: Request) {
 
   const filteredGames: OddsApiGame[] = slateGames.map((g) => ({
     ...g,
-    bookmakers: (g.bookmakers ?? []).filter((b) => isSurfBookmaker(b.key)),
+    bookmakers: filterSurfBookmakers(g.bookmakers),
   }));
 
   if (isDebug) {
@@ -343,7 +343,7 @@ async function getLiveGameSummaries(request: Request) {
           const histGamesRaw = Array.isArray(histRaw?.data) ? (histRaw.data as OddsApiGame[]) : [];
           const histGames: OddsApiGame[] = histGamesRaw.map((g) => ({
             ...g,
-            bookmakers: (g.bookmakers ?? []).filter((b) => isSurfBookmaker(b.key)),
+            bookmakers: filterSurfBookmakers(g.bookmakers),
           }));
 
           const avgByKey = new Map<string, { openSpreadAvg: number | null; openTotalAvg: number | null }>();
@@ -502,7 +502,7 @@ async function getLiveGameSummaries(request: Request) {
 
         const histGames: OddsApiGame[] = histGamesRaw.map((g) => ({
           ...g,
-          bookmakers: (g.bookmakers ?? []).filter((b) => isSurfBookmaker(b.key)),
+          bookmakers: filterSurfBookmakers(g.bookmakers),
         }));
 
         const snapshotConsensus = computeGameConsensusSnapshot(histGames);

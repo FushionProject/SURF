@@ -36,7 +36,7 @@ import { isOvernightCapture, overnightWindowKey } from "@/lib/surf/feedSchedule"
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
 import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
-import { isSurfBookmaker } from "@/lib/surf/bookmakers";
+import { filterSurfBookmakers } from "@/lib/surf/bookmakers";
 import {
   getSurfSportConfig,
   isNflSport,
@@ -223,6 +223,7 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
       return [...grouped.entries()].map(([market, opportunities]) => {
         const ranked = opportunities.slice().sort((a, b) => b.score - a.score);
         const focus = ranked[0];
+        const arbitrage = focus.kind === "arbitrage" ? focus.arbitrage : undefined;
         const firstSide = market === "spreads"
           ? opportunities.find((opportunity) => opportunity.slot === "awaySpread")
           : market === "totals"
@@ -241,7 +242,7 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
         const middleWidth = rawMiddleWidth != null && rawMiddleWidth > 0
           ? Math.round(rawMiddleWidth * 2) / 2
           : undefined;
-        const isMiddle = middleWidth != null && firstSide != null && secondSide != null;
+        const isMiddle = arbitrage == null && middleWidth != null && firstSide != null && secondSide != null;
         const selection = getTeamAbbrev(focus.selection) ?? focus.selection;
         const currentLine = opportunityPoint(focus);
         const marketLine = market === "h2h"
@@ -254,7 +255,9 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
         const currentPrice = market !== "h2h" && focus.price != null ? ` (${formatAmericanPrice(focus.price)})` : "";
         const favoriteSplit = focus.kind === "favorite_split" ? focus.favoriteSplit : undefined;
         const title =
-          favoriteSplit
+          arbitrage
+            ? `${arbitrage.estimatedReturnPercentage.toFixed(2)}% arbitrage available`
+          : favoriteSplit
             ? `Books disagree on the MLB favorite`
           : isMiddle
             ? `${middleWidth}-point middle available: ${getTeamAbbrev(firstSide!.selection) ?? firstSide!.selection} ${opportunityPoint(firstSide!)} / ${getTeamAbbrev(secondSide!.selection) ?? secondSide!.selection} ${opportunityPoint(secondSide!)}`
@@ -266,7 +269,15 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
         const reason = isMiddle
           ? `${firstSide!.bookTitle} and ${secondSide!.bookTitle} leave a ${middleWidth}-point window between opposite sides. Prices and limits still determine whether it is usable.`
           : focus.reason;
-        const sources = favoriteSplit
+        const sources = arbitrage
+          ? arbitrage.legs.map((leg) => ({
+              label: getTeamAbbrev(leg.selection) ?? leg.selection,
+              book: leg.bookTitle,
+              value: market === "h2h"
+                ? formatAmericanPrice(leg.price)
+                : `${market === "spreads" && (leg.point ?? 0) > 0 ? "+" : ""}${leg.point} (${formatAmericanPrice(leg.price)})`,
+            }))
+          : favoriteSplit
           ? [favoriteSplit.away, favoriteSplit.home].map((side) => ({
               label: `${getTeamAbbrev(side.team) ?? side.team} favored`,
               book: side.bookTitle,
@@ -293,19 +304,21 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
             homeTeam: game.home_team,
             awayTeam: game.away_team,
           },
-          signalType: focus.kind === "favorite_split"
+          signalType: focus.kind === "arbitrage"
+            ? "Arbitrage" as const
+            : focus.kind === "favorite_split"
             ? "Book Disagreement" as const
             : focus.kind === "best_price"
               ? "Best Price" as const
               : "Best Number" as const,
           market,
           title,
-          detail: isMiddle || favoriteSplit
+          detail: arbitrage || isMiddle || favoriteSplit
             ? sources.map((source) => `${source.book} ${source.value}`).join(" · ")
             : `${focus.bookTitle} ${currentLine}${currentPrice}`,
           insight: reason,
           sources,
-          valueOptions: isMiddle || favoriteSplit
+          valueOptions: arbitrage || isMiddle || favoriteSplit
             ? undefined
             : ranked.slice(0, 2).map((opportunity) => ({
                 selection: opportunity.selection,
@@ -321,7 +334,7 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
           status: "active" as const,
           strengthScore: isMiddle ? Math.min(100, focus.score + Math.min(8, middleWidth * 3)) : focus.score,
           isTopSignal: true,
-          topBadge: isMiddle ? "LINE MIDDLE" : focus.kind.replaceAll("_", " ").toUpperCase(),
+          topBadge: arbitrage ? "ARBITRAGE" : isMiddle ? "LINE MIDDLE" : focus.kind.replaceAll("_", " ").toUpperCase(),
           opportunity: {
             kind: focus.kind,
             isMiddle,
@@ -354,6 +367,19 @@ function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: num
                     opponentPrice: favoriteSplit.home.opponentPrice,
                     booksFavoring: favoriteSplit.home.booksFavoring,
                   },
+                }
+              : undefined,
+            arbitrage: arbitrage
+              ? {
+                  legs: arbitrage.legs.map((leg) => ({
+                    selection: leg.selection,
+                    bookTitle: leg.bookTitle,
+                    point: leg.point,
+                    price: leg.price,
+                    stakePercentage: leg.stakePercentage,
+                  })),
+                  combinedImpliedProbability: arbitrage.combinedImpliedProbability,
+                  estimatedReturnPercentage: arbitrage.estimatedReturnPercentage,
                 }
               : undefined,
           },
@@ -814,7 +840,7 @@ async function getLiveSurfFeed(request: Request) {
 
   const filteredGames: OddsApiGame[] = slateGames.map((g) => ({
     ...g,
-    bookmakers: (g.bookmakers ?? []).filter((b) => isSurfBookmaker(b.key)),
+    bookmakers: filterSurfBookmakers(g.bookmakers),
   }));
   const predictionMarketSnapshot = await getPredictionMarketSnapshot(filteredGames, sportKey, now);
   const overnightCapture = isOvernightCapture(now);

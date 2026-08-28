@@ -60,6 +60,7 @@ function gameTime(value: string): string {
 
 function badge(card: SignalCard): string {
   if (card.whaleActivity) return "Whale activity";
+  if (card.opportunity?.kind === "arbitrage") return "Arbitrage";
   if (card.opportunity?.isMiddle) return "Line middle";
   if (card.opportunity?.kind === "favorite_split") return "Favorite split";
   if (card.opportunity?.kind === "key_number") return `Key ${card.opportunity.keyNumber} value`;
@@ -287,7 +288,13 @@ export function MarketEventCard({ card, now }: Props) {
             </summary>
             <ul className="mt-2 space-y-1.5 text-[10px] leading-4 text-[color:var(--surf-ink-45)]">
               <li>• {opportunity.booksCompared} sportsbooks were compared in the current snapshot.</li>
-              {opportunity.kind === "favorite_split" && opportunity.favoriteSplit ? (
+              {opportunity.kind === "arbitrage" && opportunity.arbitrage ? (
+                <>
+                  <li>• The two best prices total {(opportunity.arbitrage.combinedImpliedProbability * 100).toFixed(2)}% implied probability.</li>
+                  <li>• The estimated theoretical return is {opportunity.arbitrage.estimatedReturnPercentage.toFixed(2)}% if both legs remain available.</li>
+                  <li>• Approximate stake split: {opportunity.arbitrage.legs.map((leg) => `${leg.stakePercentage.toFixed(1)}% at ${leg.bookTitle}`).join(" / ")}.</li>
+                </>
+              ) : opportunity.kind === "favorite_split" && opportunity.favoriteSplit ? (
                 <>
                   <li>• {opportunity.favoriteSplit.away.booksFavoring} books favor {selectionLabel(opportunity.favoriteSplit.away.team)}; {opportunity.favoriteSplit.home.booksFavoring} favor {selectionLabel(opportunity.favoriteSplit.home.team)}.</li>
                   <li>• This compares current prices only; it does not claim that a sportsbook just moved.</li>
@@ -302,7 +309,7 @@ export function MarketEventCard({ card, now }: Props) {
               {opportunity.kind === "best_price" && opportunity.priceEdgePercentagePoints != null ? (
                 <li>• The estimated price advantage is {opportunity.priceEdgePercentagePoints.toFixed(1)} implied-probability points.</li>
               ) : null}
-              <li>• This ranks available market value, not the probability that the selection wins.</li>
+              <li>• {opportunity.kind === "arbitrage" ? "Prices, limits, void rules, and execution timing can remove the theoretical edge." : "This ranks available market value, not the probability that the selection wins."}</li>
             </ul>
           </details>
         </div>

@@ -48,6 +48,7 @@ export type SurfSignalTypeLabel =
   | "Consensus Shift"
   | "Key Number Cross"
   | "Market Resolution"
+  | "Arbitrage"
   | "Whale Activity"
   | "Stale Book";
 
@@ -244,7 +245,7 @@ export type TrackedMarketEvidence = {
 };
 
 export type MarketOpportunityEvidence = {
-  kind: "best_line" | "best_price" | "key_number" | "favorite_split";
+  kind: "arbitrage" | "best_line" | "best_price" | "key_number" | "favorite_split";
   isMiddle?: boolean;
   middleWidth?: number;
   score: number;
@@ -262,6 +263,17 @@ export type MarketOpportunityEvidence = {
   favoriteSplit?: {
     away: { team: string; bookTitle: string; price: number; opponentPrice: number; booksFavoring: number };
     home: { team: string; bookTitle: string; price: number; opponentPrice: number; booksFavoring: number };
+  };
+  arbitrage?: {
+    legs: Array<{
+      selection: string;
+      bookTitle: string;
+      point?: number;
+      price: number;
+      stakePercentage: number;
+    }>;
+    combinedImpliedProbability: number;
+    estimatedReturnPercentage: number;
   };
 };
 

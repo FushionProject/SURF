@@ -150,6 +150,10 @@ function parseAmericanOdds(value: string | undefined): number | null {
 }
 
 function getWhyThisMattersText(signalType: SignalCardType["signalType"], card: SignalCardType): string {
+  if (signalType === "Arbitrage") {
+    return "Opposite outcomes are priced below 100% combined implied probability → a theoretical cross-book return exists if both quotes can be filled.";
+  }
+
   if (signalType === "Best Number") {
     return "One sportsbook is off market → potential value before the market adjusts.";
   }

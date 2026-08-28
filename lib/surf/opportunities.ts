@@ -17,7 +17,24 @@ export type BestMarketOffer = {
   booksCompared: number;
 };
 
-export type MarketOpportunityKind = "best_line" | "best_price" | "key_number" | "favorite_split";
+export type MarketOpportunityKind = "arbitrage" | "best_line" | "best_price" | "key_number" | "favorite_split";
+
+export type ArbitrageLeg = {
+  slot: OfferSlot;
+  selection: string;
+  bookKey: string;
+  bookTitle: string;
+  point?: number;
+  price: number;
+  impliedProbability: number;
+  stakePercentage: number;
+};
+
+export type MarketArbitrage = {
+  legs: [ArbitrageLeg, ArbitrageLeg];
+  combinedImpliedProbability: number;
+  estimatedReturnPercentage: number;
+};
 
 export type FavoriteSplitSide = {
   team: string;
@@ -55,6 +72,7 @@ export type MarketOpportunity = {
   reason: string;
   observedAt: number;
   favoriteSplit?: MoneylineFavoriteSplit;
+  arbitrage?: MarketArbitrage;
 };
 
 export type GameOfferBoard = {
@@ -80,6 +98,10 @@ const MIN_BOOKS = 4;
 const LINE_EDGE_THRESHOLD = 1;
 const PRICE_EDGE_THRESHOLD_PP = 2.5;
 const MAX_LINE_PRICE_PENALTY_PP = 4;
+const MIN_ARBITRAGE_RETURN_PERCENT = 0.5;
+const MAX_ARBITRAGE_RETURN_PERCENT = 15;
+const MAX_ARBITRAGE_QUOTE_AGE_MS = 10 * 60 * 1000;
+const MAX_ARBITRAGE_LEG_GAP_MS = 5 * 60 * 1000;
 
 function isValidAmericanOdds(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value !== 0;
@@ -120,6 +142,155 @@ function consensusPoint(values: number[]): number | undefined {
 function impliedProbability(americanOdds: number): number {
   if (americanOdds > 0) return 100 / (americanOdds + 100);
   return -americanOdds / (-americanOdds + 100);
+}
+
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function compatibleArbitrageQuotes(first: OfferSample, second: OfferSample, observedAt: number): boolean {
+  if (first.bookKey === second.bookKey || first.price == null || second.price == null) return false;
+  if (first.providerUpdatedAt == null || second.providerUpdatedAt == null) return false;
+  if (Math.abs(first.providerUpdatedAt - second.providerUpdatedAt) > MAX_ARBITRAGE_LEG_GAP_MS) return false;
+  if (observedAt - first.providerUpdatedAt > MAX_ARBITRAGE_QUOTE_AGE_MS) return false;
+  if (observedAt - second.providerUpdatedAt > MAX_ARBITRAGE_QUOTE_AGE_MS) return false;
+  return true;
+}
+
+function buildArbitrageForMarket(
+  game: OddsApiGame,
+  market: SurfOpportunityMarketType,
+  firstSide: OfferSample[],
+  secondSide: OfferSample[],
+  observedAt: number,
+  sameContract: (first: OfferSample, second: OfferSample) => boolean,
+): MarketOpportunity | undefined {
+  let best:
+    | {
+        first: OfferSample & { price: number };
+        second: OfferSample & { price: number };
+        combinedProbability: number;
+        estimatedReturnPercentage: number;
+      }
+    | undefined;
+
+  for (const rawFirst of firstSide) {
+    for (const rawSecond of secondSide) {
+      if (!compatibleArbitrageQuotes(rawFirst, rawSecond, observedAt) || !sameContract(rawFirst, rawSecond)) continue;
+      const first = rawFirst as OfferSample & { price: number };
+      const second = rawSecond as OfferSample & { price: number };
+      const combinedProbability = impliedProbability(first.price) + impliedProbability(second.price);
+      if (combinedProbability >= 1) continue;
+      const estimatedReturnPercentage = (1 / combinedProbability - 1) * 100;
+      if (
+        estimatedReturnPercentage < MIN_ARBITRAGE_RETURN_PERCENT ||
+        estimatedReturnPercentage > MAX_ARBITRAGE_RETURN_PERCENT
+      ) {
+        continue;
+      }
+      if (!best || estimatedReturnPercentage > best.estimatedReturnPercentage) {
+        best = { first, second, combinedProbability, estimatedReturnPercentage };
+      }
+    }
+  }
+
+  if (!best) return undefined;
+  const booksCompared = new Set([...firstSide, ...secondSide].map((sample) => sample.bookKey)).size;
+  if (booksCompared < MIN_BOOKS) return undefined;
+
+  const firstProbability = impliedProbability(best.first.price);
+  const secondProbability = impliedProbability(best.second.price);
+  const combinedProbability = best.combinedProbability;
+  const estimatedReturnPercentage = roundTo(best.estimatedReturnPercentage, 2);
+  const legs: [ArbitrageLeg, ArbitrageLeg] = [
+    {
+      slot: best.first.slot,
+      selection: best.first.selection,
+      bookKey: best.first.bookKey,
+      bookTitle: best.first.bookTitle,
+      point: best.first.point,
+      price: best.first.price,
+      impliedProbability: roundTo(firstProbability, 6),
+      stakePercentage: roundTo((firstProbability / combinedProbability) * 100, 1),
+    },
+    {
+      slot: best.second.slot,
+      selection: best.second.selection,
+      bookKey: best.second.bookKey,
+      bookTitle: best.second.bookTitle,
+      point: best.second.point,
+      price: best.second.price,
+      impliedProbability: roundTo(secondProbability, 6),
+      stakePercentage: roundTo((secondProbability / combinedProbability) * 100, 1),
+    },
+  ];
+  const marketLabel = market === "h2h" ? "moneyline" : market === "spreads" ? "spread" : "total";
+
+  return {
+    id: `opportunity:${game.id}:arbitrage:${market}:${best.first.point ?? "moneyline"}`,
+    gameId: game.id,
+    market,
+    slot: best.first.slot,
+    selection: best.first.selection,
+    kind: "arbitrage",
+    bookKey: best.first.bookKey,
+    bookTitle: best.first.bookTitle,
+    point: best.first.point,
+    price: best.first.price,
+    lineEdge: 0,
+    booksCompared,
+    score: Math.min(100, Math.round(92 + estimatedReturnPercentage * 2)),
+    reason: `The best opposite ${marketLabel} prices combine to ${(combinedProbability * 100).toFixed(2)}% implied probability, leaving an estimated ${estimatedReturnPercentage.toFixed(2)}% theoretical return if both quotes can be filled.`,
+    observedAt,
+    arbitrage: {
+      legs,
+      combinedImpliedProbability: roundTo(combinedProbability, 6),
+      estimatedReturnPercentage,
+    },
+  };
+}
+
+function buildArbitrageOpportunities(
+  game: OddsApiGame,
+  samples: OfferSample[],
+  observedAt: number,
+): MarketOpportunity[] {
+  const gameTime = new Date(game.commence_time).getTime();
+  if (!Number.isFinite(gameTime) || gameTime <= observedAt) return [];
+
+  const bySlot = (slot: OfferSlot) => samples.filter((sample) => sample.slot === slot);
+  const samePoint = (first: OfferSample, second: OfferSample) =>
+    first.point != null && second.point != null && Math.abs(first.point - second.point) < 0.001;
+  const oppositeSpread = (first: OfferSample, second: OfferSample) =>
+    first.point != null && second.point != null && Math.abs(first.point + second.point) < 0.001;
+
+  return [
+    buildArbitrageForMarket(
+      game,
+      "h2h",
+      bySlot("awayMoneyline"),
+      bySlot("homeMoneyline"),
+      observedAt,
+      () => true,
+    ),
+    buildArbitrageForMarket(
+      game,
+      "spreads",
+      bySlot("awaySpread"),
+      bySlot("homeSpread"),
+      observedAt,
+      oppositeSpread,
+    ),
+    buildArbitrageForMarket(
+      game,
+      "totals",
+      bySlot("over"),
+      bySlot("under"),
+      observedAt,
+      samePoint,
+    ),
+  ].filter((opportunity): opportunity is MarketOpportunity => opportunity != null);
 }
 
 function betterPrice(candidate: number | undefined, current: number | undefined): boolean {
@@ -500,6 +671,8 @@ export function buildGameOfferBoard(
     const favoriteSplit = buildFavoriteSplit(game, samples, observedAt);
     if (favoriteSplit) opportunities.push(favoriteSplit);
   }
+
+  opportunities.push(...buildArbitrageOpportunities(game, samples, observedAt));
 
   const lastUpdatedAt = samples.reduce<number | undefined>(
     (latest, sample) => sample.providerUpdatedAt == null ? latest : Math.max(latest ?? 0, sample.providerUpdatedAt),

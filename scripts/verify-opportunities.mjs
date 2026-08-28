@@ -174,6 +174,107 @@ assert.deepEqual(
 assert.equal(totalWindow.offers.over?.point, 45.5);
 assert.equal(totalWindow.offers.under?.point, 47.5);
 
+const arbitrageObservedAt = new Date("2026-08-24T05:02:00.000Z").getTime();
+const moneylineArbitrage = buildGameOfferBoard(
+  game({
+    id: "moneyline-arbitrage",
+    sportKey: "americanfootball_nfl",
+    moneylines: [
+      { away: +110, home: -130 },
+      { away: -130, home: +110 },
+      { away: -115, home: -105 },
+      { away: -105, home: -115 },
+    ],
+  }),
+  "americanfootball_nfl",
+  arbitrageObservedAt,
+);
+const moneylineArb = moneylineArbitrage.opportunities.find((opportunity) => opportunity.kind === "arbitrage");
+assert.ok(moneylineArb, "a fresh cross-book moneyline below 100% implied probability should qualify");
+assert.equal(moneylineArb?.market, "h2h");
+assert.equal(moneylineArb?.arbitrage?.legs[0].bookKey === moneylineArb?.arbitrage?.legs[1].bookKey, false);
+assert.ok((moneylineArb?.arbitrage?.estimatedReturnPercentage ?? 0) > 4);
+
+const sameBookFalseArbitrage = buildGameOfferBoard(
+  game({
+    id: "same-book-false-arbitrage",
+    sportKey: "americanfootball_nfl",
+    moneylines: [
+      { away: +110, home: +110 },
+      { away: -120, home: -120 },
+      { away: -125, home: -115 },
+      { away: -115, home: -125 },
+    ],
+  }),
+  "americanfootball_nfl",
+  arbitrageObservedAt,
+);
+assert.equal(
+  sameBookFalseArbitrage.opportunities.some((opportunity) => opportunity.kind === "arbitrage"),
+  false,
+  "both legs must come from different books",
+);
+
+const staleArbitrage = buildGameOfferBoard(
+  game({
+    id: "stale-arbitrage",
+    sportKey: "americanfootball_nfl",
+    moneylines: [
+      { away: +110, home: -130 },
+      { away: -130, home: +110 },
+      { away: -115, home: -105 },
+      { away: -105, home: -115 },
+    ],
+  }),
+  "americanfootball_nfl",
+  new Date("2026-08-24T05:20:00.000Z").getTime(),
+);
+assert.equal(
+  staleArbitrage.opportunities.some((opportunity) => opportunity.kind === "arbitrage"),
+  false,
+  "stale quotes must never produce an arbitrage signal",
+);
+
+const spreadArbitrage = buildGameOfferBoard(
+  game({
+    id: "spread-arbitrage",
+    sportKey: "americanfootball_nfl",
+    spreads: [
+      { away: +3, home: -3, awayPrice: +105, homePrice: -125 },
+      { away: +3, home: -3, awayPrice: -125, homePrice: +105 },
+      { away: +3, home: -3, awayPrice: -110, homePrice: -110 },
+      { away: +3, home: -3, awayPrice: -108, homePrice: -112 },
+    ],
+  }),
+  "americanfootball_nfl",
+  arbitrageObservedAt,
+);
+assert.equal(
+  spreadArbitrage.opportunities.some((opportunity) => opportunity.kind === "arbitrage" && opportunity.market === "spreads"),
+  true,
+  "same-line opposite spread prices may form a true arbitrage",
+);
+
+const middleIsNotArbitrage = buildGameOfferBoard(
+  game({
+    id: "middle-is-not-arbitrage",
+    sportKey: "americanfootball_nfl",
+    spreads: [
+      { away: +3.5, home: -3.5, awayPrice: +105, homePrice: -125 },
+      { away: +2.5, home: -2.5, awayPrice: -125, homePrice: +105 },
+      { away: +3, home: -3 },
+      { away: +3, home: -3 },
+    ],
+  }),
+  "americanfootball_nfl",
+  arbitrageObservedAt,
+);
+assert.equal(
+  middleIsNotArbitrage.opportunities.some((opportunity) => opportunity.kind === "arbitrage"),
+  false,
+  "a middle window is not mislabeled as guaranteed arbitrage",
+);
+
 const tooFewBooks = buildGameOfferBoard(
   game({
     id: "too-few",
@@ -258,4 +359,4 @@ assert.equal(
   "one disagreeing sportsbook is not enough to call the favorite split",
 );
 
-console.log("Opportunity fixtures passed: best lines, moneylines, prices, favorite splits, key numbers, middles, totals, and strict noise rejection.");
+console.log("Opportunity fixtures passed: best lines, moneylines, prices, favorite splits, key numbers, middles, true arbs, and strict noise rejection.");

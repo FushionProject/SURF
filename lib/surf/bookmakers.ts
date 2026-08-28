@@ -1,24 +1,26 @@
-const SURF_BOOKMAKER_KEYS = new Set([
-  // Primary US sportsbooks.
+import type { OddsApiBookmaker } from "./types";
+
+// The Odds API prices any explicit group of up to ten bookmakers like one region.
+// Keep this list curated so Surf compares recognizable, regulated US sportsbooks
+// without increasing the existing request cost.
+export const SURF_ODDS_API_BOOKMAKER_KEYS = [
   "draftkings",
   "fanduel",
   "betmgm",
-  "williamhill_us", // Caesars' current The Odds API key.
-  "caesars", // Retained for compatibility with older snapshots.
+  "williamhill_us",
   "fanatics",
   "betrivers",
-
-  // Additional US books already included in the same upstream `us` response.
-  "betonlineag",
-  "betus",
-  "bovada",
-  "lowvig",
-  "mybookieag",
-
-  // Supported aliases that may appear in explicit-bookmaker or older responses.
   "espnbet",
+  "hardrockbet",
+  "ballybet",
+  "betparx",
+] as const;
+
+const SURF_BOOKMAKER_KEYS = new Set<string>([
+  ...SURF_ODDS_API_BOOKMAKER_KEYS,
+  // Compatibility aliases for older stored snapshots.
+  "caesars",
   "espn_bet",
-  "bet365",
 ]);
 
 export function normalizeBookmakerKey(key: string): string {
@@ -27,4 +29,20 @@ export function normalizeBookmakerKey(key: string): string {
 
 export function isSurfBookmaker(key: string): boolean {
   return SURF_BOOKMAKER_KEYS.has(normalizeBookmakerKey(key));
+}
+
+export function surfBookmakerTitle(key: string, fallback: string): string {
+  const normalized = normalizeBookmakerKey(key);
+  if (normalized === "espnbet" || normalized === "espn_bet") return "theScore Bet";
+  if (normalized === "williamhill_us" || normalized === "caesars") return "Caesars";
+  return fallback;
+}
+
+export function filterSurfBookmakers(bookmakers: OddsApiBookmaker[] | undefined): OddsApiBookmaker[] {
+  return (bookmakers ?? [])
+    .filter((bookmaker) => isSurfBookmaker(bookmaker.key))
+    .map((bookmaker) => ({
+      ...bookmaker,
+      title: surfBookmakerTitle(bookmaker.key, bookmaker.title),
+    }));
 }
