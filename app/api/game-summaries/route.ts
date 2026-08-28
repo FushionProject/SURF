@@ -21,6 +21,7 @@ import { getDemoGameSummaries, isSurfDemoMode } from "@/lib/surf/demoData";
 import { getNflInjuryFeed, type NflInjuryFeed } from "@/lib/surf/injuries";
 import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
 import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
+import { isSurfBookmaker } from "@/lib/surf/bookmakers";
 import {
   isNflSport,
   parseRequestedSport,
@@ -59,22 +60,6 @@ function isSoonNotStarted(commenceTimeIso: string, now: number): boolean {
   // Only try to capture opens for games happening today/soon.
   const horizonMs = 36 * 60 * 60 * 1000;
   return t - now <= horizonMs;
-}
-
-const CORE_BOOKMAKER_KEYS = new Set([
-  "draftkings",
-  "fanduel",
-  "betmgm",
-  "caesars",
-  "espnbet",
-  "espn_bet",
-  "bet365",
-  "fanatics",
-  "betrivers",
-]);
-
-function normalizeBookmakerKey(key: string): string {
-  return key.trim().toLowerCase();
 }
 
 function parseMode(value: string | null): NbaRefreshMode {
@@ -254,7 +239,7 @@ async function getLiveGameSummaries(request: Request) {
 
   const filteredGames: OddsApiGame[] = slateGames.map((g) => ({
     ...g,
-    bookmakers: (g.bookmakers ?? []).filter((b) => CORE_BOOKMAKER_KEYS.has(normalizeBookmakerKey(b.key))),
+    bookmakers: (g.bookmakers ?? []).filter((b) => isSurfBookmaker(b.key)),
   }));
 
   if (isDebug) {
@@ -358,7 +343,7 @@ async function getLiveGameSummaries(request: Request) {
           const histGamesRaw = Array.isArray(histRaw?.data) ? (histRaw.data as OddsApiGame[]) : [];
           const histGames: OddsApiGame[] = histGamesRaw.map((g) => ({
             ...g,
-            bookmakers: (g.bookmakers ?? []).filter((b) => CORE_BOOKMAKER_KEYS.has(normalizeBookmakerKey(b.key))),
+            bookmakers: (g.bookmakers ?? []).filter((b) => isSurfBookmaker(b.key)),
           }));
 
           const avgByKey = new Map<string, { openSpreadAvg: number | null; openTotalAvg: number | null }>();
@@ -517,7 +502,7 @@ async function getLiveGameSummaries(request: Request) {
 
         const histGames: OddsApiGame[] = histGamesRaw.map((g) => ({
           ...g,
-          bookmakers: (g.bookmakers ?? []).filter((b) => CORE_BOOKMAKER_KEYS.has(normalizeBookmakerKey(b.key))),
+          bookmakers: (g.bookmakers ?? []).filter((b) => isSurfBookmaker(b.key)),
         }));
 
         const snapshotConsensus = computeGameConsensusSnapshot(histGames);

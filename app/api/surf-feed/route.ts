@@ -36,6 +36,7 @@ import { isOvernightCapture, overnightWindowKey } from "@/lib/surf/feedSchedule"
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
 import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
+import { isSurfBookmaker } from "@/lib/surf/bookmakers";
 import {
   getSurfSportConfig,
   isNflSport,
@@ -43,18 +44,6 @@ import {
   SURF_ENABLED_SPORT_KEYS,
   type SurfSportKey,
 } from "@/lib/surf/sports";
-
-const CORE_BOOKMAKER_KEYS = new Set([
-  "draftkings",
-  "fanduel",
-  "betmgm",
-  "caesars",
-  "espnbet",
-  "espn_bet",
-  "bet365",
-  "fanatics",
-  "betrivers",
-]);
 
 type SignalLifecycleEntry = {
   signature: string;
@@ -728,10 +717,6 @@ function enrichSignals(signals: SignalCard[], games: OddsApiGame[], detections: 
   });
 }
 
-function normalizeBookmakerKey(key: string): string {
-  return key.trim().toLowerCase();
-}
-
 async function getLiveSurfFeed(request: Request) {
   const url = new URL(request.url);
   const requestedSport = parseRequestedSport(url.searchParams.get("sport"));
@@ -829,7 +814,7 @@ async function getLiveSurfFeed(request: Request) {
 
   const filteredGames: OddsApiGame[] = slateGames.map((g) => ({
     ...g,
-    bookmakers: (g.bookmakers ?? []).filter((b) => CORE_BOOKMAKER_KEYS.has(normalizeBookmakerKey(b.key))),
+    bookmakers: (g.bookmakers ?? []).filter((b) => isSurfBookmaker(b.key)),
   }));
   const predictionMarketSnapshot = await getPredictionMarketSnapshot(filteredGames, sportKey, now);
   const overnightCapture = isOvernightCapture(now);
