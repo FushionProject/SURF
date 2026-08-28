@@ -15,6 +15,8 @@ import {
 } from "@/lib/surf/marketContext";
 import type { GameMarketAverage } from "@/lib/surf/marketAverage";
 import { computeMarketAverage, updateGameHistory } from "@/lib/surf/marketAverage";
+import { recordAndLoadPersistentMarketHistory } from "@/lib/surf/persistentMarketHistory";
+import { mergePersistentGameMarketAverage } from "@/lib/surf/persistentMarketHistoryCore";
 import { getDemoGameSummaries, isSurfDemoMode } from "@/lib/surf/demoData";
 import { getNflInjuryFeed, type NflInjuryFeed } from "@/lib/surf/injuries";
 import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
@@ -287,6 +289,16 @@ async function getLiveGameSummaries(request: Request) {
   const marketAverage: Record<string, GameMarketAverage> = {};
   for (const g of filteredGames) {
     marketAverage[g.id] = updateGameHistory({ game: g, nowMs: now });
+  }
+
+  // Persistence piggybacks on the odds snapshot already fetched for this
+  // response. It never performs an additional Odds API request.
+  const persistentMarketAverage = await recordAndLoadPersistentMarketHistory(filteredGames, sportKey, now);
+  for (const g of filteredGames) {
+    marketAverage[g.id] = mergePersistentGameMarketAverage(
+      marketAverage[g.id],
+      persistentMarketAverage[g.id],
+    );
   }
 
   if (isDebug && isMlb) {
