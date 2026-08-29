@@ -31,12 +31,15 @@ import { getOvernightMarketSummary } from "@/lib/surf/overnightMarket";
 import { getMarketTapeEvents, recordMarketTapeSnapshot } from "@/lib/surf/marketTape";
 import { getMarketHorizonEvents, recordMarketHorizonSnapshot } from "@/lib/surf/marketHorizon";
 import { buildOpportunityBoards, type MarketOpportunity } from "@/lib/surf/opportunities";
-import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
+import { getOddsRequestTelemetry, getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
 import { isOvernightCapture, overnightWindowKey } from "@/lib/surf/feedSchedule";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
 import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
 import { filterSurfBookmakers } from "@/lib/surf/bookmakers";
+import { persistentMarketHistoryStatus } from "@/lib/surf/persistentMarketHistory";
+import { recordRopeReport, type RopeAuditInput } from "@/lib/surf/ropeAudit";
+import { persistRopeReport, ropePersistenceStatus } from "@/lib/surf/ropePersistence";
 import {
   getSurfSportConfig,
   isNflSport,
@@ -59,6 +62,31 @@ declare global {
 const SIGNAL_LIFECYCLE_STORE: Map<string, SignalLifecycleEntry> =
   globalThis.__surfSignalLifecycleStore ?? new Map<string, SignalLifecycleEntry>();
 globalThis.__surfSignalLifecycleStore = SIGNAL_LIFECYCLE_STORE;
+
+async function runRopeAudit(options: {
+  sportKey: SurfSportKey;
+  auditedAt: number;
+  games: OddsApiGame[];
+  signals: SignalCard[];
+  predictionProviders: RopeAuditInput["predictionProviders"];
+}): Promise<void> {
+  const privateToken = process.env.ROPE_AUDIT_TOKEN;
+  const auditPersistence = ropePersistenceStatus();
+  const report = recordRopeReport({
+    ...options,
+    oddsTelemetry: getOddsRequestTelemetry(options.sportKey),
+    runtime: {
+      demoMode: false,
+      oddsApiConfigured: Boolean(process.env.ODDS_API_KEY),
+      persistentHistoryConfigured: persistentMarketHistoryStatus().configured,
+      auditPersistenceConfigured: auditPersistence.configured,
+      auditPersistenceVerified: auditPersistence.verified,
+      auditPersistenceError: auditPersistence.lastError,
+      privateReportConfigured: Boolean(privateToken && privateToken.length >= 24),
+    },
+  });
+  await persistRopeReport(report, 750);
+}
 
 function signalSignature(signal: SignalCard): string {
   return JSON.stringify({
@@ -879,6 +907,13 @@ async function getLiveSurfFeed(request: Request) {
     const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, true), true);
     const taggedSignalsRaw = [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals];
     const taggedSignals = addSignalLifecycle(taggedSignalsRaw, now);
+    await runRopeAudit({
+      sportKey,
+      auditedAt: now,
+      games: filteredGames,
+      signals: taggedSignals,
+      predictionProviders: predictionMarketSnapshot.providers,
+    });
     console.log(JSON.stringify({ surfDebug: debug }, null, 2));
     console.log(
       JSON.stringify(
@@ -940,6 +975,13 @@ async function getLiveSurfFeed(request: Request) {
     [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals],
     now,
   );
+  await runRopeAudit({
+    sportKey,
+    auditedAt: now,
+    games: filteredGames,
+    signals: taggedSignals,
+    predictionProviders: predictionMarketSnapshot.providers,
+  });
   if (isDebug) {
     const leagueCounts = taggedSignals.reduce(
       (acc, s) => {
