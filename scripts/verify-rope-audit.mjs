@@ -103,6 +103,7 @@ const runtime = {
   demoMode: false,
   oddsApiConfigured: true,
   persistentHistoryConfigured: true,
+  persistentHistoryVerified: true,
   auditPersistenceConfigured: true,
   auditPersistenceVerified: true,
   privateReportConfigured: true,
@@ -134,6 +135,40 @@ const quiet = buildRopeReport({
   runtime,
 });
 assert.equal(quiet.status, "PASS", "a legitimately quiet feed must pass ROPE");
+
+const unverifiedPersistence = buildRopeReport({
+  sportKey: "americanfootball_nfl",
+  auditedAt: now,
+  games: [game],
+  signals: [],
+  predictionProviders: { kalshi: "no_coverage", polymarket: "no_coverage" },
+  oddsTelemetry: telemetry,
+  runtime: {
+    ...runtime,
+    persistentHistoryVerified: false,
+    auditPersistenceVerified: false,
+  },
+});
+assert.equal(unverifiedPersistence.status, "HOLD", "configured-but-unverified persistence cannot pass release");
+assert.equal(unverifiedPersistence.checks.find((entry) => entry.id === "runtime.market-history")?.status, "fail");
+assert.equal(unverifiedPersistence.checks.find((entry) => entry.id === "runtime.audit-history")?.status, "fail");
+
+const failedPersistence = buildRopeReport({
+  sportKey: "americanfootball_nfl",
+  auditedAt: now,
+  games: [game],
+  signals: [],
+  predictionProviders: { kalshi: "no_coverage", polymarket: "no_coverage" },
+  oddsTelemetry: telemetry,
+  runtime: {
+    ...runtime,
+    persistentHistoryError: "Database permission denied.",
+    auditPersistenceError: "Required database table is missing.",
+  },
+});
+assert.equal(failedPersistence.status, "HOLD");
+assert.ok(failedPersistence.checks.find((entry) => entry.id === "runtime.market-history")?.details.includes("Database permission denied."));
+assert.ok(failedPersistence.checks.find((entry) => entry.id === "runtime.audit-history")?.details.includes("Required database table is missing."));
 
 const brokenSignal = {
   ...signal,
@@ -185,4 +220,4 @@ assert.equal(holding.checks.find((entry) => entry.id === "signals.arbitrage")?.s
 assert.equal(holding.checks.find((entry) => entry.id === "polling.single-flight")?.status, "fail");
 assert.equal(holding.checks.find((entry) => entry.id === "api.quota")?.status, "fail");
 
-console.log("ROPE fixtures passed: clean release, quiet feed, and hard release-blocker detection.");
+console.log("ROPE fixtures passed: clean release, quiet feed, unverified/failed persistence, and hard release-blocker detection.");

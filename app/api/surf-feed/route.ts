@@ -38,8 +38,9 @@ import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
 import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
 import { filterSurfBookmakers } from "@/lib/surf/bookmakers";
 import { persistentMarketHistoryStatus } from "@/lib/surf/persistentMarketHistory";
-import { recordRopeReport, type RopeAuditInput } from "@/lib/surf/ropeAudit";
+import { buildRopeReport, recordRopeReport, type RopeAuditInput } from "@/lib/surf/ropeAudit";
 import { persistRopeReport, ropePersistenceStatus } from "@/lib/surf/ropePersistence";
+import { verifySurfPersistence } from "@/lib/surf/supabasePersistence";
 import {
   getSurfSportConfig,
   isNflSport,
@@ -71,21 +72,37 @@ async function runRopeAudit(options: {
   predictionProviders: RopeAuditInput["predictionProviders"];
 }): Promise<void> {
   const privateToken = process.env.ROPE_AUDIT_TOKEN;
+  await verifySurfPersistence({ timeoutMs: 650 });
+  const marketPersistence = persistentMarketHistoryStatus();
   const auditPersistence = ropePersistenceStatus();
-  const report = recordRopeReport({
+  let auditInput: RopeAuditInput = {
     ...options,
     oddsTelemetry: getOddsRequestTelemetry(options.sportKey),
     runtime: {
       demoMode: false,
       oddsApiConfigured: Boolean(process.env.ODDS_API_KEY),
-      persistentHistoryConfigured: persistentMarketHistoryStatus().configured,
+      persistentHistoryConfigured: marketPersistence.configured,
+      persistentHistoryVerified: marketPersistence.verified,
+      persistentHistoryError: marketPersistence.lastError,
       auditPersistenceConfigured: auditPersistence.configured,
       auditPersistenceVerified: auditPersistence.verified,
       auditPersistenceError: auditPersistence.lastError,
       privateReportConfigured: Boolean(privateToken && privateToken.length >= 24),
     },
-  });
-  await persistRopeReport(report, 750);
+  };
+  const persisted = await persistRopeReport(buildRopeReport(auditInput), 750);
+  if (!persisted && auditPersistence.verified) {
+    const failedPersistence = ropePersistenceStatus();
+    auditInput = {
+      ...auditInput,
+      runtime: {
+        ...auditInput.runtime,
+        auditPersistenceVerified: false,
+        auditPersistenceError: failedPersistence.lastError ?? "The ROPE report could not be stored.",
+      },
+    };
+  }
+  recordRopeReport(auditInput);
 }
 
 function signalSignature(signal: SignalCard): string {

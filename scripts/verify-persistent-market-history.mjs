@@ -107,4 +107,57 @@ const merged = mergePersistentGameMarketAverage(fallback, spreadOnly);
 assert.equal(merged.openSpreadAvg, -2.5);
 assert.equal(merged.openTotalAvg, 45, "missing persistent markets should retain the in-memory fallback");
 
-console.log("Persistent market history fixtures passed: capture inputs, book counts, change ordering, retracements, and fallback merging.");
+const reversed = persistentRowsToGameMarketAverages(rows.slice().reverse())[game.id];
+assert.equal(reversed.openSpreadAvg, -2.5, "database row order cannot change the opener");
+assert.equal(reversed.currentSpreadAvg, -2.5, "database row order cannot change the current line");
+assert.equal(reversed.peakSpreadAvg, -3.5);
+
+const duplicateRows = persistentRowsToGameMarketAverages([
+  ...rows,
+  { ...rows[2] },
+  { ...rows[3] },
+])[game.id];
+assert.equal(duplicateRows.spreadHistory.length, 3, "overlapping pages cannot duplicate timeline points");
+
+const mixedValidity = persistentRowsToGameMarketAverages([
+  {
+    game_id: "second-game",
+    game_key: "second-key",
+    market: "spreads",
+    line_value: "not-a-line",
+    observed_at: "2026-08-25T13:00:00.000Z",
+    is_opening: true,
+  },
+  {
+    game_id: "second-game",
+    game_key: "second-key",
+    market: "totals",
+    line_value: 48.5,
+    observed_at: "invalid-time",
+    is_opening: true,
+  },
+  {
+    game_id: "second-game",
+    game_key: "second-key",
+    market: "totals",
+    line_value: 47.5,
+    observed_at: "2026-08-25T14:00:00.000Z",
+    is_opening: false,
+  },
+]);
+assert.equal(mixedValidity["second-game"].spreadHistory.length, 0);
+assert.equal(mixedValidity["second-game"].totalHistory.length, 1);
+assert.equal(mixedValidity["second-game"].openTotalAvg, 47.5);
+assert.equal(mixedValidity["second-game"].currentTotalAvg, 47.5);
+
+const nullCapture = buildPersistentMarketHistoryCapture(
+  { ...game, id: "thin-game" },
+  "americanfootball_nfl",
+  "thin-key",
+  { spreadAvg: null, booksSpread: 0, totalAvg: null, booksTotal: 0 },
+);
+assert.equal(nullCapture.spread_value, null);
+assert.equal(nullCapture.total_value, null);
+assert.equal(nullCapture.spread_books, 0);
+
+console.log("Persistent market history fixtures passed: capture inputs, ordering, retracements, pagination dedupe, malformed rows, null markets, and fallback merging.");

@@ -23,6 +23,8 @@ export type RopeRuntimeConfiguration = {
   demoMode: boolean;
   oddsApiConfigured: boolean;
   persistentHistoryConfigured: boolean;
+  persistentHistoryVerified: boolean;
+  persistentHistoryError?: string;
   auditPersistenceConfigured: boolean;
   auditPersistenceVerified: boolean;
   auditPersistenceError?: string;
@@ -190,11 +192,22 @@ function runtimeChecks(runtime: RopeRuntimeConfiguration): RopeCheck[] {
     runtime.oddsApiConfigured
       ? check("runtime.odds-key", "runtime", "pass", "Odds provider configuration", "The Odds API is configured.")
       : check("runtime.odds-key", "runtime", "fail", "Odds provider configuration", "ODDS_API_KEY is missing."),
-    runtime.persistentHistoryConfigured
-      ? check("runtime.market-history", "runtime", "pass", "Durable market history", "Supabase market history is configured.")
-      : check("runtime.market-history", "runtime", "fail", "Durable market history", "Market history would reset when the server restarts."),
+    !runtime.persistentHistoryConfigured
+      ? check("runtime.market-history", "runtime", "fail", "Durable market history", "Market history would reset when the server restarts.")
+      : runtime.persistentHistoryError
+        ? check(
+            "runtime.market-history",
+            "runtime",
+            "fail",
+            "Durable market history",
+            "The configured market-history store failed verification.",
+            [runtime.persistentHistoryError],
+          )
+        : runtime.persistentHistoryVerified
+          ? check("runtime.market-history", "runtime", "pass", "Durable market history", "The Supabase history schema and server access were verified.")
+          : check("runtime.market-history", "runtime", "fail", "Durable market history", "Supabase is configured but its history schema has not been verified."),
     !runtime.auditPersistenceConfigured
-      ? check("runtime.audit-history", "runtime", "warn", "Durable ROPE history", "ROPE reports are currently retained in memory only.")
+      ? check("runtime.audit-history", "runtime", "fail", "Durable ROPE history", "ROPE reports are currently retained in memory only.")
       : runtime.auditPersistenceError
         ? check(
             "runtime.audit-history",
@@ -205,8 +218,8 @@ function runtimeChecks(runtime: RopeRuntimeConfiguration): RopeCheck[] {
             [runtime.auditPersistenceError],
           )
         : runtime.auditPersistenceVerified
-          ? check("runtime.audit-history", "runtime", "pass", "Durable ROPE history", "A ROPE report write has been verified during this server session.")
-          : check("runtime.audit-history", "runtime", "warn", "Durable ROPE history", "The report store is configured but has not completed a verified write during this server session."),
+          ? check("runtime.audit-history", "runtime", "pass", "Durable ROPE history", "The ROPE audit schema and server access were verified.")
+          : check("runtime.audit-history", "runtime", "fail", "Durable ROPE history", "The report store is configured but has not passed schema verification."),
     runtime.privateReportConfigured
       ? check("runtime.private-report", "runtime", "pass", "Private report access", "The private ROPE report token is configured.")
       : check("runtime.private-report", "runtime", "fail", "Private report access", "ROPE_AUDIT_TOKEN is missing or too short."),

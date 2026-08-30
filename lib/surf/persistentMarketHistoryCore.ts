@@ -101,9 +101,16 @@ export function persistentRowsToGameMarketAverages(
 
   const result: Record<string, GameMarketAverage> = {};
   for (const [gameId, gameRows] of byGame) {
+    const seen = new Set<string>();
     const ordered = gameRows
       .slice()
-      .sort((a, b) => (timestamp(a.observed_at) ?? 0) - (timestamp(b.observed_at) ?? 0));
+      .sort((a, b) => (timestamp(a.observed_at) ?? 0) - (timestamp(b.observed_at) ?? 0))
+      .filter((row) => {
+        const key = `${row.market}:${row.observed_at}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     const spreadHistory = ordered
       .filter((row) => row.market === "spreads")
       .flatMap((row) => {

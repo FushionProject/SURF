@@ -38,6 +38,11 @@ NFL injury context comes from API-Sports and requires `API_SPORTS_KEY` plus the
 audited provider team-ID mapping. Missing or partial coverage is shown honestly;
 Surf never invents injury records.
 
+Durable line history and private ROPE evidence use server-only Supabase access.
+Production requires a Supabase secret key and the versioned persistence
+migrations; the browser publishable key is never used for these writes. See
+[Surf Supabase Reliability](docs/SUPABASE_RELIABILITY.md).
+
 ## Prediction markets
 
 Surf reads public Kalshi and Polymarket winner-market data. Games may show one

@@ -1,64 +1,43 @@
 import "server-only";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
 
+import { SingleFlight } from "@/lib/surf/persistenceReliability";
 import type { RopeReport } from "@/lib/surf/ropeAudit";
+import { runSupabaseOperation, surfPersistenceStatus } from "@/lib/surf/supabasePersistence";
 import type { SurfSportKey } from "@/lib/surf/sports";
 
 declare global {
-  var __surfRopeAuditClient: SupabaseClient | undefined;
-  var __surfRopePersistenceAttempts: Set<string> | undefined;
-  var __surfRopePersistenceHealth: RopePersistenceHealth | undefined;
+  var __surfRopePersistenceSingleFlight: SingleFlight<string, boolean> | undefined;
+  var __surfRopePersistenceSuccesses: Map<string, number> | undefined;
 }
 
-const persistenceAttempts = globalThis.__surfRopePersistenceAttempts ?? new Set<string>();
-globalThis.__surfRopePersistenceAttempts = persistenceAttempts;
+const persistenceSingleFlight = globalThis.__surfRopePersistenceSingleFlight
+  ?? new SingleFlight<string, boolean>();
+globalThis.__surfRopePersistenceSingleFlight = persistenceSingleFlight;
+const persistenceSuccesses = globalThis.__surfRopePersistenceSuccesses ?? new Map<string, number>();
+globalThis.__surfRopePersistenceSuccesses = persistenceSuccesses;
+
+const SUCCESS_TTL_MS = 20 * 60 * 1000;
+const MAX_SUCCESS_KEYS = 1_000;
 
 export type RopePersistenceStatus = {
   configured: boolean;
   backend: "supabase" | "memory";
   verified: boolean;
+  state: "unconfigured" | "unverified" | "healthy" | "degraded" | "circuit_open";
   lastError?: string;
 };
-
-type RopePersistenceHealth = {
-  verified: boolean;
-  lastError?: string;
-};
-
-const persistenceHealth = globalThis.__surfRopePersistenceHealth ?? { verified: false };
-globalThis.__surfRopePersistenceHealth = persistenceHealth;
-
-function configuration(): { url: string; key: string } | undefined {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return undefined;
-  return { url, key };
-}
-
-function client(): SupabaseClient | undefined {
-  if (globalThis.__surfRopeAuditClient) return globalThis.__surfRopeAuditClient;
-  const config = configuration();
-  if (!config) return undefined;
-  globalThis.__surfRopeAuditClient = createClient(config.url, config.key, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
-  return globalThis.__surfRopeAuditClient;
-}
 
 export function ropePersistenceStatus(): RopePersistenceStatus {
-  return configuration()
-    ? {
-        configured: true,
-        backend: "supabase",
-        verified: persistenceHealth.verified,
-        lastError: persistenceHealth.lastError,
-      }
-    : { configured: false, backend: "memory", verified: false };
+  const status = surfPersistenceStatus("rope-audit");
+  return {
+    configured: status.configured,
+    backend: status.backend,
+    verified: status.verified,
+    state: status.state,
+    lastError: status.lastError,
+  };
 }
 
 function fingerprint(report: RopeReport): string {
@@ -70,12 +49,7 @@ function fingerprint(report: RopeReport): string {
     signals: report.signalEvidence,
     books: report.summary.uniqueBooks,
   });
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < stable.length; index += 1) {
-    hash ^= stable.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
+  return createHash("sha256").update(stable).digest("hex");
 }
 
 function auditWindow(auditedAt: number): string {
@@ -87,66 +61,59 @@ function persistenceKey(report: RopeReport): string {
   return `${report.sportKey}:${auditWindow(report.auditedAt)}:${fingerprint(report)}`;
 }
 
-async function writeReport(report: RopeReport): Promise<void> {
-  const supabase = client();
-  if (!supabase) return;
-  const { error } = await supabase
-    .from("surf_rope_audit_runs")
-    .upsert(
-      {
-        sport_key: report.sportKey,
-        audit_window: auditWindow(report.auditedAt),
-        audited_at: new Date(report.auditedAt).toISOString(),
-        fingerprint: fingerprint(report),
-        status: report.status,
-        score: report.score,
-        game_count: report.summary.games,
-        signal_count: report.summary.signals,
-        report,
-      },
-      {
-        onConflict: "sport_key,audit_window,fingerprint",
-        ignoreDuplicates: true,
-      },
-    );
-  if (error) throw new Error(`ROPE persistence failed (${error.code ?? "unknown"})`);
+function pruneSuccesses(now: number): void {
+  for (const [key, expiresAt] of persistenceSuccesses) {
+    if (expiresAt <= now) persistenceSuccesses.delete(key);
+  }
+  if (persistenceSuccesses.size <= MAX_SUCCESS_KEYS) return;
+  const overflow = persistenceSuccesses.size - MAX_SUCCESS_KEYS;
+  for (const key of [...persistenceSuccesses.keys()].slice(0, overflow)) persistenceSuccesses.delete(key);
 }
 
-export async function persistRopeReport(report: RopeReport, timeoutMs = 1_000): Promise<boolean> {
-  if (!configuration()) return false;
+export async function persistRopeReport(report: RopeReport, timeoutMs = 1_200): Promise<boolean> {
+  const status = ropePersistenceStatus();
+  if (!status.configured || !Number.isFinite(report.auditedAt) || report.auditedAt <= 0) return false;
   const key = persistenceKey(report);
-  if (persistenceAttempts.has(key)) return persistenceHealth.verified;
-  persistenceAttempts.add(key);
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const persisted = await Promise.race([
-      writeReport(report)
-        .then(() => {
-          persistenceHealth.verified = true;
-          delete persistenceHealth.lastError;
-          return true;
-        })
-        .catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : "Unknown ROPE persistence failure";
-          persistenceHealth.verified = false;
-          persistenceHealth.lastError = message;
-          console.warn(`[surf] ${message}; retaining ROPE report in memory.`);
-          return false;
-        }),
-      new Promise<boolean>((resolve) => {
-        timeout = setTimeout(() => {
-          persistenceHealth.verified = false;
-          persistenceHealth.lastError = "ROPE persistence timed out.";
-          console.warn("[surf] ROPE persistence timed out; retaining report in memory.");
-          resolve(false);
-        }, timeoutMs);
-      }),
-    ]);
-    if (!persisted) persistenceAttempts.delete(key);
-    return persisted;
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
+  const now = Date.now();
+  pruneSuccesses(now);
+  if ((persistenceSuccesses.get(key) ?? 0) > now) return true;
+
+  return persistenceSingleFlight.run(key, async () => {
+    const result = await runSupabaseOperation(
+      "rope-audit",
+      async (client, signal) => {
+        const { error } = await client
+          .from("surf_rope_audit_runs")
+          .upsert(
+            {
+              sport_key: report.sportKey,
+              audit_window: auditWindow(report.auditedAt),
+              audited_at: new Date(report.auditedAt).toISOString(),
+              fingerprint: fingerprint(report),
+              status: report.status,
+              score: report.score,
+              game_count: report.summary.games,
+              signal_count: report.summary.signals,
+              report,
+            },
+            {
+              onConflict: "sport_key,audit_window,fingerprint",
+              ignoreDuplicates: true,
+            },
+          )
+          .abortSignal(signal);
+        if (error) throw error;
+        return true;
+      },
+      { timeoutMs: Math.max(250, timeoutMs), maxAttempts: 2, retryBaseDelayMs: 75 },
+    );
+    if (!result.ok) {
+      console.warn(`[surf] ${result.failure.message} Retaining ROPE report in memory.`);
+      return false;
+    }
+    persistenceSuccesses.set(key, Date.now() + SUCCESS_TTL_MS);
+    return true;
+  });
 }
 
 function isRopeReport(value: unknown): value is RopeReport {
@@ -155,26 +122,37 @@ function isRopeReport(value: unknown): value is RopeReport {
   return candidate.acronym === "ROPE"
     && (candidate.status === "PASS" || candidate.status === "HOLD")
     && typeof candidate.auditedAt === "number"
-    && Array.isArray(candidate.checks);
+    && Array.isArray(candidate.checks)
+    && Array.isArray(candidate.signalEvidence);
 }
 
 export async function loadPersistedRopeReports(
   sportKey: SurfSportKey,
   limit = 96,
+  timeoutMs = 1_500,
 ): Promise<RopeReport[]> {
-  const supabase = client();
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("surf_rope_audit_runs")
-    .select("report")
-    .eq("sport_key", sportKey)
-    .order("audited_at", { ascending: false })
-    .limit(Math.max(1, Math.min(720, limit)));
-  if (error) {
-    console.warn(`[surf] ROPE history load failed (${error.code ?? "unknown"}).`);
-    return [];
-  }
-  return (data ?? [])
-    .flatMap((row) => isRopeReport(row.report) ? [row.report] : [])
-    .sort((a, b) => a.auditedAt - b.auditedAt);
+  if (!ropePersistenceStatus().configured) return [];
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(720, Math.floor(limit)))
+    : 96;
+  const result = await runSupabaseOperation(
+    "rope-audit",
+    async (client, signal) => {
+      const { data, error } = await client
+        .from("surf_rope_audit_runs")
+        .select("report")
+        .eq("sport_key", sportKey)
+        .order("audited_at", { ascending: false })
+        .limit(safeLimit)
+        .abortSignal(signal);
+      if (error) throw error;
+      return (data ?? [])
+        .flatMap((row) => isRopeReport(row.report) ? [row.report] : [])
+        .sort((a, b) => a.auditedAt - b.auditedAt);
+    },
+    { timeoutMs: Math.max(250, timeoutMs), maxAttempts: 2, retryBaseDelayMs: 75 },
+  );
+  if (result.ok) return result.value;
+  console.warn(`[surf] ${result.failure.message} Reading ROPE history from memory only.`);
+  return [];
 }

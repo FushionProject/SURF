@@ -78,7 +78,9 @@ enabled, grants no access to `anon` or `authenticated`, and is accessed only by
 the server-side Supabase client.
 
 Without the server secret, the product continues to work and ROPE retains a
-24-hour in-process history. The report marks durability as incomplete.
+24-hour in-process history. The report holds release until the versioned schema
+health check verifies both durable stores. See [Supabase reliability](SUPABASE_RELIABILITY.md)
+for the failure policy and release sequence.
 
 ## Release ritual
 
