@@ -107,7 +107,6 @@ function TeamLogo({ card, side }: { card: SignalCard; side: "away" | "home" }) {
       className="relative grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-05)] text-[8px] font-bold text-[color:var(--surf-ink-55)]"
       title={team}
     >
-      <span aria-hidden="true">{abbreviation}</span>
       {logo && logoVisible ? (
         // The established Surf logo source is remote and intentionally shared across leagues.
         // eslint-disable-next-line @next/next/no-img-element
@@ -119,7 +118,9 @@ function TeamLogo({ card, side }: { card: SignalCard; side: "away" | "home" }) {
           decoding="async"
           onError={() => setLogoVisible(false)}
         />
-      ) : null}
+      ) : (
+        <span aria-hidden="true">{abbreviation}</span>
+      )}
     </div>
   );
 }
