@@ -9,11 +9,11 @@
   --ed-secondary: #777;
   --ed-line: #d7d7d7;
   --ed-soft: #f0f0f0;
-  --ed-art: #eaf3f9;
+  --ed-art: #e8fcff;
   --ed-grid: #11111109;
   --ed-inverse-line: #444;
-  --ed-blue: #a6d8f5;
-  --ed-blue-ink: #234b65;
+  --ed-blue: #00e5ff;
+  --ed-blue-ink: #006b78;
 }
 :root[data-surf-mode="dark"] {
   --ed-scheme: dark;
@@ -25,11 +25,11 @@
   --ed-secondary: #aaa;
   --ed-line: #373a3d;
   --ed-soft: #222528;
-  --ed-art: #19252e;
+  --ed-art: #10292d;
   --ed-grid: #ffffff09;
   --ed-inverse-line: #c4c4c4;
-  --ed-blue: #a6d8f5;
-  --ed-blue-ink: #bde5ff;
+  --ed-blue: #00e5ff;
+  --ed-blue-ink: #00e5ff;
 }
 
 :root {
@@ -539,7 +539,6 @@ body {
   width: 32px;
   height: 32px;
   object-fit: contain;
-  filter: grayscale(1);
 }
 .bn-team-name {
   min-width: 0;
@@ -1323,20 +1322,20 @@ body {
   color: var(--ed-blue);
 }
 :root[data-surf-mode="dark"] .bn-surf-mark {
-  color: #397599;
+  color: #00e5ff;
 }
 :root[data-surf-mode="dark"] .bn-masthead nav a {
   color: #555;
 }
 :root[data-surf-mode="dark"] .bn-masthead nav a[aria-current] {
   color: #111;
-  border-color: #397599;
+  border-color: #00e5ff;
 }
 :root[data-surf-mode="dark"] .bn-hero-link svg {
-  color: #397599;
+  color: #00e5ff;
 }
 :root[data-surf-mode="dark"] .bn-mobile-nav a[aria-current] {
-  color: #234b65;
+  color: #006b78;
 }
 @media (max-width: 850px) {
   .bn-header-inner {
