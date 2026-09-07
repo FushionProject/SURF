@@ -12,8 +12,11 @@ assert.equal(isSurfVisibleSportKey("basketball_nba"), false, "NBA must stay hidd
 assert.deepEqual(parseRequestedSport("basketball_nba"), { ok: false, value: "basketball_nba" });
 assert.equal(SURF_ENABLED_SPORT_KEYS.includes("basketball_nba"), false, "NBA must not be accepted by live API routes");
 
-for (const sport of ["americanfootball_nfl_preseason", "americanfootball_nfl", "baseball_mlb"]) {
+assert.equal(isSurfVisibleSportKey("americanfootball_nfl_preseason"), false);
+assert.deepEqual(parseRequestedSport("americanfootball_nfl_preseason"), { ok: false, value: "americanfootball_nfl_preseason" });
+
+for (const sport of ["americanfootball_nfl", "baseball_mlb"]) {
   assert.equal(parseRequestedSport(sport).ok, true, `${sport} should remain enabled`);
 }
 
-console.log("Sport gating fixtures passed: NBA preserved internally but blocked from UI and live routes.");
+console.log("Sport gating fixtures passed: NBA and preseason blocked from UI and live routes.");

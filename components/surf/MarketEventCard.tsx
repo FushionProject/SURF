@@ -142,8 +142,8 @@ function SignalStrength({ score, measure = "market magnitude" }: { score: number
       aria-label={`Signal strength ${tier.label}. Measures ${measure}, not pick confidence.`}
       title={`Measures ${measure}, not pick confidence`}
     >
-      <span>Signal strength</span>
-      <span className="flex items-center gap-1" aria-hidden="true">
+      <span className="whitespace-nowrap">Strength</span>
+      <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
         {Array.from({ length: 5 }).map((_, index) => (
           <span
             key={index}
@@ -156,7 +156,6 @@ function SignalStrength({ score, measure = "market magnitude" }: { score: number
         ))}
       </span>
       <span className="text-[color:var(--surf-ink-60)]">{tier.label}</span>
-      <span className="normal-case tracking-normal text-[color:var(--surf-ink-30)]">· {measure}</span>
     </div>
   );
 }
@@ -192,7 +191,7 @@ export function MarketEventCard({ card, now }: Props) {
   const verified = Boolean(opportunity || tracked || horizon || whale);
 
   return (
-    <article className="rounded-[20px] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)] px-4 py-4 shadow-[var(--surf-card-shadow)]">
+    <article className="sports-signal border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)]" data-kind={opportunity?.kind ?? (whale ? "whale" : "movement")}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.1em]">
           <span className="text-[color:var(--surf-primary)]">{timingLabel(card, now)}</span>
@@ -218,7 +217,7 @@ export function MarketEventCard({ card, now }: Props) {
         <div className="shrink-0 text-[10px] text-[color:var(--surf-ink-40)]">{gameTime(card.commenceTime)}</div>
       </div>
 
-      <h2 className="mt-3 text-[17px] font-semibold leading-5 tracking-[-0.02em] text-[color:var(--surf-ink-solid)]">
+      <h2 className="mt-3 text-[24px] font-bold leading-tight tracking-[-0.025em] text-[color:var(--surf-ink-solid)]">
         {headline(card)}
       </h2>
       <SignalStrength

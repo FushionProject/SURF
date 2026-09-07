@@ -7,7 +7,6 @@ export const SURF_SPORT_KEYS = [
 
 export type SurfSportKey = (typeof SURF_SPORT_KEYS)[number];
 export const SURF_ENABLED_SPORT_KEYS = [
-  "americanfootball_nfl_preseason",
   "americanfootball_nfl",
   "baseball_mlb",
 ] as const satisfies readonly SurfSportKey[];

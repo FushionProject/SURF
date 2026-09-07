@@ -10,8 +10,8 @@ type Props = {
 
 export function SportSelector({ value, onChange, disabled = false }: Props) {
   return (
-    <div className="mb-4">
-      <div className="grid w-full grid-cols-3 rounded-full border border-[color:var(--surf-line-10)] bg-[color:var(--surf-fill-03)] p-1">
+    <div className="sports-selector mb-4">
+      <div className="flex gap-6 border-b border-[color:var(--surf-line-10)]">
           {SURF_VISIBLE_SPORTS.map((sport) => (
             <button
               key={sport.key}

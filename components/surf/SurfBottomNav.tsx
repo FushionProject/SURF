@@ -18,7 +18,7 @@ export function SurfBottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[color:var(--surf-line-06)] bg-[color:var(--surf-chrome-bg)]">
+    <nav aria-label="Primary navigation" className="sports-nav fixed bottom-0 left-0 right-0 z-50 border-t border-[color:var(--surf-line-06)] bg-[color:var(--surf-chrome-bg)]">
       <div className="surf-shell mx-auto w-full max-w-md px-4 py-3">
         <div className="grid grid-cols-2 gap-2">
           {ITEMS.map((it) => {
@@ -27,6 +27,7 @@ export function SurfBottomNav() {
               <Link
                 key={it.href}
                 href={it.href}
+                aria-current={active ? "page" : undefined}
                 className={
                   active
                     ? "rounded-xl border border-[color:var(--surf-primary)]/35 bg-[color:var(--surf-surface)] px-3 py-2 text-center text-xs font-semibold tracking-wide text-[color:var(--surf-ink)] shadow-[0_0_22px_rgba(0,229,255,0.14)]"

@@ -9,11 +9,11 @@ type Props = {
 
 export function SurfAppHeader({ title, subtitle }: Props) {
   return (
-    <header className="pb-5 pt-6">
+    <header className="sports-header pb-5 pt-6">
       <div>
         <div className="mb-5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold tracking-tight text-[color:var(--surf-ink-solid)]">Surf</span>
+            <Link href="/games" className="sports-wordmark">surf<span>.</span></Link>
             <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--surf-primary)]" />
           </div>
           <Link
@@ -31,7 +31,7 @@ export function SurfAppHeader({ title, subtitle }: Props) {
             </svg>
           </Link>
         </div>
-        <h1 className="text-[28px] font-semibold leading-none tracking-[-0.04em] text-[color:var(--surf-ink-solid)]">
+        <h1 className="text-[32px] font-bold leading-tight tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
           {title}
         </h1>
         <p className="mt-2 max-w-sm text-[15px] leading-6 text-[color:var(--surf-ink-55)]">{subtitle}</p>

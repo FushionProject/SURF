@@ -1,0 +1,91 @@
+/* The sports redesign uses flat surfaces and one readable type scale. */
+:root, html[data-theme] {
+  --surf-base: #080b10;
+  --surf-surface: #11161e;
+  --surf-inner: #171e28;
+  --surf-primary: #67b5ff;
+  --surf-primary-rgb: 103,181,255;
+  --surf-positive: #92d5bd;
+  --surf-line: #26303d;
+  --surf-line-strong: #344151;
+  --surf-line-10: #26303d;
+  --surf-ink-35: #8995a5;
+  --surf-ink-40: #939fae;
+  --surf-ink-45: #a1adbb;
+  --surf-ink-55: #b0bac7;
+  --surf-card-shadow: none;
+  --surf-chrome-bg: #0e131b;
+}
+.surf-bg, .surf-content { background: var(--surf-base); }
+.surf-bg::before, .surf-bg::after,
+.surf-bg > .pointer-events-none { display: none; }
+.surf-shell { max-width: 880px; }
+.sports-header { padding-top: 24px; }
+.sports-header > div > div:first-child { padding-bottom: 20px; border-bottom: 1px solid #26303d; }
+.sports-header p { max-width: none; font-size: 16px; }
+.sports-wordmark { font-size: 30px; font-weight: 800; letter-spacing: -1.5px; }
+.sports-wordmark span { color: var(--surf-primary); }
+.sports-wordmark + span { display: none; }
+.sports-selector button {
+  min-height: 48px; min-width: 64px; border-radius: 0;
+  font-size: 15px; background: transparent; border-bottom: 3px solid transparent;
+}
+.sports-selector button[aria-pressed="true"] {
+  color: var(--surf-primary); border-color: var(--surf-primary);
+}
+.sports-nav .surf-shell { max-width: 880px; }
+.sports-nav a {
+  border: 0; border-radius: 4px; box-shadow: none; background: transparent;
+  font-size: 15px; padding: 12px; min-height: 44px;
+}
+.sports-nav a[aria-current="page"] { color: #8ec8ff; background: #1b2c40; }
+.sports-nav { padding-bottom: env(safe-area-inset-bottom); }
+.sports-signal {
+  padding: 24px; border-radius: 10px; border-left: 3px solid #67b5ff;
+  margin-bottom: 8px;
+}
+.sports-signal[data-kind="arbitrage"] { border-left-color: #92d5bd; }
+.sports-signal[data-kind="whale"] { border-left-color: #c0afff; }
+.sports-signal > div:first-child { flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid #26303d; }
+.sports-signal > div:nth-child(2) { margin-top: 18px; }
+.sports-signal h2 { margin: 18px 0 12px; max-width: 620px; font-size: 26px; }
+.sports-signal p { font-size: 15px; line-height: 1.6; }
+.sports-signal [class*="text-[8px]"],
+.sports-signal [class*="text-[9px]"],
+.sports-signal [class*="text-[10px]"],
+.sports-signal [class*="text-[11px]"] { font-size: 12px; line-height: 1.5; }
+.sports-signal .text-xs { font-size: 16px; }
+.sports-signal .font-mono.text-sm { font-family: var(--font-geist-sans), sans-serif; font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.sports-signal [class*="shadow-"], .sports-game [class*="shadow-"] { box-shadow: none; }
+.sports-signal summary { min-height: 40px; padding-top: 8px; }
+.sports-signal ul { font-size: 13px; line-height: 1.6; }
+.sports-signal [class*="rounded-xl"] { border-radius: 6px; }
+.sports-game { border-radius: 10px; margin-bottom: 24px; }
+.sports-game > .pointer-events-none { display: none; }
+.sports-game [class*="text-[8px]"],
+.sports-game [class*="text-[9px]"],
+.sports-game [class*="text-[10px]"] { font-size: 12px; line-height: 1.5; }
+.sports-game [class*="text-[11px]"] { font-size: 14px; line-height: 1.5; }
+.sports-game [class*="rounded-"] { border-radius: 6px; }
+.sports-game [class*="bg-[linear-gradient"] { background: transparent; border: 0; padding: 20px 0; box-shadow: none; }
+.sports-game [class*="bg-[linear-gradient"] > .pointer-events-none { display: none; }
+.sports-game [class*="bg-[linear-gradient"] p { font-size: 15px; line-height: 1.6; }
+.sports-game [class*="bg-[linear-gradient"] [class*="rounded-full"] { border: 0; background: transparent; padding-left: 0; }
+.sports-game [class*="bg-[linear-gradient"] h3 { font-size: 21px; }
+.sports-game [class*="drop-shadow"] { filter: none; }
+.sports-consensus { border-top: 1px solid #26303d; border-bottom: 1px solid #26303d; }
+.sports-consensus > summary { cursor: pointer; padding: 16px 0; font-size: 14px; font-weight: 600; }
+.sports-consensus > summary span { float: right; font-size: 12px; font-weight: 400; color: #939fae; }
+.sports-consensus[open] > summary { margin-bottom: 12px; }
+.sports-game button { min-height: 40px; }
+.sports-game svg text { font-size: 12px; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid #67b5ff; outline-offset: 4px; }
+@media (max-width: 600px) {
+  .sports-signal { padding: 18px; }
+  .sports-signal h2 { font-size: 23px; }
+  .sports-signal > div:first-child { gap: 10px; }
+  .sports-signal > div:nth-child(2) { flex-wrap: wrap; }
+  .sports-game > div.relative { padding-inline: 16px; }
+  .sports-header h1 { font-size: 28px; }
+  .sports-consensus > summary span { float: none; display: block; margin-top: 4px; }
+}

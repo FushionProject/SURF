@@ -789,7 +789,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
   const activeHistory = marketMode === "spreads" ? marketHistory?.spreadHistory ?? [] : marketHistory?.totalHistory ?? [];
 
   return (
-    <article className="relative overflow-hidden rounded-[26px] border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)] shadow-[var(--surf-card-shadow)]">
+    <article className="sports-game relative overflow-hidden border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)]">
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-36"
         style={{
@@ -840,12 +840,13 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
             observedAt={observedAt}
           />
 
-          <div className="mt-4">
+          <details className="sports-consensus mt-4">
+            <summary>Prediction markets <span>View probabilities</span></summary>
             <PredictionMarketConsensusStrip
               consensus={data.predictionMarketConsensus?.[game.id]}
               league={config.league}
             />
-          </div>
+          </details>
 
           <section className="mt-5">
             <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
@@ -982,8 +983,8 @@ export default function GamesPage() {
       <div className="surf-content">
         <div className="surf-shell mx-auto w-full px-4 pb-24" style={{ maxWidth: "52rem" }}>
           <SurfAppHeader
-            title="Catch the moves that matter."
-            subtitle="One clear market read for every matchup—sportsbook prices, prediction-market flow, line movement, and injuries."
+            title="Games"
+            subtitle="The matchup. The market. Your best number."
           />
 
           <SportSelector
