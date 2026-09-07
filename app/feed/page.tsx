@@ -151,10 +151,10 @@ export default function Home() {
 
   const sinceLastVisit = useMemo(() => {
     if (!lastVisitAt) return null;
-    return (data?.signals ?? []).filter(
+    return filterSignalFeed(data?.signals ?? [], filter).filter(
       (signal) => signalChangeTime(signal) > lastVisitAt,
     ).length;
-  }, [data, lastVisitAt]);
+  }, [data, filter, lastVisitAt]);
 
   const sportLabel = getSurfSportConfig(sport).label;
   const scheduleTimestamp = updatedAt ?? data?.generatedAt;
