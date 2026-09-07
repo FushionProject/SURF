@@ -12,7 +12,11 @@ for (const sport of sports) {
   await Promise.all(["surf-games", "surf-feed"].map(async endpoint => {
     const response = await fetch(`${source}/api/${endpoint}?sport=${sport}&refreshMode=dynamic`);
     assert.equal(response.status, 200, `${sport} ${endpoint}`);
-    captured.set(`${endpoint}:${sport}`, await response.json());
+    const payload = await response.json();
+    if (endpoint === "surf-games") {
+      assert(!payload.games.some(game => game.bookmakers?.some(book => book.key === "betparx")), `${sport}: removed book returned`);
+    }
+    captured.set(`${endpoint}:${sport}`, payload);
   }));
 }
 const rankings = await fetch(`${source}/api/cfb-rankings`);
