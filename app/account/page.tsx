@@ -12,14 +12,14 @@ export default async function AccountPage() {
   const supabase = await createSupabaseServerClient();
   const { data } = supabase ? await supabase.auth.getClaims() : { data: null };
   const claims = data?.claims;
-  const email = typeof claims?.email === "string" ? claims.email : "Surf member";
+  const email = typeof claims?.email === "string" ? claims.email : "BestBet member";
 
   return (
     <div className="surf-bg min-h-full flex-1 bg-[color:var(--surf-base)]">
       <main className="surf-content mx-auto w-full max-w-md px-5 pb-28">
         <SurfAppHeader
           title="Your account"
-          subtitle="One identity for saved context, alerts, and your Surf plan."
+          subtitle="One identity for saved context, alerts, and your BestBet account."
         />
 
         {!supabase ? (
