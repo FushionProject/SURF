@@ -1,5 +1,7 @@
 # Full-data editorial preview
 
+**Promoted September 7, 2026:** this design is now on local and GitHub `main`. The text below records the original integration. See [release audit](SURF-RELEASE-AUDIT-2026-09-07.md) for current status and rollback.
+
 This experiment lives on `codex/surf-full-data-preview`. The prior design remains at `codex/surf-editorial-themes` (`1bc4895`), and main remains unchanged at `6af58ad` at the time of integration. The working checkout is `/Users/ryanpalumbo/.codex/worktrees/betnow-redesign/surf`.
 
 The editorial layout, wave animation, appearance choices, full-color team logos, and watchlist are retained. The preview now exposes the existing Surf catalog:
