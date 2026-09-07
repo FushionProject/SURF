@@ -5,6 +5,7 @@ import type {
   TrackedBookLineMove,
 } from "./types";
 import type { SurfLeague, SurfSportKey, SurfSportLabel } from "./sports";
+import { filterSurfBookmakers, SURF_BOOKMAKER_POOL_KEY } from "./bookmakers.ts";
 
 const HALF_POINT = 0.5;
 const SINGLE_BOOK_MIN_MOVE = 1;
@@ -41,6 +42,7 @@ type StoredMarketEvent = MarketTapeEvent & {
 };
 
 export type MarketTapeStore = {
+  bookmakerPoolKey?: string;
   latest: Map<string, BookLineSnapshot>;
   rawMoves: RawBookMove[];
   events: Map<string, StoredMarketEvent>;
@@ -66,6 +68,7 @@ declare global {
 
 export function createMarketTapeStore(): MarketTapeStore {
   return {
+    bookmakerPoolKey: SURF_BOOKMAKER_POOL_KEY,
     latest: new Map<string, BookLineSnapshot>(),
     rawMoves: [],
     events: new Map<string, StoredMarketEvent>(),
@@ -135,7 +138,7 @@ function lineRange(values: number[]): number {
 function extractSnapshots(game: OddsApiGame, sportKey: SurfSportKey, now: number): BookLineSnapshot[] {
   const snapshots: BookLineSnapshot[] = [];
 
-  for (const bookmaker of game.bookmakers ?? []) {
+  for (const bookmaker of filterSurfBookmakers(game.bookmakers)) {
     for (const market of bookmaker.markets ?? []) {
       if (market.key !== "spreads" && market.key !== "totals") continue;
       const marketKey = `${sportKey}:${game.id}:${market.key}`;
@@ -166,6 +169,15 @@ function extractSnapshots(game: OddsApiGame, sportKey: SurfSportKey, now: number
 }
 
 function cleanup(store: MarketTapeStore, now: number): void {
+  if (store.bookmakerPoolKey !== SURF_BOOKMAKER_POOL_KEY) {
+    // Derived live comparisons cannot safely mix different source pools. This
+    // does not touch stored history, which can be replayed through the filter.
+    store.latest.clear();
+    store.rawMoves = [];
+    store.events.clear();
+    store.observationCounts.clear();
+    store.bookmakerPoolKey = SURF_BOOKMAKER_POOL_KEY;
+  }
   for (const [key, snapshot] of store.latest.entries()) {
     if (now - snapshot.observedAt > STORE_TTL_MS) store.latest.delete(key);
   }

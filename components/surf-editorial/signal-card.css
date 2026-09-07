@@ -1,26 +1,26 @@
 /* Signal cards inherit the editorial layout's light/dark surface and cyan tokens. */
-.bn-signal.bn-signal-card { min-width: 0; border-top: 2px solid var(--ed-blue-ink); }
+.bn-signal.bn-signal-card { min-width: 0; border: 1px solid var(--ed-card-outline); border-top: 2px solid var(--ed-blue); }
 .bn-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .bn-card-meta .bn-signal-number { font-size: 12px; }
-.bn-card-meta .bn-card-kind { font-size: 10px; letter-spacing: .06em; }
-.bn-card-meta time { margin-left: auto; color: var(--ed-blue-ink); font-size: 11px; line-height: 1.6; }
+.bn-card-meta .bn-card-kind { font-size: 12px; letter-spacing: .03em; }
+.bn-card-meta time { margin-left: auto; color: var(--ed-blue-ink); font-size: 12px; line-height: 1.6; }
 .bn-card-matchup { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px 16px; margin-top: 23px; }
 .bn-card-teams { display: flex; align-items: center; gap: 11px; font-size: 13px; line-height: 1.5; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .bn-card-at { font-weight: 400; color: var(--ed-muted); }
 .bn-card-logos { display: flex; gap: 5px; flex: none; }
 .bn-card-logo { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--ed-secondary); }
 .bn-card-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.bn-card-kickoff { color: var(--ed-muted); font-size: 11px; line-height: 1.6; }
+.bn-card-kickoff { color: var(--ed-muted); font-size: 12px; line-height: 1.6; }
 .bn-signal.bn-signal-card h3 { font-size: clamp(23px, 2.3vw, 29px); font-weight: 600; line-height: 1.2; letter-spacing: -.035em; margin: 19px 0 12px; overflow-wrap: anywhere; }
 .bn-signal.bn-signal-card .bn-card-why { font-size: 14px; line-height: 1.65; margin: 0 0 21px; }
-.bn-card-quote-label { color: var(--ed-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin: 18px 0 8px; }
+.bn-card-quote-label { color: var(--ed-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
 .bn-card-quotes { border-top: 1px solid var(--ed-line); border-bottom: 1px solid var(--ed-line); margin: 0; }
 .bn-card-quotes > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); gap: 15px; align-items: center; padding: 15px 0; }
 .bn-card-quotes > div + div { border-top: 1px solid var(--ed-line); }
 .bn-card-quotes dt { min-width: 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .bn-card-quotes small { display: block; font-size: 12px; color: var(--ed-blue-ink); }
 .bn-card-quotes dd { margin: 0; text-align: right; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; overflow-wrap: anywhere; }
-.bn-signal.bn-signal-card .bn-card-context { font-size: 11px; line-height: 1.6; margin: 11px 0 0; }
+.bn-signal.bn-signal-card .bn-card-context { font-size: 12px; line-height: 1.6; margin: 11px 0 0; }
 .bn-signal.bn-signal-card .bn-card-detail { font-size: 18px; color: var(--ed-ink); font-variant-numeric: tabular-nums; }
 .bn-card-execution { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr); gap: 16px; border-top: 1px solid var(--ed-line); border-bottom: 1px solid var(--ed-line); padding: 20px 0; }
 .bn-card-execution-main > * { display: block; }
@@ -32,21 +32,14 @@
 .bn-card-execution dd { margin: 5px 0 0; font-size: 21px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .bn-card-flow-note { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 15px; margin-top: 12px; color: var(--ed-muted); font-size: 11px; line-height: 1.7; }
 .bn-card-flow-note a { color: var(--ed-blue-ink); font-weight: 500; white-space: nowrap; }
-.bn-card-strength { display: flex; align-items: center; gap: 10px; margin: 24px 0 18px; font-size: 10px; color: var(--ed-muted); }
+.bn-card-strength { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 24px 0 0; font-size: 12px; color: var(--ed-muted); }
 .bn-card-strength > div { height: 4px; flex: 1; min-width: 30px; max-width: 100px; background: var(--ed-line); }
 .bn-card-strength i { display: block; height: 100%; background: var(--ed-blue-ink); }
 .bn-card-strength strong { font-size: 11px; color: var(--ed-ink); font-weight: 500; }
-.bn-card-method { border-top: 1px solid var(--ed-line); margin-top: 20px; }
-.bn-card-method summary { display: flex; justify-content: space-between; gap: 12px; list-style: none; color: var(--ed-blue-ink); padding: 15px 0 0; font-size: 12px; font-weight: 500; cursor: pointer; }
-.bn-card-method summary::-webkit-details-marker { display: none; }
-.bn-card-method summary > span { font-size: 16px; line-height: 1; }
-.bn-card-method[open] summary { margin-bottom: 14px; }
-.bn-card-method[open] summary > span { transform: rotate(45deg); }
-.bn-card-method summary:focus-visible, .bn-card-flow-note a:focus-visible { outline: 2px solid var(--ed-blue-ink); outline-offset: 5px; }
-.bn-signal.bn-signal-card .bn-card-disclaimer { font-size: 11px; margin-top: 12px; }
+.bn-card-flow-note a:focus-visible { outline: 2px solid var(--ed-blue-ink); outline-offset: 5px; }
 @media (max-width: 600px) {
   .bn-card-meta time { margin-left: 0; flex-basis: 100%; }
-  .bn-signal.bn-signal-card .bn-card-why { font-size: 13px; }
+  .bn-signal.bn-signal-card .bn-card-why { font-size: 14px; }
   .bn-card-quotes > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 12px; }
   .bn-card-quotes dd { font-size: 18px; }
   .bn-card-execution { grid-template-columns: 1fr; }

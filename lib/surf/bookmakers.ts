@@ -1,4 +1,4 @@
-import type { OddsApiBookmaker } from "./types";
+import type { OddsApiBookmaker, OddsApiGame } from "./types";
 
 // The Odds API prices any explicit group of up to ten bookmakers like one region.
 // Keep this list curated so Surf compares recognizable, regulated US sportsbooks
@@ -13,8 +13,11 @@ export const SURF_ODDS_API_BOOKMAKER_KEYS = [
   "espnbet",
   "hardrockbet",
   "ballybet",
-  "betparx",
 ] as const;
+
+// Used only to invalidate derived in-memory market comparisons when the pool
+// changes. Persisted observations are not rewritten or deleted.
+export const SURF_BOOKMAKER_POOL_KEY = SURF_ODDS_API_BOOKMAKER_KEYS.join(",");
 
 const SURF_BOOKMAKER_KEYS = new Set<string>([
   ...SURF_ODDS_API_BOOKMAKER_KEYS,
@@ -45,4 +48,8 @@ export function filterSurfBookmakers(bookmakers: OddsApiBookmaker[] | undefined)
       ...bookmaker,
       title: surfBookmakerTitle(bookmaker.key, bookmaker.title),
     }));
+}
+
+export function filterSurfGames(games: OddsApiGame[]): OddsApiGame[] {
+  return games.map((game) => ({ ...game, bookmakers: filterSurfBookmakers(game.bookmakers) }));
 }

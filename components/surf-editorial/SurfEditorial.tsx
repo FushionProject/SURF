@@ -7,7 +7,6 @@ import {
 } from "./DataPanels";
 import { EditorialSignal } from "./EditorialSignal";
 import { upcomingGames, upcomingSignals, matchesEditorialGame, matchesEditorialSignal, countNewSignals, nextEditorialRefreshDelay } from "@/lib/surf/editorialBoard";
-import { WhaleTrackingStatus } from "@/components/surf/WhaleTrackingStatus";
 import { OvernightMoves } from "@/components/surf/OvernightMoves";
 import { filterSignalFeed } from "@/lib/surf/signalFeed";
 import {
@@ -551,6 +550,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 )}
               </Link>
             ))}
+            <Link href="/how-to-use">How to use Surf</Link>
           </nav>
           <ThemeControl />
           <Link href="/account" className="bn-account-link">
@@ -629,11 +629,10 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
               </div>
               <div className="bn-art-bottom">
                 <span>
-                  ALL SIDES.
+                  SEE HOW THE
                   <br />
-                  ONE PLACE.
+                  MARKET FLOWS.
                 </span>
-                <span className="bn-art-bars" />
               </div>
             </div>
           </section>
@@ -697,7 +696,6 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 summary={data?.feed?.overnight}
                 sportKey={sport}
               />
-              <WhaleTrackingStatus coverage={data?.feed?.activityCoverage} />
             </div>
           )}
           {(data?.games?.dataSource ||

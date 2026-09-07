@@ -42,6 +42,10 @@ try {
     const card = page.locator(".bn-game").first();
     await card.getByText("Surf Market Read", { exact: true }).waitFor();
     await card.getByText("Prediction markets", { exact: true }).waitFor();
+    assert.equal(await card.getByText(/Large-trade direction|Large-trade activity/).count(), 0);
+    assert.equal(await page.locator('.bn-masthead a[href="/how-to-use"]').count(), 1);
+    assert.equal(await page.locator(".bn-art-bars").count(), 0);
+    assert.match(await page.locator(".bn-art-bottom").innerText(), /SEE HOW THE\s+MARKET FLOWS/);
     assert.equal(await card.getByRole("button", { name: "Compare all sportsbook quotes" }).count(), 1);
     await card.getByRole("button", { name: "Compare all sportsbook quotes" }).click();
     assert(await card.locator("table tbody tr").count() > 0);
@@ -68,6 +72,7 @@ try {
     await page.goto(`${preview}/feed?sport=${sport}&type=whales`);
     await page.locator(".bn-current-signals").waitFor();
     assert.equal(await page.getByRole("button", { name: /Whale activity|Market opportunities/ }).count(), 0);
+    assert.equal(await page.getByText(/Coverage & checks|Evidence & method/).count(), 0);
     assert(!new URL(page.url()).searchParams.has("type"));
     const count = await page.locator(".bn-signal-card").count();
     if (count) {
@@ -75,14 +80,20 @@ try {
       assert.equal(await signal.locator(".bn-card-logo").count(), 2);
       assert.match(await signal.locator(".bn-card-meta time").innerText(), /(?:Verified|Filled|Moved|Changed|Observed).*PDT/);
       assert(await signal.locator(".bn-card-quotes, .bn-card-execution").count() > 0);
-      await signal.locator("summary").click();
-      await signal.locator(".bn-evidence-data").waitFor();
+      assert.equal(await signal.locator(".bn-card-method").count(), 0);
     }
     for (const theme of ["dark", "light"]) {
       await page.evaluate(mode => document.documentElement.dataset.surfMode = mode, theme);
-      for (const width of [320, 390, 768, 1440]) {
+      for (const width of [320, 390, 640, 768, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
         await noOverflow();
+        const typography = await page.evaluate(() => ({
+          statsLabel: parseFloat(getComputedStyle(document.querySelector(".bn-stats > div > span")).fontSize),
+          statsCaption: parseFloat(getComputedStyle(document.querySelector(".bn-stats small")).fontSize),
+          briefing: parseFloat(getComputedStyle(document.querySelector(".bn-rail-intro")).fontSize),
+        }));
+        assert(typography.statsLabel >= 11 && typography.statsCaption >= 12 && typography.briefing >= 14, JSON.stringify(typography));
+        assert(await page.locator('.bn-masthead a[href="/how-to-use"]').isVisible());
         if (sport === "americanfootball_nfl" && width === 390 && count && process.env.SURF_UI_SCREENSHOT) {
           await page.locator(".bn-signal-card").first().screenshot({ path: `${process.env.SURF_UI_SCREENSHOT}-signal-${theme}.png` });
         }
@@ -108,5 +119,5 @@ try {
   await page.setViewportSize({ width: 390, height: 1000 });
   await noOverflow();
   assert.deepEqual(errors, [], "Browser errors including hydration");
-  console.log("Editorial UI passed: captured NFL/MLB/CFB data, visible proof, timezone times, unified whales, two-leg middle, kickoff expiry, AP filter/search, graphs, themes and four widths.");
+  console.log("Editorial UI passed: NFL/MLB/CFB, simplified cards, guide navigation, larger text, timezone times, unified whales, two-leg middle, kickoff expiry, AP filter/search, graphs, themes and five widths.");
 } finally { await browser.close(); }

@@ -5,7 +5,6 @@ import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { getTeamLogo } from "@/lib/teamLogos";
 import type { SignalCard } from "@/lib/surf/types";
 import { signalAdditionalQuotes, signalKindLabel, signalQuoteRows, signalStrength, signalTimestamp, signalTimingLabel, type SignalQuoteRow } from "@/lib/surf/signalPresentation";
-import { SignalEvidence } from "./DataPanels";
 import "./signal-card.css";
 
 const subscribe = () => () => {};
@@ -100,10 +99,5 @@ export function EditorialSignal({ signal, index, now }: { signal: SignalCard; in
     {strength && <div className="bn-card-strength" aria-label={`${strength.measure}: ${strength.label}, ${strength.score} out of 100. Not pick confidence.`}>
       <span>{strength.measure}</span><div aria-hidden="true"><i style={{ width: `${strength.score}%` }} /></div><strong>{strength.label}</strong>
     </div>}
-    <details className="bn-card-method">
-      <summary>Evidence &amp; method <span aria-hidden="true">+</span></summary>
-      <SignalEvidence signal={signal} compact />
-      <p className="bn-card-disclaimer">{whale ? "Activity size reflects observed trading, not the probability this team wins." : "Signal strength is market relevance and value, not pick confidence."}</p>
-    </details>
   </article>;
 }

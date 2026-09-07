@@ -23,8 +23,8 @@ const steps = [
     description: "Open Signals for qualifying price differences, middles, arbitrage quotes, and large prediction-market buys—not a card for every small change.",
   },
   {
-    title: "Read the evidence",
-    description: "Expand Evidence & method to see why a card qualified. Check its timestamp, then confirm the number, price, and rules at the venue.",
+    title: "Check the details",
+    description: "Each card shows the number, price, source, and timestamp. Confirm those details and the settlement rules at the venue before acting.",
   },
 ];
 
@@ -51,7 +51,7 @@ const definitions = [
       "Kalshi activity is anonymous. A burst is not proof that one person placed the entire amount. A Polymarket wallet is also not a verified person or proof of an informed bettor.",
       "The activity is an observed sample, not all trading volume or net positions. Check the venue, team, amount, and activity label—not just the headline.",
       "Current whale activity appears alongside sportsbook opportunities in Signals. Surf only shows activity for upcoming games; whale cards leave the feed when the game starts.",
-      "Surf checks on its market-refresh schedule, not continuously when nobody is using it. Public trade searches are bounded and incomplete scans are labeled. It does not claim to capture every fill, maker trade, or historical position.",
+      "Surf checks on its market-refresh schedule, not continuously when nobody is using it. Public trade searches are bounded. Surf does not claim to capture every fill, maker trade, or historical position.",
     ],
   },
   {
@@ -71,7 +71,7 @@ const definitions = [
   {
     title: "Prediction markets and injuries",
     paragraphs: [
-      "Kalshi and Polymarket percentages show market-implied win probability, not Surf’s forecast. Large-trade direction separately shows which team leads the qualifying observed buying activity; it is not the total market’s volume split.",
+      "Games shows Kalshi and Polymarket market-implied win probability, not Surf’s forecast. Qualifying large buys appear in Signals, separate from those probabilities; they are not the total market’s volume split.",
       "Injuries are matchup context. A listed injury does not establish why a price moved, and an unavailable report does not mean a team is injury-free.",
     ],
   },

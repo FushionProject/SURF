@@ -1,7 +1,7 @@
 import type { SurfSportKey } from "./sports";
 import type { OddsApiGame } from "./types";
 import { refreshIntervalMs } from "./feedSchedule.ts";
-import { SURF_ODDS_API_BOOKMAKER_KEYS } from "./bookmakers.ts";
+import { filterSurfGames, SURF_ODDS_API_BOOKMAKER_KEYS } from "./bookmakers.ts";
 
 const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
 
@@ -113,7 +113,7 @@ function oddsUrl(sportKey: SurfSportKey, apiKey: string): string {
   const url = new URL(`${ODDS_API_BASE}/sports/${sportKey}/odds`);
   url.searchParams.set("apiKey", apiKey);
   // An explicit set keeps outlier/offshore sources out and includes selected
-  // `us2` books such as theScore Bet. Ten books carry the same quota cost as
+  // `us2` books such as theScore Bet. Up to ten books carry the same quota cost as
   // the previous single-region request.
   url.searchParams.set("bookmakers", SURF_ODDS_API_BOOKMAKER_KEYS.join(","));
   // Moneylines are especially useful in baseball, where the price is the line.
@@ -145,7 +145,8 @@ export async function getSharedOddsSnapshot(options: {
     now - existing.fetchedAt < refreshIntervalMs(now, nextGameAt(existing.games, now))
   ) {
     telemetryFor(options.sportKey).cacheReuseCount += 1;
-    return { games: existing.games, fetchedAt: existing.fetchedAt, reused: true };
+    // A hot reload can retain snapshots captured before the curated pool changed.
+    return { games: filterSurfGames(existing.games), fetchedAt: existing.fetchedAt, reused: true };
   }
 
   // A forced refresh may bypass cached data, but it must never create a second
@@ -154,7 +155,7 @@ export async function getSharedOddsSnapshot(options: {
     telemetryFor(options.sportKey).inFlightReuseCount += 1;
     const games = await existing.inFlight;
     const completed = snapshots.get(options.sportKey);
-    return { games, fetchedAt: completed?.fetchedAt ?? Date.now(), reused: true };
+    return { games: filterSurfGames(games), fetchedAt: completed?.fetchedAt ?? Date.now(), reused: true };
   }
 
   const telemetry = telemetryFor(options.sportKey);
@@ -180,11 +181,11 @@ export async function getSharedOddsSnapshot(options: {
       }
       const raw: unknown = await response.json().catch(() => null);
       if (!Array.isArray(raw)) throw new Error("Unexpected Odds API response shape");
-      const games = [...new Map((raw as OddsApiGame[]).filter(game =>
+      const games = filterSurfGames([...new Map((raw as OddsApiGame[]).filter(game =>
         game.sport_key === options.sportKey && typeof game.id === "string" &&
         typeof game.home_team === "string" && typeof game.away_team === "string" &&
         game.home_team !== game.away_team && Number.isFinite(Date.parse(game.commence_time))
-      ).map(game => [game.id, game])).values()];
+      ).map(game => [game.id, game])).values()]);
       telemetry.lastFetchedGameCount = games.length;
       telemetry.lastFetchedBookmakerCount = new Set(
         games.flatMap((game) => (game.bookmakers ?? []).map((bookmaker) => bookmaker.key)),

@@ -1,6 +1,5 @@
 "use client";
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { MarketMovementChart } from "@/components/surf/MarketMovementChart";
 import { PredictionMarketConsensusStrip } from "@/components/surf/PredictionMarketConsensusStrip";
 import type { NflInjuryFeed } from "@/lib/surf/injuries";
@@ -16,7 +15,6 @@ import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { buildGameOfferBoard, type GameOfferBoard } from "@/lib/surf/opportunities";
 import { buildGameMarketRead } from "@/lib/surf/gameMarketRead";
 import { movementLabel } from "@/lib/surf/marketMovementTimeline";
-import { upcomingSignals } from "@/lib/surf/editorialBoard";
 import "./game-panels.css";
 export type FullGameData = {
   marketAverage?: Record<string, GameMarketAverage>;
@@ -68,14 +66,12 @@ export function GameDataPanels({
         data.currentMedianSnapshot?.[game.id]?.spreads)
       : (history?.currentTotalAvg ??
         data.currentMedianSnapshot?.[game.id]?.totals);
-  const whales = upcomingSignals(data.predictionMarketWhaleSignals ?? [], observedAt).filter(
-    (s) => s.game.id === game.id && s.status !== "resolved" && s.whaleActivity,
-  );
   const read = buildGameMarketRead({
     gameId: game.id,
     homeLabel: getTeamAbbrev(game.home_team) ?? game.home_team,
     board,
-    whaleSignals: whales,
+    // Executed trade activity has its own current cards in Signals.
+    whaleSignals: [],
     history,
     consensus,
     spreadName: config.league === "MLB" ? "run line" : "spread",
@@ -140,27 +136,6 @@ export function GameDataPanels({
           lastObservedAt={history?.lastObservedAt}
         />
       </details>
-      {whales.length > 0 && (
-        <details className="bn-data-section bn-report-disclosure">
-          <summary><span>Large-trade activity<small>{whales.length} qualified {whales.length === 1 ? "event" : "events"} for this matchup</small></span></summary>
-          {whales.map((s) => (
-            <div className="bn-whale-summary" key={s.id}>
-              <strong>{s.title}</strong>
-              <p>{s.insight}</p>
-              {s.whaleActivity && (
-                <p>
-                  {s.whaleActivity.venueLabel} ·{" "}
-                  {money(s.whaleActivity.committedUsd)} committed ·{" "}
-                  {time(s.whaleActivity.occurredAt)}
-                </p>
-              )}
-            </div>
-          ))}
-          <Link href={`/feed?sport=${sport}`}>
-            View Signals ↗
-          </Link>
-        </details>
-      )}
       <details className="bn-data-section bn-report-disclosure">
         <summary>
           <span>{reportLabel}<small>{config.league === "MLB" ? "Not connected for MLB" : injuryCount > 0 ? `${injuryCount} listed ${injuryCount === 1 ? "report" : "reports"} · view both teams` : "View coverage for both teams"}</small></span>

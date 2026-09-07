@@ -20,6 +20,7 @@
   --ed-chrome-ink: #f5f5f5;
   --ed-blue: #00e5ff;
   --ed-blue-ink: #006b78;
+  --ed-card-outline: color-mix(in srgb, var(--ed-blue) 62%, var(--ed-line));
 }
 :root[data-surf-mode="dark"] {
   --ed-scheme: dark;
@@ -189,7 +190,8 @@ body {
   gap: 8px;
   border-bottom: 3px solid transparent;
   padding-top: 3px;
-  font-size: 12px;
+  font-size: 13px;
+  white-space: nowrap;
   color: var(--ed-muted);
 }
 .bn-masthead nav a:hover {
@@ -209,7 +211,8 @@ body {
   display: flex;
   align-items: center;
   gap: 18px;
-  font-size: 11px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 .bn-main {
   max-width: 1440px;
@@ -250,7 +253,7 @@ body {
   color: var(--ed-secondary);
 }
 .bn-hero-copy > p:not(.bn-eyebrow) {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--ed-muted);
   line-height: 1.7;
 }
@@ -292,20 +295,9 @@ body {
   z-index: 1;
 }
 .bn-art-bottom {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
   align-items: end;
-}
-.bn-art-bars {
-  width: 70px;
-  height: 30px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--ed-ink) 0 2px,
-    transparent 2px 5px,
-    var(--ed-ink) 5px 6px,
-    transparent 6px 9px
-  );
 }
 .bn-stats {
   display: grid;
@@ -317,6 +309,7 @@ body {
   border: 1px solid var(--ed-stats-line);
 }
 .bn-stats > div {
+  min-width: 0;
   padding: 0 25px;
   border-right: 1px solid var(--ed-stats-line);
 }
@@ -328,21 +321,23 @@ body {
   border: 0;
 }
 .bn-stats > div > span {
-  font-family: monospace;
-  font-size: 9px;
-  letter-spacing: 1px;
+  font-size: 12px;
+  letter-spacing: .04em;
+  line-height: 1.6;
   color: var(--ed-stats-muted);
 }
 .bn-stats strong {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 12px;
   font-size: 34px;
   font-weight: 500;
   margin-top: 10px;
 }
 .bn-stats small {
-  font-size: 10px;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--ed-stats-muted);
   font-weight: 400;
 }
@@ -473,11 +468,11 @@ body {
 }
 .bn-game {
   background: var(--ed-card);
-  border: 1px solid var(--ed-line);
+  border: 1px solid var(--ed-card-outline);
   overflow: hidden;
 }
 .bn-game:hover {
-  border-color: var(--ed-muted);
+  border-color: var(--ed-blue);
 }
 .bn-game-meta {
   padding: 10px 20px;
@@ -612,7 +607,7 @@ body {
   width: 100%;
   border-top: 1px solid var(--ed-line);
   padding: 10px 20px;
-  font-size: 10px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
   background: var(--ed-soft);
 }
@@ -633,7 +628,7 @@ body {
 .bn-detail table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 11px;
+  font-size: 13px;
 }
 .bn-detail th {
   color: var(--ed-muted);
@@ -674,7 +669,7 @@ body {
   flex: 1;
 }
 .bn-rail-intro {
-  font-size: 10px;
+  font-size: 14px;
   color: var(--ed-muted);
   line-height: 1.6;
   margin: 12px 0 24px;
@@ -685,17 +680,17 @@ body {
 }
 .bn-rail-signal > span {
   font-family: monospace;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--ed-muted);
 }
 .bn-rail-signal h3 {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 500;
   line-height: 1.5;
   margin: 10px 0;
 }
 .bn-rail-signal p {
-  font-size: 10px;
+  font-size: 13px;
   color: var(--ed-muted);
   line-height: 1.6;
 }
@@ -708,7 +703,7 @@ body {
   justify-content: space-between;
   border-top: 1px solid var(--ed-line);
   padding-top: 18px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .bn-rail-quiet {
   font-size: 12px;
@@ -766,7 +761,7 @@ body {
 }
 .bn-signal {
   background: var(--ed-card);
-  border: 1px solid var(--ed-line);
+  border: 1px solid var(--ed-card-outline);
   padding: 28px 30px;
 }
 .bn-signal-top {
@@ -1004,7 +999,7 @@ body {
     gap: 20px;
   }
   .bn-masthead nav a {
-    font-size: 11px;
+    font-size: 12px;
   }
   .bn-workspace {
     grid-template-columns: 1fr;
@@ -1047,9 +1042,6 @@ body {
   .bn-stats > div {
     padding: 0 17px;
   }
-  .bn-stats > div > span {
-    font-size: 8px;
-  }
   .bn-stats-refresh button {
     font-size: 10px;
   }
@@ -1059,13 +1051,22 @@ body {
 }
 @media (max-width: 600px) {
   .bn-header-inner {
-    height: 73px;
+    min-height: 73px;
+    height: auto;
+    flex-wrap: wrap;
     padding: 0 20px;
     justify-content: space-between;
   }
   .bn-masthead nav {
-    display: none;
+    display: flex;
+    order: 4;
+    width: 100%;
+    overflow-x: auto;
+    min-width: 0;
+    gap: 22px;
+    scrollbar-width: none;
   }
+  .bn-masthead nav a { min-height: 45px; font-size: 13px; flex-shrink: 0; }
   .bn-account-link {
     font-size: 10px;
     gap: 10px;
@@ -1097,7 +1098,7 @@ body {
     margin: 20px 0;
   }
   .bn-hero-copy > p:not(.bn-eyebrow) {
-    font-size: 11px;
+    font-size: 14px;
   }
   .bn-hero-link {
     margin-top: 20px;
@@ -1114,33 +1115,29 @@ body {
     display: block;
   }
   .bn-art-bottom {
-    font-size: 10px;
-  }
-  .bn-art-bars {
-    height: 20px;
-    width: 55px;
+    font-size: 12px;
   }
   .bn-stats {
     grid-template-columns: repeat(3, 1fr);
-    padding: 18px;
+    padding: 16px 12px;
     margin-bottom: 30px;
   }
   .bn-stats > div {
-    padding: 0 12px;
+    padding: 0 8px;
   }
   .bn-stats > div:nth-child(3) {
     border: 0;
     padding-right: 0;
   }
   .bn-stats > div > span {
-    font-size: 7px;
-    letter-spacing: 0.1px;
+    font-size: 11px;
+    letter-spacing: 0;
   }
   .bn-stats strong {
     font-size: 29px;
   }
   .bn-stats small {
-    font-size: 8px;
+    font-size: 12px;
   }
   .bn-stats .bn-stats-refresh {
     grid-column: 1/-1;
@@ -1242,7 +1239,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .bn-mobile-nav a[aria-current] {
     color: var(--ed-card);
@@ -1264,7 +1261,7 @@ body {
   flex-shrink: 0;
 }
 .bn-header-inner {
-  gap: 36px;
+  gap: 28px;
 }
 .bn-theme-control {
   display: flex;
@@ -1327,15 +1324,25 @@ body {
 }
 @media (max-width: 850px) {
   .bn-header-inner {
-    gap: 20px;
+    gap: 16px;
+    height: auto;
+    padding-top: 18px;
+    flex-wrap: wrap;
   }
   .bn-masthead nav {
-    gap: 15px;
+    gap: 22px;
+    order: 4;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
+  .bn-masthead nav a { min-height: 45px; flex-shrink: 0; }
 }
 @media (max-width: 600px) {
   .bn-header-inner {
-    gap: 12px;
+    gap: 0 12px;
+    padding-top: 18px;
   }
   .bn-theme-control {
     margin-left: auto;
@@ -1715,7 +1722,7 @@ body {
   align-items: center;
   gap: 7px;
   margin-top: 16px;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--ed-muted);
 }
 .bn-top-signals input {
@@ -1768,8 +1775,8 @@ body {
 .bn-team-name { flex: 1; min-width: 0; }
 .bn-team-record { display: block; margin-top: 6px; font-size: 11px; color: var(--ed-muted); }
 .bn-offer { max-width: 140px; flex-shrink: 0; }
-.bn-offer small { font-size: 11px; }
-.bn-offer small.bn-offer-midpoint { font-size: 10px; }
+.bn-offer small { font-size: 12px; }
+.bn-offer small.bn-offer-midpoint { font-size: 11px; }
 .bn-offer-edge {
   display: inline-block;
   color: var(--ed-blue-ink);
