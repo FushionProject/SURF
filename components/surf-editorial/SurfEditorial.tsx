@@ -543,7 +543,30 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 <span>SURF / MARKET RESEARCH</span>
                 <span>01—03</span>
               </div>
-              <span className="bn-art-arrow">↗</span>
+              <div className="bn-waves">
+                {[0, 1, 2].map((layer) => (
+                  <svg
+                    key={layer}
+                    className={`bn-wave bn-wave-${layer}`}
+                    viewBox="0 0 1200 240"
+                    preserveAspectRatio="none"
+                    focusable="false"
+                  >
+                    <path
+                      d="M0 120 C100 40 200 40 300 120 S500 200 600 120 S800 40 900 120 S1100 200 1200 120"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    <path
+                      d="M0 120 C100 40 200 40 300 120 S500 200 600 120 S800 40 900 120 S1100 200 1200 120 V240 H0 Z"
+                      fill="currentColor"
+                      opacity="0.06"
+                    />
+                  </svg>
+                ))}
+              </div>
               <div className="bn-art-bottom">
                 <span>
                   ALL SIDES.

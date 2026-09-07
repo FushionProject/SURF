@@ -296,16 +296,6 @@ body {
   line-height: 1.4;
   align-items: end;
 }
-.bn-art-arrow {
-  position: absolute;
-  inset: 12px 0 0;
-  display: grid;
-  place-content: center;
-  font-size: 300px;
-  font-weight: 800;
-  line-height: 1;
-  transform: rotate(-5deg);
-}
 .bn-art-bars {
   width: 70px;
   height: 30px;
@@ -1045,9 +1035,6 @@ body {
   .bn-hero h1 {
     font-size: 62px;
   }
-  .bn-art-arrow {
-    font-size: 220px;
-  }
   .bn-art-top {
     font-size: 7px;
   }
@@ -1119,10 +1106,6 @@ body {
     min-height: 130px;
     height: 130px;
     padding: 15px;
-  }
-  .bn-art-arrow {
-    font-size: 125px;
-    inset: -6px 0 0 50px;
   }
   .bn-art-top {
     font-size: 8px;
@@ -1415,5 +1398,59 @@ body {
   }
   .bn-signal p {
     font-size: 12px;
+  }
+}
+
+/* Two identical wave periods keep the horizontal loop seamless. */
+.bn-waves {
+  position: absolute;
+  inset: 20% 0 15%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bn-wave {
+  position: absolute;
+  width: 200%;
+  max-width: none;
+  height: 100%;
+  left: 0;
+  top: 0;
+  color: var(--ed-blue-ink);
+  animation: bn-wave-roll 14s linear infinite;
+}
+.bn-wave-0 {
+  opacity: 0.25;
+  top: -14%;
+  animation-duration: 22s;
+  animation-delay: -7s;
+}
+.bn-wave-1 {
+  opacity: 0.45;
+  top: 10%;
+  animation-direction: reverse;
+  animation-duration: 18s;
+  animation-delay: -11s;
+}
+.bn-wave-2 {
+  color: var(--ed-blue);
+  animation-delay: -4s;
+}
+@keyframes bn-wave-roll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bn-wave {
+    animation: none;
+  }
+  .bn-wave-1 {
+    transform: translateX(-20%);
+  }
+  .bn-wave-0 {
+    transform: translateX(-35%);
   }
 }
