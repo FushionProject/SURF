@@ -7,3 +7,5 @@ Evolves the BetNow editorial layout into Surf branding with a wave mark, mostly 
 Market data and qualification rules are unchanged. Saved games use `surf:editorial-saved`, with a fallback to the existing BetNow watchlist on this browser.
 
 Verified production build, targeted lint, and browser tests for explicit theme selection, reload persistence, dynamic system appearance changes, preserved search state, and overflow at 360, 390, 768, 1024, and 1440 pixels in both themes. Browser verification used captured provider data. No deployment or database changes.
+
+The signal feed now uses a single vertical column at every width. Both themes share a dark navigation header, neutral content panels, and cyan action accents; dark mode uses charcoal panels instead of white inversions. Verified feed stacking and evidence expansion at five viewport widths in both themes, plus appearance persistence and system changes.
