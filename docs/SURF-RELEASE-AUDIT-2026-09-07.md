@@ -92,3 +92,10 @@ At the next run, check database restoration, verify migration state if accessibl
 - NFL HOLD 70: 16 games/9 signals/10 books. CFB HOLD 35: 82/40/1–10 books. MLB HOLD 70: 11/3/10 books. Blockers and warnings are unchanged. The CFB duplicate is the same Florida State headline collision already fixed on main; the preview still runs the earlier build pending the controlled final update.
 - Morning recap remains stable: the same UAB move and pre-6 AM timestamp, no NFL/MLB recap entries. This supports preservation since recovery, not recovery of the lost earlier baseline. No new action is required this hour.
 - Private evidence: `/tmp/surf-rope-release/*-0812.json`. No code, schema, design, rollback or release-gate changes; no deployment. Continue until the 10 AM handoff.
+
+## 09:14 AM CT — final hourly observation before handoff
+
+- Private reports were accessible before refresh (NFL 4, CFB 69, MLB 4); no restart. Exactly one fresh sequential request per sport returned HTTP 200.
+- Gates remain unchanged: NFL HOLD 70 (16 games/9 signals/10 books); CFB HOLD 35 (82/53/1–10 books); MLB HOLD 70 (11/8/10 books). CFB has two theoretical arbitrage signals in this snapshot; their presence is not a release pass or an execution guarantee. The same Florida State headline collision remains on the old running build; its fix is already on main. Storage connection, thin CFB coverage and partial prediction coverage remain as previously recorded.
+- The UAB recap and its pre-6 AM timestamp are unchanged; NFL/MLB recaps remain empty. No new continuity failure was observed in the recovered process. The earlier gap still limits the overnight recap.
+- Private evidence: `/tmp/surf-rope-release/*-0913.json`. No new user action or code change this hour. At the next run after 10 AM: export existing private history before restarting, activate the already-built main version, make at most one fresh request per sport, verify runtime and gates, deliver the handoff and pause this automation.
