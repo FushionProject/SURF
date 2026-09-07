@@ -19,8 +19,8 @@ export function SurfBottomNav() {
 
   return (
     <nav aria-label="Primary navigation" className="sports-nav fixed bottom-0 left-0 right-0 z-50 border-t border-[color:var(--surf-line-06)] bg-[color:var(--surf-chrome-bg)]">
-      <div className="surf-shell mx-auto w-full max-w-md px-4 py-3">
-        <div className="grid grid-cols-2 gap-2">
+      <div className="sports-nav-inner">
+        <div className="sports-nav-tabs">
           {ITEMS.map((it) => {
             const active = pathname ? it.isActive(pathname) : false;
             return (
@@ -28,13 +28,16 @@ export function SurfBottomNav() {
                 key={it.href}
                 href={it.href}
                 aria-current={active ? "page" : undefined}
-                className={
-                  active
-                    ? "rounded-xl border border-[color:var(--surf-primary)]/35 bg-[color:var(--surf-surface)] px-3 py-2 text-center text-xs font-semibold tracking-wide text-[color:var(--surf-ink)] shadow-[0_0_22px_rgba(0,229,255,0.14)]"
-                    : "rounded-xl border border-[color:var(--surf-line-08)] bg-[color:var(--surf-surface)] px-3 py-2 text-center text-xs font-semibold tracking-wide text-[color:var(--surf-ink-55)] transition-colors hover:text-[color:var(--surf-ink)]"
-                }
+                className="sports-nav-link"
               >
-                {it.label}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  {it.label === "Games" ? (
+                    <><rect x="3" y="5" width="18" height="15" rx="3" /><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2" /></>
+                  ) : (
+                    <><path d="M3 15h4l3-8 4 12 3-8h4" /><path d="M3 4h18" opacity=".35" /></>
+                  )}
+                </svg>
+                <span>{it.label}</span>
               </Link>
             );
           })}

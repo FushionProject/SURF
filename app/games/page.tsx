@@ -117,7 +117,7 @@ function TeamMark({ name, league, compact = false }: { name: string; league: Sur
 
   return (
     <div
-      className={`relative flex shrink-0 items-center justify-center rounded-[20px] border border-white/10 bg-white/[0.045] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_12px_30px_rgba(0,0,0,0.28)] ${
+      className={`sports-team-mark relative flex shrink-0 items-center justify-center ${
         compact ? "h-9 w-9" : "h-[68px] w-[68px]"
       }`}
       style={{
@@ -148,7 +148,7 @@ function TeamIdentity({ name, league, side }: { name: string; league: SurfLeague
   const abbrev = getTeamAbbrev(name) ?? name.slice(0, 3).toUpperCase();
 
   return (
-    <div className={`flex min-w-0 flex-col items-center ${side === "home" ? "text-right" : "text-left"}`}>
+    <div className={`sports-team flex min-w-0 flex-col items-center ${side === "home" ? "text-right" : "text-left"}`}>
       <TeamMark name={name} league={league} />
       <div className="mt-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-[color:var(--surf-ink-35)]">{side}</div>
       <div className="mt-1 max-w-[130px] truncate text-center text-[13px] font-semibold tracking-[-0.02em] text-[color:var(--surf-ink-90)] sm:max-w-[210px] sm:text-sm">
@@ -188,11 +188,7 @@ function PredictionMarketConsensusStrip({
       />
       <div className="flex items-start justify-between gap-4 px-4 pb-3 pt-3.5">
         <div>
-          <div className="flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[color:var(--surf-ink-65)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--surf-primary)] shadow-[0_0_10px_rgba(var(--surf-primary-rgb),0.45)]" />
-            Prediction market
-          </div>
-          <div className="mt-1 text-[9px] text-[color:var(--surf-ink-35)]">Market-implied win probability · not a forecast</div>
+          <div className="text-[9px] text-[color:var(--surf-ink-35)]">Market-implied win probability · not a forecast</div>
         </div>
         <div className="rounded-full border border-[color:var(--surf-line-06)] bg-white/[0.025] px-2.5 py-1 text-[8px] font-medium text-[color:var(--surf-ink-40)]">
           {sourceLabel}
@@ -333,7 +329,7 @@ function MarketRead({
   }
 
   return (
-    <section className="relative overflow-hidden rounded-[20px] border border-[rgba(var(--surf-primary-rgb),0.2)] bg-[linear-gradient(135deg,rgba(var(--surf-primary-rgb),0.105),rgba(139,92,246,0.055)_48%,rgba(0,0,0,0.08))] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.055)] sm:px-5">
+    <section className="sports-market-read relative overflow-hidden">
       <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-[rgba(var(--surf-primary-rgb),0.11)] blur-3xl" />
       <div className="relative">
         <div className="flex items-center justify-between gap-3">
@@ -426,13 +422,13 @@ function BestOfferTile({
       ? `${selection} ${american(offer.price)}`
       : offer.market === "spreads"
       ? `${selection} ${signed(offer.point)}`
-      : `${offer.selection} ${plain(offer.point)}`
+      : plain(offer.point)
     : "Not posted";
   const tag = opportunityTag(opportunity);
 
   return (
     <div
-      className="relative min-w-0 bg-[color:var(--surf-fill-02)] px-3.5 py-3.5 transition-colors hover:bg-[color:var(--surf-fill-03)]"
+      className="sports-offer relative min-w-0"
       style={{
         backgroundImage: `linear-gradient(135deg, rgba(${accentRgb},0.075), transparent 48%)`,
       }}
@@ -449,10 +445,10 @@ function BestOfferTile({
           </span>
         ) : null}
       </div>
-      <div className="mt-2 truncate text-[16px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-solid)]">
-        {line}{offer?.market !== "h2h" && offer?.price != null ? ` (${american(offer.price)})` : ""}
+      <div className="sports-offer-value">
+        <span>{line}</span>{offer?.market !== "h2h" && offer?.price != null ? <span className="sports-offer-price">{american(offer.price)}</span> : null}
       </div>
-      <div className="mt-1.5 truncate text-[9px] font-medium text-[color:var(--surf-ink-50)]">
+      <div className="sports-offer-book">
         {offer ? offer.bookTitle : "Waiting for sportsbook lines"}
       </div>
       {offer ? (
@@ -831,8 +827,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
           <section className="sports-best">
             <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
               <div>
-                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-50)]">
-                  <span className="h-1.5 w-1.5 rounded-sm bg-[color:var(--surf-positive)] shadow-[0_0_9px_color-mix(in_srgb,var(--surf-positive)_45%,transparent)]" />
+                <div className="sports-best-heading">
                   Best sportsbook numbers
                 </div>
                 <div className="mt-1 text-[9px] text-[color:var(--surf-ink-30)]">Best number first, then best price · {bookCount} books checked</div>

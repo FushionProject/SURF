@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 import "./sports.css";
 import { SurfThemeProvider } from "@/components/surf/ThemeProvider";
 
-const inter = Inter({
+const manrope = Manrope({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -21,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
   }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${manrope.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <SurfThemeProvider>{children}</SurfThemeProvider>
       </body>

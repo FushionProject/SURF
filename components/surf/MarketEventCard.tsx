@@ -192,13 +192,10 @@ export function MarketEventCard({ card, now }: Props) {
 
   return (
     <article className="sports-signal border border-[color:var(--surf-line-10)] bg-[color:var(--surf-surface)]" data-kind={opportunity?.kind ?? (whale ? "whale" : "movement")}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.1em]">
-          <span className="text-[color:var(--surf-primary)]">{timingLabel(card, now)}</span>
-          <span className="text-[color:var(--surf-ink-25)]">·</span>
-          <span className="text-[color:var(--surf-ink-45)]">{badge(card)}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[color:var(--surf-ink-40)]">
+      <div className="sports-signal-meta">
+        <span className="sports-signal-kind">{badge(card)}</span>
+        <span className="sports-signal-time">{timingLabel(card, now)}</span>
+        <div className="sports-signal-status flex items-center gap-1.5">
           <span className={`h-1.5 w-1.5 rounded-full ${verified ? "bg-[color:var(--surf-positive)]" : "bg-[color:var(--surf-neutral)]"}`} />
           {whale ? (whale.venue === "polymarket" ? "On-chain" : "Public trade") : opportunity ? "Live quote" : verified ? "Verified" : "Snapshot"}
         </div>
@@ -267,7 +264,7 @@ export function MarketEventCard({ card, now }: Props) {
           </div>
 
           {card.sources && card.sources.length > 0 ? (
-            <div className="mt-3 divide-y divide-[color:var(--surf-line-06)] rounded-xl border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)]">
+            <div className="sports-signal-quotes mt-3 divide-y divide-[color:var(--surf-line-06)] rounded-xl border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)]">
               {card.sources.slice(0, 2).map((source) => (
                 <div key={`${source.label}:${source.book}`} className="flex items-center justify-between gap-4 px-3 py-2.5">
                   <div>
