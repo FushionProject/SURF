@@ -28,7 +28,7 @@ export default async function AccountPage({ searchParams }: {
   const email = member?.email ?? "Surf member";
 
   return (
-    <div className="surf-bg min-h-full flex-1 bg-[color:var(--surf-base)]">
+    <div className="bn-app bn-secondary-page surf-bg min-h-full flex-1 bg-[color:var(--surf-base)]">
       <main className="surf-content mx-auto w-full max-w-md px-5 pb-28">
         <SurfAppHeader
           title="Your account"

@@ -939,6 +939,28 @@ body {
 .bn-account-back {
   font-size: 11px;
 }
+/* Account/guide still use shared Surf controls. Keep their legacy tokens in
+   sync with the editorial theme, including light mode and filled buttons. */
+.bn-secondary-page {
+  --surf-base: var(--ed-page);
+  --surf-surface: var(--ed-card);
+  --surf-inner: var(--ed-soft);
+  --surf-primary: var(--ed-blue);
+  --surf-primary-rgb: 0, 229, 255;
+  --surf-ink-solid: var(--ed-ink);
+  --surf-ink-25: var(--ed-muted);
+  --surf-ink-40: var(--ed-muted);
+  --surf-ink-45: var(--ed-muted);
+  --surf-ink-55: var(--ed-muted);
+  --surf-ink-70: var(--ed-ink);
+  --surf-chrome-bg: var(--ed-page);
+  color: var(--ed-ink);
+}
+.bn-secondary-page .surf-content { background: transparent; }
+.bn-secondary-page input { font-size: 16px; }
+.bn-secondary-page .bn-account-header > div { gap: 14px; flex-wrap: wrap; }
+.bn-secondary-page .bn-account-back { font-size: 12px; }
+.bn-secondary-page .sports-nav-link:hover { color: var(--ed-ink); }
 @media (min-width: 1600px) {
   .bn-game-grid {
     grid-template-columns: 1fr;

@@ -86,7 +86,7 @@ const definitions = [
 
 export default function HowToUsePage() {
   return (
-    <div className="surf-bg min-h-full flex-1 bg-[color:var(--surf-base)]">
+    <div className="bn-app bn-secondary-page surf-bg min-h-full flex-1 bg-[color:var(--surf-base)]">
       <main className="surf-content surf-shell mx-auto w-full px-4 pb-28">
         <SurfAppHeader
           title="How to use Surf"
