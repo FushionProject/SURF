@@ -33,7 +33,13 @@ body, button, input, select, textarea, .font-mono {
 
 /* Brand and wayfinding are distinct from data labels. */
 .sports-header { padding-top: 24px; padding-bottom: 24px; }
-.sports-header > div > div:first-child { padding-bottom: 20px; margin-bottom: 28px; border-bottom: 1px solid #222; }
+.sports-masthead { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 28px; padding-bottom: 24px; margin-bottom: 28px; border-bottom: 1px solid #252525; }
+.sports-masthead::after { content: ""; position: absolute; bottom: -1px; left: 0; width: 64px; height: 2px; background: var(--surf-primary); }
+.sports-masthead-wave { display: block; justify-self: end; width: 100%; max-width: 320px; height: 64px; color: var(--surf-primary); pointer-events: none; }
+.sports-masthead-wave path { stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; opacity: .55; }
+.sports-masthead-wave path:nth-child(2) { opacity: .22; }
+.sports-masthead-wave path:nth-child(3) { opacity: .12; }
+.sports-account-link { flex-shrink: 0; }
 .sports-header h1 { font-size: 42px; font-weight: 800; letter-spacing: -.055em; line-height: 1.15; }
 .sports-header p { max-width: 650px; font-size: 16px; color: #aaa; line-height: 1.65; }
 .sports-brand { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; text-decoration: none; }
@@ -128,7 +134,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 @media (max-width: 600px) {
   .sports-header h1 { font-size: 36px; }
   .sports-header { padding-top: 20px; }
-  .sports-header > div > div:first-child { margin-bottom: 24px; }
+  .sports-masthead { gap: 18px; padding-bottom: 20px; margin-bottom: 24px; }
+  .sports-masthead-wave { height: 44px; }
   .sports-signal { padding: 20px; }
   .sports-signal h2 { font-size: 26px; }
   .sports-signal-meta { gap: 8px 12px; }

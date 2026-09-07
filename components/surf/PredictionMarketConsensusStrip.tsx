@@ -74,14 +74,13 @@ export function PredictionMarketConsensusStrip({
         <span className="text-xs text-[color:var(--surf-ink-40)]">Observed sample · past 24 hours</span>
       </div>
       {consensus.sources.map((source) => <TeamActivity key={source.venue} source={source} />)}
-      <p className="pb-3 text-xs leading-relaxed text-[color:var(--surf-ink-40)]">
-        Qualified activity only—not total volume or net positions. Kalshi: named-team YES flow. Polymarket: sampled buys.
-        {Number.isFinite(observedAt.getTime()) ? (
-          <> As of <time dateTime={observedAt.toISOString()}>{observedAt.toLocaleString(undefined, {
+      {Number.isFinite(observedAt.getTime()) ? (
+        <p className="pb-3 text-xs leading-relaxed text-[color:var(--surf-ink-40)]">
+          As of <time dateTime={observedAt.toISOString()}>{observedAt.toLocaleString(undefined, {
             month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short",
-          })}</time>.</>
-        ) : null}
-      </p>
+          })}</time>
+        </p>
+      ) : null}
     </section>
   );
 }

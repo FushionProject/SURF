@@ -12,15 +12,26 @@ export function SurfAppHeader({ title, subtitle }: Props) {
   return (
     <header className="sports-header pb-5 pt-6">
       <div>
-        <div className="mb-5 flex items-center justify-between gap-4">
+        <div className="sports-masthead">
           <Link href="/games" className="sports-brand" aria-label="Surf home">
             <SurfBrandMark className="sports-brand-mark" />
             <span className="sports-wordmark">surf<span>.</span></span>
           </Link>
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            viewBox="0 0 320 64"
+            fill="none"
+            className="sports-masthead-wave"
+          >
+            <path d="M1 40C45 40 53 14 96 14s52 36 96 36 73-28 127-28" />
+            <path d="M1 48C45 48 53 22 96 22s52 36 96 36 73-28 127-28" />
+            <path d="M1 32C45 32 53 6 96 6s52 36 96 36 73-28 127-28" />
+          </svg>
           <Link
             href="/account"
             aria-label="Open your Surf account"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] text-[color:var(--surf-ink-55)] transition-colors hover:border-[color:var(--surf-line-strong)] hover:text-[color:var(--surf-ink-solid)]"
+            className="sports-account-link flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--surf-line-08)] bg-transparent text-[color:var(--surf-ink-55)] transition-colors hover:border-[color:var(--surf-primary)] hover:text-[color:var(--surf-ink-solid)]"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4">
               <path
