@@ -2,7 +2,7 @@
 
 ## Main and rollback
 
-The approved editorial Surf design and full existing data catalog are now on local and GitHub `main` at `ebef904`. This includes current backend fixes from the previous main. Main checkout: `/Users/ryanpalumbo/surf`. The preview on port 3158 currently runs the identical committed build from `/Users/ryanpalumbo/.codex/worktrees/betnow-redesign/surf`.
+The approved editorial Surf design and full existing data catalog are now on local and GitHub `main` at `ebef904`. This includes current backend fixes from the previous main. Main checkout: `/Users/ryanpalumbo/surf`. After the final audit, the preview on port 3158 runs the tested main build directly from `/Users/ryanpalumbo/surf`, including the price-pressure headline fix.
 
 Previous main is permanently identified by `rollback/pre-editorial-2026-09-07` and `codex/rollback-pre-editorial-2026-09-07`, both pushed to GitHub, commit `6af58add19d9091861ad631fb9948b144ce368d1`. The earlier design experiments also remain on their branches. No force push is needed to roll back: create a branch from main, restore the tracked tree from this tag, review and commit that restoration, then merge it into main. Database changes are additive and separate; do not reset database data when restoring the UI. Preserve the untracked `public/design-lab/` directory.
 
@@ -99,3 +99,25 @@ At the next run, check database restoration, verify migration state if accessibl
 - Gates remain unchanged: NFL HOLD 70 (16 games/9 signals/10 books); CFB HOLD 35 (82/53/1–10 books); MLB HOLD 70 (11/8/10 books). CFB has two theoretical arbitrage signals in this snapshot; their presence is not a release pass or an execution guarantee. The same Florida State headline collision remains on the old running build; its fix is already on main. Storage connection, thin CFB coverage and partial prediction coverage remain as previously recorded.
 - The UAB recap and its pre-6 AM timestamp are unchanged; NFL/MLB recaps remain empty. No new continuity failure was observed in the recovered process. The earlier gap still limits the overnight recap.
 - Private evidence: `/tmp/surf-rope-release/*-0913.json`. No new user action or code change this hour. At the next run after 10 AM: export existing private history before restarting, activate the already-built main version, make at most one fresh request per sport, verify runtime and gates, deliver the handoff and pause this automation.
+
+## 10:15 AM CT — final handoff: HOLD
+
+Overnight checks are complete and the hourly automation is paused. Main and the remote rollback references are preserved.
+
+Before the controlled preview update, exported the existing private history (5 NFL, 89 CFB, 5 MLB reports) to `/tmp/surf-rope-release/final-before-restart.json` with owner-only permissions. Activated the tested main build on the same port, without a duplicate listener. Raw final reports are `/tmp/surf-rope-release/*-final.json`. They are not published or injected into live history.
+
+| Final live check | Result | Games / signals | Books per game |
+| --- | --- | --- | --- |
+| NFL | HOLD 70 | 16 / 10 | 10 |
+| CFB | HOLD 50 | 81 / 28 | 3–10 |
+| MLB | HOLD 65 | 11 / 10 | 10 |
+
+All three final duplicate checks pass. The startup snapshot does not recreate the previous colliding historical events; the dedicated regression separately verifies that those distinct quoted lines produce different headlines. No gate was relaxed. All sports still fail durable market/ROPE connection checks. CFB still fails minimum book coverage. CFB and MLB have prediction-provider warnings in the final snapshot.
+
+Games, feed, watchlist, account and guide pages return HTTP 200; unauthenticated private audit access returns 404. The existing public phone preview returns HTTP 200. No production deployment occurred. The Mac remains locked, so a fresh visual and interactive mobile pass could not be completed. Unlock it for that final check.
+
+**Ready now:** approved design on main with remote rollback, security dependency updates, tested auth-redirect protection, partial-data recovery, distinguishable price-pressure headlines, restored Supabase project and verified private schema. Existing full suite: 16 suites pass; the subsequent headline fix also passed relevant suites, lint and production build.
+
+**Ryan's priorities today:** privately connect the Surf server credential and verify app persistence through restart; finish production domain/hosting and Auth/email configuration; resolve or explicitly scope thin CFB coverage; verify provider licensing/quota and intended account features; unlock the Mac for the final visual pass. The detailed action list above remains applicable. The database restoration and migration work is already done.
+
+**Continuity limitation:** the unplanned 5 AM outage lost the earlier baseline; the final controlled update also starts a new in-memory session. The saved evidence documents partial observation windows, not a complete 10 PM–6 AM history. An always-on collector and a verified durable connection remain required before promising reliable overnight recaps.
