@@ -1,0 +1,1 @@
+export const THEME_INIT = `(function(){var m='system';try{var s=localStorage.getItem('surf:editorial-theme');if(s==='light'||s==='dark')m=s;}catch(e){}document.documentElement.dataset.appearance=m;document.documentElement.dataset.surfMode=m==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):m;})();`;

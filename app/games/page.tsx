@@ -1,5 +1,5 @@
-import BetNow from "@/components/betnow/BetNow";
+import SurfEditorial from "@/components/surf-editorial/SurfEditorial";
 
 export default function Page() {
-  return <BetNow view="markets" />;
+  return <SurfEditorial view="markets" />;
 }

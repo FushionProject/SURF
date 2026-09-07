@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ThemeControl } from "./ThemeControl";
 import { useEffect, useMemo, useState } from "react";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import {
@@ -128,11 +129,22 @@ export function Icon({
 }
 export function Brand() {
   return (
-    <Link href="/games" className="bn-brand" aria-label="BetNow home">
-      <span className="bn-brand-symbol" aria-hidden="true">
-        ↗
-      </span>
-      BET<span className="bn-brand-now">NOW</span>
+    <Link href="/games" className="bn-brand" aria-label="Surf home">
+      <svg
+        className="bn-surf-mark"
+        width="38"
+        height="30"
+        viewBox="0 0 38 30"
+        aria-hidden="true"
+      >
+        <path
+          d="M2 11c6-10 11 10 17 0s11 10 17 0M2 21c6-10 11 10 17 0s11 10 17 0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+        />
+      </svg>
+      SURF
     </Link>
   );
 }
@@ -370,7 +382,7 @@ function Signal({ signal, index }: { signal: SignalCard; index: number }) {
   );
 }
 
-export default function BetNow({ view = "markets" }: { view?: View }) {
+export default function SurfEditorial({ view = "markets" }: { view?: View }) {
   const { sport, sportSynced, selectSport } = useSurfSport();
   const [data, setData] = useState<Snapshot>();
   const [error, setError] = useState("");
@@ -384,7 +396,9 @@ export default function BetNow({ view = "markets" }: { view?: View }) {
     const timer = setTimeout(() => {
       try {
         const ids: unknown = JSON.parse(
-          localStorage.getItem("betnow:saved") ?? "[]",
+          localStorage.getItem("surf:editorial-saved") ??
+            localStorage.getItem("betnow:saved") ??
+            "[]",
         );
         if (Array.isArray(ids))
           setSaved(ids.filter((id): id is string => typeof id === "string"));
@@ -423,7 +437,7 @@ export default function BetNow({ view = "markets" }: { view?: View }) {
         ? current.filter((v) => v !== id)
         : [...current, id];
       try {
-        localStorage.setItem("betnow:saved", JSON.stringify(next));
+        localStorage.setItem("surf:editorial-saved", JSON.stringify(next));
       } catch {}
       return next;
     });
@@ -478,6 +492,7 @@ export default function BetNow({ view = "markets" }: { view?: View }) {
               </Link>
             ))}
           </nav>
+          <ThemeControl />
           <Link href="/account" className="bn-account-link">
             Your account <Icon name="arrow" size={16} />
           </Link>
@@ -525,7 +540,7 @@ export default function BetNow({ view = "markets" }: { view?: View }) {
             </div>
             <div className="bn-hero-art" aria-hidden="true">
               <div className="bn-art-top">
-                <span>BN / MARKET RESEARCH</span>
+                <span>SURF / MARKET RESEARCH</span>
                 <span>01—03</span>
               </div>
               <span className="bn-art-arrow">↗</span>
@@ -765,7 +780,7 @@ export default function BetNow({ view = "markets" }: { view?: View }) {
               </section>
               <section className="bn-note">
                 <span className="bn-note-icon">↗</span>
-                <p className="bn-eyebrow">THE BETNOW STANDARD</p>
+                <p className="bn-eyebrow">THE SURF STANDARD</p>
                 <h3>
                   See more.
                   <br />
