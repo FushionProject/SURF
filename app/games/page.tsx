@@ -828,32 +828,12 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
         </div>
 
         <div className="-mx-5 mt-5 border-t border-[color:var(--surf-line-06)] bg-black/[0.075] px-5 pt-5 sm:-mx-6 sm:px-6">
-          <MarketRead
-            game={game}
-            board={board}
-            consensus={data.predictionMarketConsensus?.[game.id]}
-            whaleSignals={data.predictionMarketWhaleSignals ?? []}
-            opening={opening}
-            current={current}
-            injuries={data.injuries}
-            spreadName={spreadName}
-            observedAt={observedAt}
-          />
-
-          <details className="sports-consensus mt-4">
-            <summary>Prediction markets <span>View probabilities</span></summary>
-            <PredictionMarketConsensusStrip
-              consensus={data.predictionMarketConsensus?.[game.id]}
-              league={config.league}
-            />
-          </details>
-
-          <section className="mt-5">
+          <section className="sports-best">
             <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
               <div>
                 <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-50)]">
                   <span className="h-1.5 w-1.5 rounded-sm bg-[color:var(--surf-positive)] shadow-[0_0_9px_color-mix(in_srgb,var(--surf-positive)_45%,transparent)]" />
-                  Best available now
+                  Best sportsbook numbers
                 </div>
                 <div className="mt-1 text-[9px] text-[color:var(--surf-ink-30)]">Best number first, then best price · {bookCount} books checked</div>
               </div>
@@ -874,6 +854,26 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
               </div>
             </div>
           </section>
+
+          <details className="sports-consensus mt-4" open>
+            <summary>Prediction markets <span>Market-implied probabilities</span></summary>
+            <PredictionMarketConsensusStrip
+              consensus={data.predictionMarketConsensus?.[game.id]}
+              league={config.league}
+            />
+          </details>
+
+          <MarketRead
+            game={game}
+            board={board}
+            consensus={data.predictionMarketConsensus?.[game.id]}
+            whaleSignals={data.predictionMarketWhaleSignals ?? []}
+            opening={opening}
+            current={current}
+            injuries={data.injuries}
+            spreadName={spreadName}
+            observedAt={observedAt}
+          />
 
           <section className="mt-4 rounded-[18px] border border-[color:var(--surf-line-08)] bg-black/[0.10] p-3 sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
