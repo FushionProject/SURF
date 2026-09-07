@@ -85,3 +85,10 @@ At the next run, check database restoration, verify migration state if accessibl
 - Added quoted line(s) to price-pressure headlines, including positive spread signs. A regression reproduces the +2.5 versus +3.5 collision and checks total-line formatting. Market-horizon and ROPE suites plus production build pass. ROPE duplicate rules and all thresholds are unchanged.
 - The fix is committed to main, but deliberately not activated in the running preview yet: restarting would again discard the remaining in-memory overnight evidence. At the final handoff, preserve report files before a controlled preview update and verify the new build; do not claim the live duplicate gate cleared before observing it. The running preview remains the earlier approved build.
 - Morning recap retained the same UAB observation, with no new post-6 AM movement attributed to the overnight window; NFL/MLB recaps remain empty. Outage limitations still apply. Private evidence is `/tmp/surf-rope-release/*-0711.json`.
+
+## 08:13 AM CT — unchanged blockers; recovered process retained history
+
+- Existing reports were available before refresh: NFL 3, CFB 47, MLB 3. No restart or duplicate collector. One fresh sequential feed request per sport returned HTTP 200.
+- NFL HOLD 70: 16 games/9 signals/10 books. CFB HOLD 35: 82/40/1–10 books. MLB HOLD 70: 11/3/10 books. Blockers and warnings are unchanged. The CFB duplicate is the same Florida State headline collision already fixed on main; the preview still runs the earlier build pending the controlled final update.
+- Morning recap remains stable: the same UAB move and pre-6 AM timestamp, no NFL/MLB recap entries. This supports preservation since recovery, not recovery of the lost earlier baseline. No new action is required this hour.
+- Private evidence: `/tmp/surf-rope-release/*-0812.json`. No code, schema, design, rollback or release-gate changes; no deployment. Continue until the 10 AM handoff.
