@@ -1758,3 +1758,39 @@ body {
 .bn-data-panels .text-amber-300 {
   color: var(--ed-blue-ink);
 }
+
+/* Restore the market context without changing the editorial layout. */
+.bn-game-read {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.bn-game-read > span:last-child { font: inherit; font-size: 11px; }
+.bn-team-name { flex: 1; min-width: 0; }
+.bn-team-record { display: block; margin-top: 6px; font-size: 11px; color: var(--ed-muted); }
+.bn-offer { max-width: 140px; flex-shrink: 0; }
+.bn-offer small { font-size: 11px; }
+.bn-offer small.bn-offer-midpoint { font-size: 10px; }
+.bn-offer-edge {
+  display: inline-block;
+  color: var(--ed-blue-ink);
+  border-bottom: 1px solid var(--ed-blue-ink);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 0;
+  margin-top: 5px;
+}
+.bn-system-refresh { display: flex; align-items: center; gap: 8px; }
+.bn-current-signals { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; margin-top: 18px; font-size: 12px; color: var(--ed-muted); }
+.bn-current-signals strong { color: var(--ed-blue-ink); font-weight: 600; }
+.bn-cfb-filter a { text-decoration: underline; text-underline-offset: 3px; }
+@media (min-width: 1151px) and (max-width: 1400px) {
+  .bn-matchup { grid-template-columns: 1fr; gap: 18px; }
+  .bn-team-row + .bn-team-row { border-left: 0; padding-left: 0; }
+  .bn-team-name h3 { max-width: none; }
+}
+@media (max-width: 440px) {
+  .bn-team-row { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; }
+  .bn-team-logo { width: 32px; height: 32px; }
+  .bn-team-name h3 { max-width: none; }
+  .bn-offer { grid-column: 2; text-align: left; max-width: none; }
+}

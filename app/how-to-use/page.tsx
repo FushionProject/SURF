@@ -50,7 +50,7 @@ const definitions = [
       "Surf flags qualifying $10K+ buying activity in game-winner markets. A card can represent an individual large trade, a Polymarket wallet’s buys grouped within 90 seconds, or a Kalshi buying burst across nearby trades.",
       "Kalshi activity is anonymous. A burst is not proof that one person placed the entire amount. A Polymarket wallet is also not a verified person or proof of an informed bettor.",
       "The activity is an observed sample, not all trading volume or net positions. Check the venue, team, amount, and activity label—not just the headline.",
-      "Use the Whales filter to see this activity separately from sportsbook prices. Surf only shows activity for upcoming games; whale cards leave the feed when the game starts.",
+      "Current whale activity appears alongside sportsbook opportunities in Signals. Surf only shows activity for upcoming games; whale cards leave the feed when the game starts.",
       "Surf checks on its market-refresh schedule, not continuously when nobody is using it. Public trade searches are bounded and incomplete scans are labeled. It does not claim to capture every fill, maker trade, or historical position.",
     ],
   },

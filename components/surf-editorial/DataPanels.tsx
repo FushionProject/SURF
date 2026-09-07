@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { MarketMovementChart } from "@/components/surf/MarketMovementChart";
 import { PredictionMarketConsensusStrip } from "@/components/surf/PredictionMarketConsensusStrip";
@@ -13,6 +13,11 @@ import type {
 } from "@/lib/surf/types";
 import { getSurfSportConfig, type SurfSportKey } from "@/lib/surf/sports";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
+import { buildGameOfferBoard, type GameOfferBoard } from "@/lib/surf/opportunities";
+import { buildGameMarketRead } from "@/lib/surf/gameMarketRead";
+import { movementLabel } from "@/lib/surf/marketMovementTimeline";
+import { upcomingSignals } from "@/lib/surf/editorialBoard";
+import "./game-panels.css";
 export type FullGameData = {
   marketAverage?: Record<string, GameMarketAverage>;
   currentMedianSnapshot?: Record<string, { spreads?: number; totals?: number }>;
@@ -31,11 +36,12 @@ const money = (n: number) =>
     maximumFractionDigits: 0,
   });
 const time = (n: number | string) =>
-  new Date(n).toLocaleString("en-US", {
+  new Date(n).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZoneName: "short",
   });
 export function GameDataPanels({
   game,
@@ -43,27 +49,50 @@ export function GameDataPanels({
   data,
   consensus,
   observedAt,
+  board: suppliedBoard,
 }: {
   game: OddsApiGame;
   sport: SurfSportKey;
   data: FullGameData;
   consensus?: GamePredictionMarketConsensus;
   observedAt: number;
+  board?: GameOfferBoard;
 }) {
   const [mode, setMode] = useState<"spreads" | "totals">("spreads");
   const config = getSurfSportConfig(sport);
   const history = data.marketAverage?.[game.id];
+  const board = useMemo(() => suppliedBoard ?? buildGameOfferBoard(game, sport, observedAt), [suppliedBoard, game, sport, observedAt]);
   const current =
     mode === "spreads"
       ? (history?.currentSpreadAvg ??
         data.currentMedianSnapshot?.[game.id]?.spreads)
       : (history?.currentTotalAvg ??
         data.currentMedianSnapshot?.[game.id]?.totals);
-  const whales = (data.predictionMarketWhaleSignals ?? []).filter(
-    (s) => s.game.id === game.id,
+  const whales = upcomingSignals(data.predictionMarketWhaleSignals ?? [], observedAt).filter(
+    (s) => s.game.id === game.id && s.status !== "resolved" && s.whaleActivity,
   );
+  const read = buildGameMarketRead({
+    gameId: game.id,
+    homeLabel: getTeamAbbrev(game.home_team) ?? game.home_team,
+    board,
+    whaleSignals: whales,
+    history,
+    consensus,
+    spreadName: config.league === "MLB" ? "run line" : "spread",
+  });
+  const activeHistory = (mode === "spreads" ? history?.spreadHistory : history?.totalHistory) ?? [];
+  const injuryCount = config.league === "CFB"
+    ? [game.away_team, game.home_team].reduce((count, team) => count + (data.cfbContext?.teams[team]?.injuries.length ?? 0), 0)
+    : [game.away_team, game.home_team].reduce((count, team) => count + (data.injuries?.injuriesByTeam[team]?.length ?? 0), 0);
+  const reportLabel = config.league === "CFB" ? "Team context & availability" : "Injury reports";
   return (
     <div className="bn-data-panels">
+      <section className="bn-market-read-panel" aria-label="Surf Market Read">
+        <div className="bn-market-read-label"><span>Surf Market Read</span><small>Not a pick</small></div>
+        <h4>{read.headline}</h4>
+        <p>{read.detail}</p>
+        {read.sourceUrl ? <a href={read.sourceUrl} target="_blank" rel="noreferrer">View trade source ↗</a> : null}
+      </section>
       <section className="bn-data-section">
         <h4>Prediction markets</h4>
         {consensus ? (
@@ -77,9 +106,12 @@ export function GameDataPanels({
           </p>
         )}
       </section>
-      <section className="bn-data-section">
+      <details className="bn-data-section bn-report-disclosure bn-history-disclosure">
+        <summary>
+          <span>Line history<small>{movementLabel(mode, activeHistory, { current: current ?? undefined, lastObservedAt: history?.lastObservedAt })}</small></span>
+        </summary>
         <div className="bn-data-heading">
-          <h4>Line history</h4>
+          <span className="bn-data-muted">Surf-recorded observations</span>
           <div className="bn-data-tabs" aria-label="Line history market">
             {(
               [
@@ -100,21 +132,17 @@ export function GameDataPanels({
         <MarketMovementChart
           mode={mode}
           current={current ?? undefined}
-          history={
-            (mode === "spreads"
-              ? history?.spreadHistory
-              : history?.totalHistory) ?? []
-          }
+          history={activeHistory}
           observedAt={observedAt}
           homeAbbrev={getTeamAbbrev(game.home_team) ?? game.home_team}
           spreadName={config.league === "MLB" ? "run line" : "spread"}
           historySource={history?.historySource}
           lastObservedAt={history?.lastObservedAt}
         />
-      </section>
+      </details>
       {whales.length > 0 && (
-        <section className="bn-data-section">
-          <h4>Large-trade activity</h4>
+        <details className="bn-data-section bn-report-disclosure">
+          <summary><span>Large-trade activity<small>{whales.length} qualified {whales.length === 1 ? "event" : "events"} for this matchup</small></span></summary>
           {whales.map((s) => (
             <div className="bn-whale-summary" key={s.id}>
               <strong>{s.title}</strong>
@@ -128,16 +156,14 @@ export function GameDataPanels({
               )}
             </div>
           ))}
-          <Link href={`/feed?sport=${sport}&type=whales`}>
-            Explore whale activity ↗
+          <Link href={`/feed?sport=${sport}`}>
+            View Signals ↗
           </Link>
-        </section>
+        </details>
       )}
       <details className="bn-data-section bn-report-disclosure">
         <summary>
-          {config.league === "CFB"
-            ? "Team context & availability"
-            : "Injury reports"}
+          <span>{reportLabel}<small>{config.league === "MLB" ? "Not connected for MLB" : injuryCount > 0 ? `${injuryCount} listed ${injuryCount === 1 ? "report" : "reports"} · view both teams` : "View coverage for both teams"}</small></span>
         </summary>
         {config.league === "MLB" ? (
           <p className="bn-data-muted">
@@ -172,8 +198,8 @@ export function GameDataPanels({
                     {config.league === "CFB" && (
                       <>
                         <p>
-                          {cfb?.record
-                            ? `${cfb.record} · ${cfb.completedGames} verified finals`
+                        {cfb?.record
+                            ? `${cfb.record} across ${cfb.completedGames} provider-covered finals`
                             : "Record unavailable"}
                         </p>
                         {cfb?.recentForm && <p>Recent: {cfb.recentForm}</p>}
@@ -182,7 +208,7 @@ export function GameDataPanels({
                           cfb.pointsAgainst != null && (
                             <p>
                               {cfb.pointsFor} scored / {cfb.pointsAgainst}{" "}
-                              allowed per verified game
+                              allowed per provider-covered game
                             </p>
                           )}
                       </>
@@ -200,7 +226,7 @@ export function GameDataPanels({
                         {config.league === "CFB"
                           ? (cfb?.availability ?? "Availability not verified")
                           : covered
-                            ? "No current injuries reported."
+                            ? "No injuries listed in the provider's latest report."
                             : "Coverage unavailable for this team."}
                       </p>
                     )}
@@ -214,6 +240,8 @@ export function GameDataPanels({
                 : (data.injuries?.notice ??
                   "Injury data is shown only when the provider reports coverage.")}
             </p>
+            {config.league === "CFB" ? <p className="bn-data-muted">Records and recent form reflect available provider results; season coverage may be incomplete. An empty availability report is not confirmation that every player is healthy.</p> : null}
+            {config.league !== "CFB" && data.injuries?.checkedAt ? <p className="bn-data-muted">Provider checked {time(data.injuries.checkedAt)}{data.injuries.isPartial ? " · partial team coverage" : ""}.</p> : null}
             {config.league === "CFB" &&
               data.cfbContext?.games[game.id]?.venue && (
                 <p>Venue: {data.cfbContext.games[game.id].venue}</p>
@@ -224,7 +252,7 @@ export function GameDataPanels({
     </div>
   );
 }
-export function SignalEvidence({ signal }: { signal: SignalCard }) {
+export function SignalEvidence({ signal, compact = false }: { signal: SignalCard; compact?: boolean }) {
   const whale = signal.whaleActivity,
     opportunity = signal.opportunity,
     tracked = signal.trackedMarket,
@@ -233,7 +261,7 @@ export function SignalEvidence({ signal }: { signal: SignalCard }) {
     <div className="bn-evidence-data">
       {whale && (
         <>
-          <div className="bn-evidence-facts">
+          {!compact && <div className="bn-evidence-facts">
             <div>
               <small>Committed cash</small>
               <strong>{money(whale.committedUsd)}</strong>
@@ -246,15 +274,15 @@ export function SignalEvidence({ signal }: { signal: SignalCard }) {
               <small>Executed fills</small>
               <strong>{whale.tradeCount}</strong>
             </div>
-          </div>
-          <p>
+          </div>}
+          {!compact && <p>
             {whale.venueLabel} · {whale.outcomeTeam} · {time(whale.occurredAt)}
-          </p>
+          </p>}
           <p>
-            {whale.isAnonymous
+            {!compact && <>{whale.isAnonymous
               ? "Anonymous public flow"
-              : `Wallet ${whale.participantLabel ?? "tracked"}`}{" "}
-            · {whale.contracts.toLocaleString()} contracts
+              : `Wallet ${whale.participantLabel ?? "tracked"}`} · </>}
+            {whale.contracts.toLocaleString()} contracts
           </p>
           {whale.priceImpactPercentagePoints != null && (
             <p>
@@ -265,7 +293,7 @@ export function SignalEvidence({ signal }: { signal: SignalCard }) {
           <p>Large activity is observed trading, not a prediction.</p>
         </>
       )}
-      {signal.sources?.length ? (
+      {!compact && signal.sources?.length ? (
         <div className="bn-evidence-quotes">
           {signal.sources.map((s, i) => (
             <div key={i}>
@@ -277,7 +305,7 @@ export function SignalEvidence({ signal }: { signal: SignalCard }) {
           ))}
         </div>
       ) : null}
-      {signal.valueOptions?.length ? (
+      {!compact && signal.valueOptions?.length ? (
         <div className="bn-evidence-quotes">
           {signal.valueOptions.map((o, i) => (
             <div key={i}>
@@ -294,7 +322,7 @@ export function SignalEvidence({ signal }: { signal: SignalCard }) {
       ) : null}
       {opportunity && (
         <>
-          <p>{opportunity.reason}</p>
+          {!compact && <p>{opportunity.reason}</p>}
           <p>
             {opportunity.booksCompared} sportsbooks compared ·{" "}
             {opportunity.selection} at {opportunity.bookTitle}.
@@ -350,7 +378,7 @@ export function SignalEvidence({ signal }: { signal: SignalCard }) {
             {tracked.snapshotsCompared} snapshots compared ·{" "}
             {tracked.confidence} movement.
           </p>
-          {tracked.movedBooks.map((m, i) => (
+          {!compact && tracked.movedBooks.map((m, i) => (
             <p key={i}>
               {m.bookTitle}: {signed(m.fromPoint)} → {signed(m.toPoint)}
             </p>
@@ -362,14 +390,14 @@ export function SignalEvidence({ signal }: { signal: SignalCard }) {
       )}
       {horizon && (
         <>
-          <div className="bn-evidence-quotes">
+          {!compact && <div className="bn-evidence-quotes">
             {horizon.facts.map((f, i) => (
               <div key={i}>
                 <span>{f.label}</span>
                 <strong>{f.value}</strong>
               </div>
             ))}
-          </div>
+          </div>}
           {horizon.advancedFacts.map((f, i) => (
             <p key={i}>{f}</p>
           ))}
