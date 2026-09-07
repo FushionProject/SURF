@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import "./globals.css";
 import "./sports.css";
-import "@/components/bestbet/bestbet.css";
+import "@/components/betnow/betnow.css";
 
 const manrope = Manrope({
   variable: "--font-geist-sans",
@@ -10,9 +10,9 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "BestBet — A fresh read on the market",
+  title: "BetNow — Every line. Every angle.",
   description:
-    "Real lines. Different opinions. One clearer picture. Sports-market perspective by BestBet.",
+    "Real lines. Different opinions. One clearer picture. Sports-market perspective by BetNow.",
 };
 
 export default function RootLayout({

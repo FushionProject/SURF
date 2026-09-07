@@ -1,5 +1,5 @@
-import BestBet from "@/components/bestbet/BestBet";
+import BetNow from "@/components/betnow/BetNow";
 
 export default function Page() {
-  return <BestBet view="markets" />;
+  return <BetNow view="markets" />;
 }

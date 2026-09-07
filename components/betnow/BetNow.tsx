@@ -128,11 +128,11 @@ export function Icon({
 }
 export function Brand() {
   return (
-    <Link href="/games" className="bb-brand" aria-label="BestBet home">
-      <span className="bb-brand-symbol">
-        b<span>↗</span>
+    <Link href="/games" className="bn-brand" aria-label="BetNow home">
+      <span className="bn-brand-symbol" aria-hidden="true">
+        ↗
       </span>
-      bestbet<span className="bb-brand-dot">.</span>
+      BET<span className="bn-brand-now">NOW</span>
     </Link>
   );
 }
@@ -147,7 +147,7 @@ function TeamLogo({ name, sport }: { name: string; sport: SurfSportKey }) {
   const [failed, setFailed] = useState(false);
   const logo = getTeamLogo(name, getSurfSportConfig(sport).league);
   return (
-    <span className="bb-team-logo">
+    <span className="bn-team-logo">
       {logo && !failed ? (
         // Provider logo URLs are already sized; keep their local error fallback.
         // eslint-disable-next-line @next/next/no-img-element
@@ -174,7 +174,7 @@ function Offer({
         ? `${side ? "U" : "O"} ${offer?.point ?? "—"}`
         : price(offer?.point);
   return (
-    <div className="bb-offer">
+    <div className="bn-offer">
       <strong>{value}</strong>
       <small>
         {market !== "h2h" && offer?.price != null
@@ -215,15 +215,15 @@ function GameCard({
         : [board.offers.over, board.offers.under];
   const opportunity = board.opportunities.find((o) => o.market === market);
   return (
-    <article className={`bb-game ${open ? "bb-game-open" : ""}`}>
-      <div className="bb-game-meta">
+    <article className={`bn-game ${open ? "bn-game-open" : ""}`}>
+      <div className="bn-game-meta">
         <span>
-          <span className="bb-dot" />
+          <span className="bn-dot" />
           {getSurfSportConfig(sport).label} <i> / </i>
           {kickoff(game.commence_time)}
         </span>
         <button
-          className={`bb-icon-button ${saved ? "is-saved" : ""}`}
+          className={`bn-icon-button ${saved ? "is-saved" : ""}`}
           aria-label={`${saved ? "Unsave" : "Save"} ${game.away_team} vs ${game.home_team}`}
           aria-pressed={saved}
           onClick={onSave}
@@ -231,11 +231,11 @@ function GameCard({
           <Icon name="save" size={17} />
         </button>
       </div>
-      <div className="bb-matchup">
+      <div className="bn-matchup">
         {[game.away_team, game.home_team].map((name, i) => (
-          <div className="bb-team-row" key={name}>
+          <div className="bn-team-row" key={name}>
             <TeamLogo name={name} sport={sport} />
-            <div className="bb-team-name">
+            <div className="bn-team-name">
               <small>{i ? "HOME" : "AWAY"}</small>
               <h3>{name}</h3>
             </div>
@@ -243,17 +243,17 @@ function GameCard({
           </div>
         ))}
       </div>
-      <div className="bb-game-read">
-        <span className={opportunity ? "bb-tag" : "bb-tag bb-tag-neutral"}>
+      <div className="bn-game-read">
+        <span className={opportunity ? "bn-tag" : "bn-tag bn-tag-neutral"}>
           {opportunity ? "Worth a closer look" : "On the board"}
         </span>
         <span>{board.booksInSample} books</span>
       </div>
       {opportunity && (
-        <p className="bb-opportunity-copy">{opportunity.reason}</p>
+        <p className="bn-opportunity-copy">{opportunity.reason}</p>
       )}
       <button
-        className="bb-compare"
+        className="bn-compare"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
@@ -261,9 +261,9 @@ function GameCard({
         <span>{open ? "−" : "↗"}</span>
       </button>
       {open && (
-        <div className="bb-detail">
-          <p className="bb-eyebrow">THE UNDERLYING QUOTES</p>
-          <div className="bb-table-wrap">
+        <div className="bn-detail">
+          <p className="bn-eyebrow">THE UNDERLYING QUOTES</p>
+          <div className="bn-table-wrap">
             <table>
               <thead>
                 <tr>
@@ -300,7 +300,7 @@ function GameCard({
               </tbody>
             </table>
           </div>
-          <p className="bb-fine">
+          <p className="bn-fine">
             {consensus
               ? `${consensus.sources.length} prediction ${consensus.sources.length === 1 ? "venue" : "venues"} matched to this game.`
               : "No verified prediction-market match."}{" "}
@@ -314,17 +314,17 @@ function GameCard({
 function Signal({ signal, index }: { signal: SignalCard; index: number }) {
   const [open, setOpen] = useState(false);
   return (
-    <article className="bb-signal">
-      <div className="bb-signal-top">
-        <span className="bb-signal-number">
+    <article className="bn-signal">
+      <div className="bn-signal-top">
+        <span className="bn-signal-number">
           {String(index + 1).padStart(2, "0")}
         </span>
-        <span className="bb-tag">{signal.signalType}</span>
+        <span className="bn-tag">{signal.signalType}</span>
       </div>
       <h3>{signal.title}</h3>
       <p>{signal.insight || signal.detail}</p>
       <div
-        className="bb-strength"
+        className="bn-strength"
         title="Market relevance and magnitude, not pick confidence"
       >
         <span>Market relevance</span>
@@ -342,14 +342,14 @@ function Signal({ signal, index }: { signal: SignalCard; index: number }) {
         </b>
       </div>
       <button
-        className="bb-text-button"
+        className="bn-text-button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
         {open ? "Less detail −" : "Read the evidence +"}
       </button>
       {open && (
-        <div className="bb-signal-evidence">
+        <div className="bn-signal-evidence">
           <p>{signal.detail}</p>
           <p>
             {signal.game.awayTeam} vs {signal.game.homeTeam} ·{" "}
@@ -370,7 +370,7 @@ function Signal({ signal, index }: { signal: SignalCard; index: number }) {
   );
 }
 
-export default function BestBet({ view = "markets" }: { view?: View }) {
+export default function BetNow({ view = "markets" }: { view?: View }) {
   const { sport, sportSynced, selectSport } = useSurfSport();
   const [data, setData] = useState<Snapshot>();
   const [error, setError] = useState("");
@@ -384,7 +384,7 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
     const timer = setTimeout(() => {
       try {
         const ids: unknown = JSON.parse(
-          localStorage.getItem("bestbet:saved") ?? "[]",
+          localStorage.getItem("betnow:saved") ?? "[]",
         );
         if (Array.isArray(ids))
           setSaved(ids.filter((id): id is string => typeof id === "string"));
@@ -423,7 +423,7 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
         ? current.filter((v) => v !== id)
         : [...current, id];
       try {
-        localStorage.setItem("bestbet:saved", JSON.stringify(next));
+        localStorage.setItem("betnow:saved", JSON.stringify(next));
       } catch {}
       return next;
     });
@@ -460,142 +460,108 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
     { id: "saved", href: "/top", label: "My watchlist", icon: "save" },
   ] as const;
   return (
-    <div className="bb-app">
-      <aside className="bb-sidebar">
-        <Brand />
-        <p className="bb-sidebar-caption">A little more perspective.</p>
-        <nav aria-label="Main navigation">
-          {nav.map((item) => (
-            <Link
-              key={item.id}
-              href={`${item.href}?sport=${sport}`}
-              className={view === item.id ? "bb-nav-active" : ""}
-              aria-current={view === item.id ? "page" : undefined}
-            >
-              <Icon name={item.icon} />
-              {item.label}
-              {item.id === "saved" && (
-                <span className="bb-nav-count">{saved.length}</span>
-              )}
-            </Link>
-          ))}
-        </nav>
-        <div className="bb-sidebar-note">
-          <span className="bb-mini-flower">✳</span>
-          <h3>
-            Good information.
-            <br />
-            Better perspective.
-          </h3>
-          <p>Follow what the market is saying. Make up your own mind.</p>
-        </div>
-        <div className="bb-sidebar-bottom">
-          <Link href="/account">
-            Your account <span>↗</span>
+    <div className="bn-app">
+      <header className="bn-masthead">
+        <div className="bn-header-inner">
+          <Brand />
+          <nav aria-label="Main navigation">
+            {nav.map((item) => (
+              <Link
+                key={item.id}
+                href={`${item.href}?sport=${sport}`}
+                aria-current={view === item.id ? "page" : undefined}
+              >
+                {item.label}
+                {item.id === "saved" && (
+                  <span className="bn-nav-count">{saved.length}</span>
+                )}
+              </Link>
+            ))}
+          </nav>
+          <Link href="/account" className="bn-account-link">
+            Your account <Icon name="arrow" size={16} />
           </Link>
-          <span>BESTBET / AN INDEPENDENT VIEW</span>
         </div>
-      </aside>
-      <div className="bb-main-shell">
-        <header className="bb-topbar">
-          <div className="bb-mobile-brand">
-            <Brand />
-          </div>
-          <span className="bb-breadcrumb">
-            The clubhouse <span>/</span>{" "}
-            {view === "signals"
-              ? "Signals"
-              : view === "saved"
-                ? "Watchlist"
-                : "Market board"}
-          </span>
-          <div className="bb-topbar-right">
-            <span className="bb-preview-pill">
-              <Icon name="sun" size={15} /> A fresh perspective
-            </span>
-            <Link
-              href="/account"
-              className="bb-avatar"
-              aria-label="Your account"
-            >
-              ↗
-            </Link>
-          </div>
-        </header>
-        <main className="bb-main">
-          <section className="bb-hero">
-            <div className="bb-hero-copy">
-              <p className="bb-eyebrow">
-                <span className="bb-dot" /> LESS NOISE. MORE CONTEXT.
+      </header>
+      <div className="bn-main-shell">
+        <main className="bn-main">
+          <section className="bn-hero">
+            <div className="bn-hero-copy">
+              <p className="bn-eyebrow">
+                <span className="bn-dot" /> THE INDEPENDENT MARKET DESK
               </p>
               <h1>
                 {view === "signals" ? (
                   <>
-                    Something’s
+                    Read between
                     <br />
-                    <em>worth a look.</em>
+                    <em>the lines.</em>
                   </>
                 ) : view === "saved" ? (
                   <>
-                    Keep your eye
+                    Your games.
                     <br />
-                    <em>on the game.</em>
+                    <em>Your watch.</em>
                   </>
                 ) : (
                   <>
-                    A fresh read
+                    Every line.
                     <br />
-                    <em>on the market.</em>
+                    <em>Every angle.</em>
                   </>
                 )}
               </h1>
               <p>
-                Real lines. Different opinions. One clearer picture.
-                <br className="bb-desktop-break" /> Your daily dose of
-                sports-market perspective.
+                The numbers. The context. The whole picture.
+                <br className="bn-desktop-break" /> Compare the market and see
+                what stands out.
               </p>
-              <a className="bb-hero-link" href="#market-board">
+              <a className="bn-hero-link" href="#market-board">
                 {view === "signals"
                   ? "Explore the signals"
                   : "Find your next matchup"}
                 <Icon name="arrow" size={17} />
               </a>
             </div>
-            <div className="bb-hero-art" aria-hidden="true">
-              <div className="bb-orbit bb-orbit-one" />
-              <div className="bb-orbit bb-orbit-two" />
-              <div className="bb-art-cross">+</div>
-              <span className="bb-art-label">A DIFFERENT ANGLE</span>
-              <div className="bb-art-ball">
-                b<span>↗</span>
+            <div className="bn-hero-art" aria-hidden="true">
+              <div className="bn-art-top">
+                <span>BN / MARKET RESEARCH</span>
+                <span>01—03</span>
               </div>
-              <span className="bb-art-bottom">THE GAME BEHIND THE GAME.</span>
-              <span className="bb-art-star">✳</span>
+              <span className="bn-art-arrow">↗</span>
+              <div className="bn-art-bottom">
+                <span>
+                  ALL SIDES.
+                  <br />
+                  ONE PLACE.
+                </span>
+                <span className="bn-art-bars" />
+              </div>
             </div>
           </section>
-          <section className="bb-stats" aria-label="Current market overview">
+          <section className="bn-stats" aria-label="Current market overview">
             <div>
-              <span>01 / ON THE BOARD</span>
+              <span>01 / MATCHUPS</span>
               <strong>
                 {data?.games?.games.length ?? "—"}
                 <small>upcoming games</small>
               </strong>
             </div>
             <div>
-              <span>02 / THE BIGGER PICTURE</span>
+              <span>02 / SOURCES</span>
               <strong>
                 {data ? books.size : "—"}
                 <small>sportsbook sources</small>
               </strong>
             </div>
             <div>
-              <span>03 / WORTH NOTICING</span>
+              <span>03 / SIGNALS</span>
               <strong>
                 {data && !data.signalError ? data.signals.length : "—"}
                 <small>market signals</small>
               </strong>
             </div>
-            <div className="bb-stats-refresh">
+            <div className="bn-stats-refresh">
               <span>
                 {loading
                   ? "Checking the market…"
@@ -613,42 +579,40 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
             </div>
           </section>
           {data?.games?.dataSource && (
-            <p className="bb-notice">
+            <p className="bn-notice">
               Sample data ·{" "}
               {data.games.dataNotice ??
                 "This is a demonstration, not a live market."}
             </p>
           )}
           {error && (
-            <div className="bb-notice" role="alert">
+            <div className="bn-notice" role="alert">
               {error}{" "}
               <button onClick={() => setRefresh((v) => v + 1)}>
                 Try again ↗
               </button>
             </div>
           )}
-          <div className="bb-workspace" id="market-board">
-            <section className="bb-board">
-              <div className="bb-section-title">
+          <div className="bn-workspace" id="market-board">
+            <section className="bn-board">
+              <div className="bn-section-title">
                 <div>
-                  <p className="bb-eyebrow">
-                    {view === "saved"
-                      ? "YOUR PERSONAL SIDELINE"
-                      : "THE MARKET, AT A GLANCE"}
+                  <p className="bn-eyebrow">
+                    {view === "saved" ? "SAVED FOR LATER" : "EXPLORE THE BOARD"}
                   </p>
                   <h2>
                     {view === "signals"
                       ? "The signals"
                       : view === "saved"
                         ? "My watchlist"
-                        : "The market board"}
+                        : "Market overview"}
                     <span>↘</span>
                   </h2>
                 </div>
-                <span className="bb-small-label">{league} EDITION</span>
+                <span className="bn-small-label">{league} EDITION</span>
               </div>
-              <div className="bb-toolbar">
-                <div className="bb-sport-tabs" aria-label="Choose sport">
+              <div className="bn-toolbar">
+                <div className="bn-sport-tabs" aria-label="Choose sport">
                   {SURF_VISIBLE_SPORTS.map((s) => (
                     <button
                       key={s.key}
@@ -659,7 +623,7 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                     </button>
                   ))}
                 </div>
-                <label className="bb-search">
+                <label className="bn-search">
                   <Icon name="search" size={17} />
                   <input
                     aria-label="Search teams"
@@ -670,8 +634,8 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                 </label>
               </div>
               {view !== "signals" && (
-                <div className="bb-market-controls">
-                  <div className="bb-market-tabs" aria-label="Market type">
+                <div className="bn-market-controls">
+                  <div className="bn-market-tabs" aria-label="Market type">
                     {(
                       [
                         ["spreads", "Spread"],
@@ -688,7 +652,7 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                       </button>
                     ))}
                   </div>
-                  <label className="bb-sort">
+                  <label className="bn-sort">
                     <span>Sort by</span>
                     <select
                       value={sort}
@@ -702,18 +666,18 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                 </div>
               )}
               {loading ? (
-                <div className="bb-loading" role="status">
-                  <span className="bb-loading-flower">✳</span>
-                  <h3>Getting the lay of the land.</h3>
+                <div className="bn-loading" role="status">
+                  <span className="bn-loading-flower">↗</span>
+                  <h3>Building your market view.</h3>
                   <p>Checking the current {league} market.</p>
                 </div>
               ) : view === "signals" ? (
-                <div className="bb-signal-grid">
+                <div className="bn-signal-grid">
                   {signals.map((s, i) => (
                     <Signal key={s.id} signal={s} index={i} />
                   ))}
                   {signals.length === 0 && (
-                    <div className="bb-empty">
+                    <div className="bn-empty">
                       <Icon name="pulse" size={28} />
                       <h3>A quiet market is still a read.</h3>
                       <p>
@@ -724,7 +688,7 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                   )}
                 </div>
               ) : (
-                <div className="bb-game-grid">
+                <div className="bn-game-grid">
                   {games.map((game) => (
                     <GameCard
                       key={game.id}
@@ -740,7 +704,7 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                     />
                   ))}
                   {games.length === 0 && (
-                    <div className="bb-empty">
+                    <div className="bn-empty">
                       <Icon
                         name={view === "saved" ? "save" : "search"}
                         size={28}
@@ -765,18 +729,18 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                 </div>
               )}
             </section>
-            <aside className="bb-right-rail">
-              <section className="bb-shortlist">
-                <div className="bb-rail-heading">
-                  <span className="bb-dot" />
-                  <h2>The short list</h2>
+            <aside className="bn-right-rail">
+              <section className="bn-shortlist">
+                <div className="bn-rail-heading">
+                  <span className="bn-dot" />
+                  <h2>The briefing</h2>
                   <Icon name="pulse" size={18} />
                 </div>
-                <p className="bb-rail-intro">
-                  A few things worth a second look.
+                <p className="bn-rail-intro">
+                  Three signals from across the market.
                 </p>
                 {(data?.signals ?? []).slice(0, 3).map((s, i) => (
-                  <div key={s.id} className="bb-rail-signal">
+                  <div key={s.id} className="bn-rail-signal">
                     <span>
                       0{i + 1} / {s.signalType}
                     </span>
@@ -787,24 +751,25 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                   </div>
                 ))}
                 {!data?.signals.length && (
-                  <p className="bb-rail-quiet">
+                  <p className="bn-rail-quiet">
                     {loading
                       ? "Listening to the market…"
-                      : data?.signalError ?? "Nothing verified to highlight yet. That’s useful information, too."}
+                      : (data?.signalError ??
+                        "Nothing verified to highlight yet. That’s useful information, too.")}
                   </p>
                 )}
-                <Link href={`/feed?sport=${sport}`} className="bb-rail-link">
+                <Link href={`/feed?sport=${sport}`} className="bn-rail-link">
                   See all signals
                   <Icon name="arrow" size={16} />
                 </Link>
               </section>
-              <section className="bb-note">
-                <span className="bb-note-icon">↗</span>
-                <p className="bb-eyebrow">THE BESTBET WAY</p>
+              <section className="bn-note">
+                <span className="bn-note-icon">↗</span>
+                <p className="bn-eyebrow">THE BETNOW STANDARD</p>
                 <h3>
-                  A better line.
+                  See more.
                   <br />
-                  An open mind.
+                  Decide better.
                 </h3>
                 <p>
                   Sportsbooks don’t always agree. We make those differences
@@ -813,24 +778,24 @@ export default function BestBet({ view = "markets" }: { view?: View }) {
                 <div>
                   No picks. No promises.
                   <br />
-                  Just a little more perspective.
+                  Independent context. Always.
                 </div>
               </section>
-              <p className="bb-rail-footnote">
+              <p className="bn-rail-footnote">
                 Independent market context.
                 <br />
                 Strength measures relevance, not certainty.
               </p>
             </aside>
           </div>
-          <footer className="bb-footer">
+          <footer className="bn-footer">
             <Brand />
-            <p>See the game from a different angle.</p>
+            <p>A clear view of the market.</p>
             <span>MARKET CONTEXT, NOT BETTING ADVICE.</span>
           </footer>
         </main>
       </div>
-      <nav className="bb-mobile-nav" aria-label="Mobile navigation">
+      <nav className="bn-mobile-nav" aria-label="Mobile navigation">
         {nav.map((item) => (
           <Link
             key={item.id}

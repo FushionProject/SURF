@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Brand } from "@/components/bestbet/BestBet";
+import { Brand } from "@/components/betnow/BetNow";
 export function SurfAppHeader({
   title,
   subtitle,
@@ -9,15 +9,15 @@ export function SurfAppHeader({
   subtitle: string;
 }) {
   return (
-    <header className="bb-account-header">
+    <header className="bn-account-header">
       <div>
         <Brand />
-        <Link href="/games" className="bb-account-back">
+        <Link href="/games" className="bn-account-back">
           Back to the board ↗
         </Link>
       </div>
       <h1>{title}</h1>
-      <p>{subtitle.replaceAll("Surf", "BestBet")}</p>
+      <p>{subtitle.replaceAll("Surf", "BetNow")}</p>
     </header>
   );
 }
