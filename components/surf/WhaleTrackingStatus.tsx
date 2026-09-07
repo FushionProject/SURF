@@ -7,11 +7,11 @@ export function WhaleTrackingStatus({ coverage, recent }: {
 }) {
   if (!coverage) return null;
   return (
-    <section aria-label="Whale tracking coverage" className="mb-4 rounded-xl border border-[color:var(--surf-line-08)] bg-[color:var(--surf-sunken)] p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <h2 className="font-semibold text-[color:var(--surf-ink-solid)]">Whale tracking</h2>
+    <details aria-label="Whale tracking coverage" className="mb-4 rounded-xl border border-[color:var(--surf-line-08)] bg-[color:var(--surf-sunken)] p-4">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="font-semibold text-[color:var(--surf-ink-solid)]">Coverage &amp; checks <span aria-hidden="true">⌄</span></span>
         <span className="text-[color:var(--surf-primary)]">${coverage.thresholdUsd.toLocaleString("en-US")}+ cash</span>
-      </div>
+      </summary>
       <p className="mt-1 text-xs leading-5 text-[color:var(--surf-ink-45)]">Past 24 hours · Upcoming game winners</p>
       <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
         {(["kalshi", "polymarket"] as const).map((venue) => {
@@ -26,6 +26,6 @@ export function WhaleTrackingStatus({ coverage, recent }: {
       </div>
       {recent ? <p className="mt-3 text-xs leading-5 text-[color:var(--surf-ink-45)]">Recent games · Polymarket individual buys: {recent.coverage === "unavailable" ? "source unavailable" : recent.coverage === "disabled" ? "not enabled" : `${recent.signals.length} records${recent.coverage === "partial" ? " · Partial scan" : ""}`}</p> : null}
       <p className="mt-3 text-xs leading-5 text-[color:var(--surf-ink-40)]">Individual buys, same-wallet buys, and anonymous buying bursts. Refreshes with the market schedule; not a complete trade history.</p>
-    </section>
+    </details>
   );
 }
