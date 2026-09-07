@@ -279,6 +279,20 @@ export type MarketOpportunityEvidence = {
 
 export type PredictionMarketVenue = "kalshi" | "polymarket";
 
+export type PredictionMarketActivitySample = {
+  basis: "qualified_large_trades";
+  coverage: "sampled" | "partial" | "unavailable";
+  windowStart: number;
+  windowEnd: number;
+  minimumActivityUsd: number;
+  awayCommittedUsd: number;
+  homeCommittedUsd: number;
+  activityCount: number;
+  latestActivityAt?: number;
+  leaderTeam?: string;
+  tied: boolean;
+};
+
 export type PredictionMarketConsensusSource = {
   venue: PredictionMarketVenue;
   label: "Kalshi" | "Polymarket";
@@ -287,6 +301,7 @@ export type PredictionMarketConsensusSource = {
   observedAt: number;
   volume24hUsd?: number;
   volume24hIsEstimate?: boolean;
+  largeTradeActivity?: PredictionMarketActivitySample;
 };
 
 export type GamePredictionMarketConsensus = {

@@ -18,9 +18,8 @@ import {
   marketContextGameKey,
 } from "@/lib/surf/marketContext";
 import type { GameMarketAverage } from "@/lib/surf/marketAverage";
-import { computeMarketAverage, updateGameHistory } from "@/lib/surf/marketAverage";
-import { recordAndLoadPersistentMarketHistory } from "@/lib/surf/persistentMarketHistory";
-import { mergePersistentGameMarketAverage } from "@/lib/surf/persistentMarketHistoryCore";
+import { computeMarketAverage } from "@/lib/surf/marketAverage";
+import { captureMarketHistorySnapshot } from "@/lib/surf/persistentMarketHistory";
 import { getDemoGameSummaries, isSurfDemoMode } from "@/lib/surf/demoData";
 import { getNflInjuryFeed, type NflInjuryFeed } from "@/lib/surf/injuries";
 import { getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
@@ -201,6 +200,7 @@ async function getLiveGameSummaries(request: Request) {
 
   const isDebug = url.searchParams.get("debug") === "1";
 
+  let marketObservedAt = Date.now();
   const games: OddsApiGame[] = await (async () => {
     if (isNba) {
       const snap = await getNbaOddsSnapshot({ mode: refreshMode, debug: isDebug });
@@ -208,6 +208,7 @@ async function getLiveGameSummaries(request: Request) {
     }
 
     const snapshot = await getSharedOddsSnapshot({ sportKey, apiKey });
+    marketObservedAt = snapshot.fetchedAt;
     return snapshot.games;
   })().catch((err) => {
     const message = err instanceof Error ? err.message : "Failed to fetch odds";
@@ -280,20 +281,9 @@ async function getLiveGameSummaries(request: Request) {
   const currentMedianSnapshot = computeGameMedianSnapshot(filteredGames);
   const currentMedianPriceSnapshot = computeGameMedianPriceSnapshot(filteredGames, currentMedianSnapshot);
 
-  const marketAverage: Record<string, GameMarketAverage> = {};
-  for (const g of filteredGames) {
-    marketAverage[g.id] = updateGameHistory({ game: g, nowMs: now });
-  }
-
   // Persistence piggybacks on the odds snapshot already fetched for this
   // response. It never performs an additional Odds API request.
-  const persistentMarketAverage = await recordAndLoadPersistentMarketHistory(filteredGames, sportKey, now);
-  for (const g of filteredGames) {
-    marketAverage[g.id] = mergePersistentGameMarketAverage(
-      marketAverage[g.id],
-      persistentMarketAverage[g.id],
-    );
-  }
+  const marketAverage = await captureMarketHistorySnapshot(filteredGames, sportKey, marketObservedAt);
 
   if (isDebug && isMlb) {
     for (const g of filteredGames) {

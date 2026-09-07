@@ -36,6 +36,7 @@ import { getMarketTapeEvents, recordMarketTapeSnapshot } from "@/lib/surf/market
 import { getMarketHorizonEvents, recordMarketHorizonSnapshot } from "@/lib/surf/marketHorizon";
 import { buildOpportunityBoards, type MarketOpportunity } from "@/lib/surf/opportunities";
 import { getOddsRequestTelemetry, getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
+import { captureMarketHistorySnapshot } from "@/lib/surf/persistentMarketHistory";
 import { isOvernightCapture, overnightWindowKey } from "@/lib/surf/feedSchedule";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
@@ -821,6 +822,7 @@ async function getLiveSurfFeed(request: Request) {
   const refreshMode = parseMode(url.searchParams.get("refreshMode"));
 
   let schedulerMeta: Awaited<ReturnType<typeof getNbaOddsSnapshot>>["meta"] | undefined;
+  let marketObservedAt = Date.now();
   const games: OddsApiGame[] = await (async () => {
     if (sportKey === "basketball_nba") {
       const snapshot = await getNbaOddsSnapshot({ mode: refreshMode, debug: isDebug });
@@ -829,6 +831,7 @@ async function getLiveSurfFeed(request: Request) {
     }
 
     const snapshot = await getSharedOddsSnapshot({ sportKey, apiKey });
+    marketObservedAt = snapshot.fetchedAt;
     return snapshot.games;
   })();
 
@@ -896,6 +899,9 @@ async function getLiveSurfFeed(request: Request) {
   }));
   const cfbContext = sportKey === "americanfootball_ncaaf" ? await getCfbContext(filteredGames, now) : undefined;
   if (cfbContext) filteredGames = filteredGames.filter(game => cfbMarketEligible(game, cfbContext));
+  // Signals visitors contribute the same scheduled observations to Games'
+  // timeline. Cached snapshot reuse performs no duplicate history write.
+  await captureMarketHistorySnapshot(filteredGames, sportKey, marketObservedAt);
   const predictionMarketSnapshot = await getPredictionMarketSnapshot(filteredGames, sportKey, now);
   if (sportKey === "americanfootball_ncaaf") {
     for (const previous of await loadCfbMemory(filteredGames.filter(g=>!cfbHydratedGames.has(g.id)), now)) {

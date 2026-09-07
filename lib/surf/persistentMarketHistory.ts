@@ -2,20 +2,23 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { computeMarketAverage, type GameMarketAverage } from "@/lib/surf/marketAverage";
+import { computeMarketAverage, updateGameHistory, restoreGameHistory, type GameMarketAverage } from "@/lib/surf/marketAverage";
 import { marketContextGameKey } from "@/lib/surf/marketContext";
 import { SingleFlight, chunkValues } from "@/lib/surf/persistenceReliability";
 import {
   buildPersistentMarketHistoryCapture,
   persistentRowsToGameMarketAverages,
+  mergePersistentGameMarketAverage,
   type PersistentMarketHistoryCapture,
   type PersistentMarketHistoryRow,
 } from "@/lib/surf/persistentMarketHistoryCore";
 import { runSupabaseOperation, surfPersistenceStatus } from "@/lib/surf/supabasePersistence";
 import type { SurfSportKey } from "@/lib/surf/sports";
 import type { OddsApiGame } from "@/lib/surf/types";
+import { recordAndLoadLocalMarketHistory } from "@/lib/surf/localMarketHistory";
 
 declare global {
+  var __surfCompletedMarketHistories: Map<string, Record<string, GameMarketAverage>> | undefined;
   var __surfPersistentMarketHistorySingleFlight:
     | SingleFlight<string, Record<string, GameMarketAverage>>
     | undefined;
@@ -24,6 +27,8 @@ declare global {
 const historySingleFlight = globalThis.__surfPersistentMarketHistorySingleFlight
   ?? new SingleFlight<string, Record<string, GameMarketAverage>>();
 globalThis.__surfPersistentMarketHistorySingleFlight = historySingleFlight;
+const completedHistories = globalThis.__surfCompletedMarketHistories ?? new Map<string, Record<string, GameMarketAverage>>();
+globalThis.__surfCompletedMarketHistories = completedHistories;
 
 const CAPTURE_BATCH_SIZE = 32;
 const GAME_ID_QUERY_BATCH_SIZE = 50;
@@ -136,7 +141,12 @@ async function recordAndLoad(
       async (client, signal) => {
         await recordCaptures(client, captures, observedAt, signal);
         const rows = await loadRows(client, sportKey, gameIds, signal);
-        return persistentRowsToGameMarketAverages(rows);
+        const histories = persistentRowsToGameMarketAverages(rows);
+        for (const history of Object.values(histories)) {
+          const latestLoadedAt = history.lastObservedAt ? Date.parse(history.lastObservedAt) : 0;
+          history.lastObservedAt = new Date(Math.max(observedAt, latestLoadedAt)).toISOString();
+        }
+        return histories;
       },
       { timeoutMs, maxAttempts: 2, retryBaseDelayMs: 75 },
     );
@@ -156,6 +166,33 @@ export async function recordAndLoadPersistentMarketHistory(
     console.warn("[surf] Invalid market-history observation time; using in-memory history for this response.");
     return {};
   }
-  if (!persistentMarketHistoryStatus().configured) return {};
-  return recordAndLoad(games, sportKey, observedAt, Math.max(250, timeoutMs));
+  const captures = games.map(game => buildPersistentMarketHistoryCapture(game, sportKey, marketContextGameKey(game), computeMarketAverage(game)));
+  const key = `${observedAt}:${captureKey(sportKey, captures, observedAt)}`;
+  const cached = completedHistories.get(key);
+  if (cached) return cached;
+  const result = !persistentMarketHistoryStatus().configured
+    ? await recordAndLoadLocalMarketHistory(games, sportKey, observedAt)
+    : await recordAndLoad(games, sportKey, observedAt, Math.max(250, timeoutMs));
+  if (Object.keys(result).length) {
+    completedHistories.set(key, result);
+    while (completedHistories.size > 12) completedHistories.delete(completedHistories.keys().next().value!);
+  }
+  return result;
+}
+
+/** Records only the shared snapshot already in hand, never fetches new odds. */
+export async function captureMarketHistorySnapshot(
+  games: OddsApiGame[], sportKey: SurfSportKey, observedAt: number,
+): Promise<Record<string, GameMarketAverage>> {
+  const result = Object.fromEntries(games.map(game => [game.id, updateGameHistory({ game, nowMs: observedAt })]));
+  let saved: Record<string, GameMarketAverage> = {};
+  try {
+    saved = await recordAndLoadPersistentMarketHistory(games, sportKey, observedAt);
+  } catch {
+    console.warn("[surf] Saved market history unavailable; serving the current market with session history.");
+  }
+  for (const game of games) {
+    result[game.id] = restoreGameHistory(game, mergePersistentGameMarketAverage(result[game.id], saved[game.id]));
+  }
+  return result;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SurfBrandMark } from "@/components/surf/SurfBrandMark";
 
 type Props = {
   title: string;
@@ -12,10 +13,10 @@ export function SurfAppHeader({ title, subtitle }: Props) {
     <header className="sports-header pb-5 pt-6">
       <div>
         <div className="mb-5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Link href="/games" className="sports-wordmark">surf<span>.</span></Link>
-            <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--surf-primary)]" />
-          </div>
+          <Link href="/games" className="sports-brand" aria-label="Surf home">
+            <SurfBrandMark className="sports-brand-mark" />
+            <span className="sports-wordmark">surf<span>.</span></span>
+          </Link>
           <Link
             href="/account"
             aria-label="Open your Surf account"

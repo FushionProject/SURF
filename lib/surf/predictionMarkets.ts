@@ -9,6 +9,7 @@ import {
   matchPolymarketWinnerMarkets,
   mergePredictionConsensus,
   predictionSeriesForSport,
+  summarizeLargeTradeActivity,
   WHALE_LOOKBACK_MS,
   type KalshiTrade,
   type KalshiWinnerMarket,
@@ -26,6 +27,7 @@ const SNAPSHOT_CACHE_MS = 2 * 60 * 1000;
 const POLYMARKET_MIN_FILL_USD = 1_000;
 
 type ProviderStatus = "available" | "partial" | "unavailable" | "no_coverage" | "disabled";
+type TradeSample<T> = { trades: T[]; incomplete: boolean };
 
 export type PredictionMarketSnapshot = {
   generatedAt: number;
@@ -92,7 +94,7 @@ async function fetchKalshiMarkets(seriesTicker: string): Promise<KalshiWinnerMar
   return markets;
 }
 
-async function fetchKalshiTickerTrades(ticker: string, now: number): Promise<KalshiTrade[]> {
+async function fetchKalshiTickerTrades(ticker: string, now: number): Promise<TradeSample<KalshiTrade>> {
   const trades: KalshiTrade[] = [];
   let cursor = "";
   for (let page = 0; page < 3; page += 1) {
@@ -106,7 +108,7 @@ async function fetchKalshiTickerTrades(ticker: string, now: number): Promise<Kal
     cursor = payload.cursor ?? "";
     if (!cursor) break;
   }
-  return trades;
+  return { trades, incomplete: Boolean(cursor) };
 }
 
 async function fetchKalshiTrades(
@@ -114,7 +116,7 @@ async function fetchKalshiTrades(
   rawMarkets: KalshiWinnerMarket[],
   thresholdUsd: number,
   now: number,
-): Promise<KalshiTrade[]> {
+): Promise<TradeSample<KalshiTrade>> {
   const rawByTicker = new Map(rawMarkets.map((market) => [market.ticker, market]));
   const tickers = matched
     .flatMap((market) => market.selections.map((selection) => selection.providerMarketId))
@@ -124,15 +126,21 @@ async function fetchKalshiTrades(
     .filter((ticker) => Number(rawByTicker.get(ticker)?.volume_24h_fp ?? 0) >= thresholdUsd);
 
   const trades: KalshiTrade[] = [];
+  let incomplete = false;
+  let successes = 0;
   for (let index = 0; index < tickers.length; index += 8) {
     const batch = tickers.slice(index, index + 8);
     const settled = await Promise.allSettled(batch.map((ticker) => fetchKalshiTickerTrades(ticker, now)));
     for (const result of settled) {
-      if (result.status === "fulfilled") trades.push(...result.value);
-      else throw new Error("Prediction activity source partially unavailable");
+      if (result.status === "fulfilled") {
+        trades.push(...result.value.trades);
+        incomplete ||= result.value.incomplete;
+        successes += 1;
+      } else incomplete = true;
     }
   }
-  return trades;
+  if (tickers.length > 0 && successes === 0) throw new Error("Prediction activity source unavailable");
+  return { trades, incomplete };
 }
 
 function slateTimeRange(games: OddsApiGame[]): { min: string; max: string } {
@@ -164,11 +172,11 @@ async function fetchPolymarketEvents(discoveryId: string, games: OddsApiGame[], 
   throw new Error("Prediction discovery page limit reached");
 }
 
-async function fetchPolymarketTrades(markets: MatchedWinnerMarket[], thresholdUsd: number): Promise<PolymarketTrade[]> {
+async function fetchPolymarketTrades(markets: MatchedWinnerMarket[], thresholdUsd: number): Promise<TradeSample<PolymarketTrade>> {
   const conditionIds = markets
     .filter((market) => (market.volume24hUsd ?? 0) >= thresholdUsd)
     .map((market) => market.marketId);
-  if (conditionIds.length === 0) return [];
+  if (conditionIds.length === 0) return { trades: [], incomplete: false };
   const url = new URL(`${POLYMARKET_DATA_BASE}/trades`);
   url.searchParams.set("market", conditionIds.join(","));
   url.searchParams.set("side", "BUY");
@@ -176,7 +184,8 @@ async function fetchPolymarketTrades(markets: MatchedWinnerMarket[], thresholdUs
   url.searchParams.set("filterType", "CASH");
   url.searchParams.set("filterAmount", String(Math.min(POLYMARKET_MIN_FILL_USD, thresholdUsd)));
   url.searchParams.set("limit", "1000");
-  return fetchJson<PolymarketTrade[]>(url);
+  const trades = await fetchJson<PolymarketTrade[]>(url);
+  return { trades, incomplete: trades.length >= 1000 };
 }
 
 function money(value: number): string {
@@ -275,31 +284,45 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
   const [kalshiTradesResult, polymarketTradesResult] = await Promise.allSettled([
     kalshiResult.status === "fulfilled"
       ? fetchKalshiTrades(kalshiMarkets, kalshiResult.value, thresholdUsd, now)
-      : Promise.resolve([]),
+      : Promise.resolve({ trades: [], incomplete: false }),
     polymarketResult.status === "fulfilled"
       ? fetchPolymarketTrades(polymarketMarkets, thresholdUsd)
-      : Promise.resolve([]),
+      : Promise.resolve({ trades: [], incomplete: false }),
   ]);
 
   const activities = [
     ...(kalshiTradesResult.status === "fulfilled"
-      ? aggregateKalshiWhaleBuys(kalshiTradesResult.value, kalshiMarkets, now, thresholdUsd)
+      ? aggregateKalshiWhaleBuys(kalshiTradesResult.value.trades, kalshiMarkets, now, thresholdUsd)
       : []),
     ...(polymarketTradesResult.status === "fulfilled"
-      ? aggregatePolymarketWhaleBuys(polymarketTradesResult.value, polymarketMarkets, now, thresholdUsd)
+      ? aggregatePolymarketWhaleBuys(polymarketTradesResult.value.trades, polymarketMarkets, now, thresholdUsd)
       : []),
   ];
 
+  const consensusByGame = mergePredictionConsensus([...kalshiMarkets, ...polymarketMarkets]);
+  const gamesById = new Map(games.map((game) => [game.id, game]));
+  for (const consensus of Object.values(consensusByGame)) {
+    const game = gamesById.get(consensus.gameId);
+    if (!game) continue;
+    for (const source of consensus.sources) {
+      const tradesResult = source.venue === "kalshi" ? kalshiTradesResult : polymarketTradesResult;
+      source.largeTradeActivity = summarizeLargeTradeActivity(
+        game, source.venue, activities, now, thresholdUsd,
+        tradesResult.status === "rejected" ? "unavailable" : tradesResult.value.incomplete ? "partial" : "sampled",
+      );
+    }
+  }
+
   return {
     generatedAt: now,
-    consensusByGame: mergePredictionConsensus([...kalshiMarkets, ...polymarketMarkets]),
+    consensusByGame,
     whaleSignals: activityCards(activities, sportKey, thresholdUsd),
     providers: {
       kalshi:
         kalshiResult.status === "rejected"
           ? "unavailable"
           : kalshiMarkets.length > 0
-            ? kalshiTradesResult.status === "rejected"
+            ? kalshiTradesResult.status === "rejected" || kalshiTradesResult.value.incomplete
               ? "partial"
               : sportKey === "americanfootball_ncaaf" && kalshiMarkets.length < games.length ? "partial" : "available"
             : "no_coverage",
@@ -307,7 +330,7 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
         polymarketResult.status === "rejected"
           ? "unavailable"
           : polymarketMarkets.length > 0
-            ? polymarketTradesResult.status === "rejected"
+            ? polymarketTradesResult.status === "rejected" || polymarketTradesResult.value.incomplete
               ? "partial"
               : sportKey === "americanfootball_ncaaf" && polymarketMarkets.length < games.length ? "partial" : "available"
             : "no_coverage",

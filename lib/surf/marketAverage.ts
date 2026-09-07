@@ -1,6 +1,7 @@
 import type { OddsApiGame } from "@/lib/surf/types";
-import { isValidMLBRunLine } from "@/lib/surf/mlbRunLine";
-import { marketContextGameKey } from "@/lib/surf/marketContext";
+import { isValidMLBRunLine } from "./mlbRunLine.ts";
+import { marketContextGameKey } from "./marketContext.ts";
+import { mergePersistentGameMarketAverage } from "./persistentMarketHistoryCore.ts";
 
 export type MarketAverageHistoryPoint = {
   timestamp: string;
@@ -10,6 +11,9 @@ export type MarketAverageHistoryPoint = {
 
 export type GameMarketAverage = {
   gameKey: string;
+  // These are Surf observations, not a provider-verified market opening.
+  historySource?: "memory" | "local" | "supabase";
+  lastObservedAt?: string;
 
   openSpreadAvg: number | null;
   currentSpreadAvg: number | null;
@@ -36,6 +40,7 @@ type StoreModel = {
   peakTotalAvg: number | null;
 
   lastMovedAtMs: number | null;
+  lastObservedAtMs?: number;
 
   spreadHistory: Array<{ timestampMs: number; value: number | null }>;
   totalHistory: Array<{ timestampMs: number; value: number | null }>;
@@ -135,15 +140,54 @@ function pushPoint(opts: {
 
   const next = [...history, { timestampMs: nowMs, value }];
   if (next.length <= HISTORY_MAX_POINTS) return next;
-  return next.slice(next.length - HISTORY_MAX_POINTS);
+  // Keep the first observation when bounding the recent timeline.
+  return [next[0], ...next.slice(next.length - HISTORY_MAX_POINTS + 1)];
+}
+
+export function restoreGameHistory(game: OddsApiGame, average: GameMarketAverage): GameMarketAverage {
+  const key = marketContextGameKey(game);
+  const previous = store.get(key);
+  const toPublic = (points: StoreModel["spreadHistory"], market: "spreadAvg" | "totalAvg") => points.map(point => ({
+    timestamp: new Date(point.timestampMs).toISOString(),
+    spreadAvg: market === "spreadAvg" ? point.value : null,
+    totalAvg: market === "totalAvg" ? point.value : null,
+  }));
+  // The async database/disk read may finish after a newer request recorded its
+  // quote. Merge against the store at restore time, not the pre-await snapshot.
+  const latest: GameMarketAverage | undefined = previous ? {
+    ...previous,
+    lastMovedAt: previous.lastMovedAtMs != null ? new Date(previous.lastMovedAtMs).toISOString() : null,
+    lastObservedAt: previous.lastObservedAtMs != null ? new Date(previous.lastObservedAtMs).toISOString() : undefined,
+    spreadHistory: toPublic(previous.spreadHistory, "spreadAvg"),
+    totalHistory: toPublic(previous.totalHistory, "totalAvg"),
+  } : undefined;
+  const restored = mergePersistentGameMarketAverage(latest ?? average, average);
+  const toStored = (history: MarketAverageHistoryPoint[], market: "spreadAvg" | "totalAvg") => history
+    .map(point => ({ timestampMs: Date.parse(point.timestamp), value: point[market] }))
+    .filter(point => Number.isFinite(point.timestampMs));
+  store.set(key, {
+    ...restored,
+    gameKey: key,
+    lastMovedAtMs: restored.lastMovedAt ? Date.parse(restored.lastMovedAt) : null,
+    lastObservedAtMs: restored.lastObservedAt ? Date.parse(restored.lastObservedAt) : undefined,
+    spreadHistory: toStored(restored.spreadHistory, "spreadAvg"),
+    totalHistory: toStored(restored.totalHistory, "totalAvg"),
+  });
+  return restored;
 }
 
 export function updateGameHistory(opts: { game: OddsApiGame; nowMs: number }): GameMarketAverage {
   const { game, nowMs } = opts;
   const key = marketContextGameKey(game);
-  const snap = computeMarketAverage(game);
-
   const prev = store.get(key);
+  const requestedSnapshot = computeMarketAverage(game);
+  // Reusing an older cached response must not manufacture a newer observation
+  // or undo a line that a concurrent request already recorded.
+  const outOfOrder = prev?.lastObservedAtMs != null && nowMs <= prev.lastObservedAtMs;
+  const snap = outOfOrder && prev
+    ? { spreadAvg: prev.currentSpreadAvg, totalAvg: prev.currentTotalAvg }
+    : requestedSnapshot;
+  const observedAt = outOfOrder && prev?.lastObservedAtMs ? prev.lastObservedAtMs : nowMs;
 
   const init: StoreModel = prev ?? {
     gameKey: key,
@@ -161,6 +205,9 @@ export function updateGameHistory(opts: { game: OddsApiGame; nowMs: number }): G
   };
 
   const next: StoreModel = { ...init };
+  next.lastObservedAtMs = observedAt;
+  if (next.openSpreadAvg == null && snap.spreadAvg != null) next.openSpreadAvg = snap.spreadAvg;
+  if (next.openTotalAvg == null && snap.totalAvg != null) next.openTotalAvg = snap.totalAvg;
 
   const spreadChanged = changedMeaningfully(init.currentSpreadAvg, snap.spreadAvg);
   const totalChanged = changedMeaningfully(init.currentTotalAvg, snap.totalAvg);
@@ -208,6 +255,8 @@ export function updateGameHistory(opts: { game: OddsApiGame; nowMs: number }): G
 
   return {
     gameKey: next.gameKey,
+    historySource: "memory",
+    lastObservedAt: new Date(observedAt).toISOString(),
 
     openSpreadAvg: next.openSpreadAvg,
     currentSpreadAvg: next.currentSpreadAvg,

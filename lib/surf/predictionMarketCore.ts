@@ -4,6 +4,7 @@ import type { SurfSportKey } from "./sports";
 import type {
   GamePredictionMarketConsensus,
   OddsApiGame,
+  PredictionMarketActivitySample,
   PredictionMarketConsensusSource,
   PredictionMarketVenue,
 } from "./types";
@@ -34,6 +35,7 @@ export type KalshiTrade = {
   no_price_dollars?: string;
   taker_side?: string;
   taker_outcome_side?: string;
+  taker_book_side?: string;
   created_time: string;
 };
 
@@ -516,6 +518,62 @@ function shortWallet(value: string | undefined): string | undefined {
   return value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
 }
 
+/** A bounded sample of qualified trades, never market-wide volume or net positions. */
+export function summarizeLargeTradeActivity(
+  game: OddsApiGame,
+  venue: PredictionMarketVenue,
+  activities: NormalizedWhaleActivity[],
+  now: number,
+  thresholdUsd = DEFAULT_WHALE_THRESHOLD_USD,
+  coverage: PredictionMarketActivitySample["coverage"] = "sampled",
+): PredictionMarketActivitySample {
+  const sample: PredictionMarketActivitySample = {
+    basis: "qualified_large_trades",
+    coverage,
+    windowStart: now - WHALE_LOOKBACK_MS,
+    windowEnd: now,
+    minimumActivityUsd: thresholdUsd,
+    awayCommittedUsd: 0,
+    homeCommittedUsd: 0,
+    activityCount: 0,
+    tied: false,
+  };
+  if (coverage === "unavailable") return sample;
+  const seen = new Set<string>();
+  for (const activity of activities) {
+    if (activity.venue !== venue || activity.game.id !== game.id || seen.has(activity.id)) continue;
+    if (!Number.isFinite(activity.committedUsd) || activity.committedUsd < thresholdUsd) continue;
+    if (!Number.isFinite(activity.occurredAt) || activity.occurredAt < sample.windowStart || activity.occurredAt > now) continue;
+    if (activity.occurredAt >= new Date(game.commence_time).getTime()) continue;
+    if (activity.outcomeTeam !== game.away_team && activity.outcomeTeam !== game.home_team) continue;
+    seen.add(activity.id);
+    if (activity.outcomeTeam === game.away_team) sample.awayCommittedUsd += activity.committedUsd;
+    else sample.homeCommittedUsd += activity.committedUsd;
+    sample.activityCount += 1;
+    sample.latestActivityAt = Math.max(sample.latestActivityAt ?? 0, activity.occurredAt);
+  }
+  if (sample.activityCount > 0) {
+    // Compare cash in cents; reversed provider outcome order never changes team attribution.
+    const difference = Math.round(sample.awayCommittedUsd * 100) - Math.round(sample.homeCommittedUsd * 100);
+    sample.tied = difference === 0;
+    sample.leaderTeam = difference === 0 ? undefined : difference > 0 ? game.away_team : game.home_team;
+  }
+  return sample;
+}
+
+function kalshiTakerOutcome(trade: KalshiTrade): "yes" | "no" | undefined {
+  const outcome = trade.taker_outcome_side?.toLowerCase();
+  const book = trade.taker_book_side?.toLowerCase();
+  const fromBook = book === "bid" ? "yes" : book === "ask" ? "no" : undefined;
+  if (outcome != null && outcome !== "yes" && outcome !== "no") return undefined;
+  if (book != null && !fromBook) return undefined;
+  if (outcome && fromBook && outcome !== fromBook) return undefined;
+  if (outcome === "yes" || outcome === "no") return outcome;
+  if (fromBook) return fromBook;
+  const legacy = trade.taker_side?.toLowerCase();
+  return legacy === "yes" || legacy === "no" ? legacy : undefined;
+}
+
 function activityFromCluster(
   cluster: BuyFill[],
   thresholdUsd: number,
@@ -572,9 +630,13 @@ export function aggregateKalshiWhaleBuys(
   const seen = new Set<string>();
   const fills: BuyFill[] = [];
   for (const trade of trades) {
+    if (!trade.trade_id) continue;
     if (seen.has(trade.trade_id)) continue;
     seen.add(trade.trade_id);
-    if ((trade.taker_outcome_side ?? trade.taker_side)?.toLowerCase() !== "yes") continue;
+    // Public trades disclose taker exposure, not wallet identity or new-position intent.
+    // A NO fill is not silently inverted to the other team's YES contract: tie and
+    // settlement rules can differ. Only the named winner contract's YES flow qualifies.
+    if (kalshiTakerOutcome(trade) !== "yes") continue;
     const match = byTicker.get(trade.ticker);
     if (!match) continue;
     const contracts = finiteNumber(trade.count_fp);
@@ -582,6 +644,7 @@ export function aggregateKalshiWhaleBuys(
     const occurredAt = new Date(trade.created_time).getTime();
     if (contracts == null || price == null || contracts <= 0 || price <= 0 || price > 1) continue;
     if (!Number.isFinite(occurredAt) || occurredAt < now - WHALE_LOOKBACK_MS || occurredAt > now + 60_000) continue;
+    if (occurredAt >= new Date(match.market.game.commence_time).getTime()) continue;
     fills.push({
       id: trade.trade_id,
       venue: "kalshi",
@@ -613,7 +676,10 @@ export function aggregatePolymarketWhaleBuys(
   const seen = new Set<string>();
   const fills: BuyFill[] = [];
   for (const trade of trades) {
-    const id = `${trade.transactionHash}:${trade.asset}:${trade.side}:${trade.timestamp}`;
+    if (!trade.transactionHash || !/^0x[a-f0-9]{40}$/i.test(trade.proxyWallet ?? "")) continue;
+    // One transaction may fill the same asset for different wallets/sizes/prices.
+    // Deduplicate identical public rows without conflating distinct observed fills.
+    const id = `${trade.transactionHash}:${trade.proxyWallet}:${trade.asset}:${trade.side}:${trade.timestamp}:${trade.size}:${trade.price}`;
     if (seen.has(id)) continue;
     seen.add(id);
     if (trade.side.toUpperCase() !== "BUY") continue;
@@ -624,6 +690,7 @@ export function aggregatePolymarketWhaleBuys(
     const occurredAt = finiteNumber(trade.timestamp) != null ? Number(trade.timestamp) * 1000 : Number.NaN;
     if (contracts == null || price == null || contracts <= 0 || price <= 0 || price > 1) continue;
     if (!Number.isFinite(occurredAt) || occurredAt < now - WHALE_LOOKBACK_MS || occurredAt > now + 60_000) continue;
+    if (occurredAt >= new Date(match.market.game.commence_time).getTime()) continue;
     fills.push({
       id,
       participantId: trade.proxyWallet,

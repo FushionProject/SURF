@@ -25,6 +25,7 @@ export type PersistentMarketHistoryRow = {
 };
 
 function finiteNumber(value: unknown): number | undefined {
+  if (typeof value === "string" && value.trim() === "") return undefined;
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : undefined;
 }
@@ -60,7 +61,8 @@ function furthestFromOpen(history: MarketAverageHistoryPoint[], market: "spreads
 }
 
 function lastMovementAt(...histories: MarketAverageHistoryPoint[][]): string | null {
-  const moved = histories.flatMap((history) => history.slice(1));
+  const moved = histories.flatMap((history) => history.filter((point, index) => index > 0
+    && (point.spreadAvg !== history[index - 1].spreadAvg || point.totalAvg !== history[index - 1].totalAvg)));
   const latest = moved.reduce<number | undefined>((current, point) => {
     const observedAt = timestamp(point.timestamp);
     if (observedAt == null) return current;
@@ -130,6 +132,10 @@ export function persistentRowsToGameMarketAverages(
 
     result[gameId] = {
       gameKey: ordered[0]?.game_key ?? gameId,
+      historySource: "supabase",
+      lastObservedAt: [...spreadHistory, ...totalHistory].length
+        ? new Date(Math.max(...[...spreadHistory, ...totalHistory].map(point => Date.parse(point.timestamp)))).toISOString()
+        : undefined,
       openSpreadAvg,
       currentSpreadAvg,
       peakSpreadAvg: furthestFromOpen(spreadHistory, "spreads"),
@@ -150,18 +156,35 @@ export function mergePersistentGameMarketAverage(
   persistent: GameMarketAverage | undefined,
 ): GameMarketAverage {
   if (!persistent) return fallback;
-  const hasSpread = persistent.spreadHistory.length > 0;
-  const hasTotal = persistent.totalHistory.length > 0;
+  const mergeHistory = (persisted: MarketAverageHistoryPoint[], recent: MarketAverageHistoryPoint[]) => {
+    const points = new Map<number, MarketAverageHistoryPoint>();
+    // Recent, successfully observed quotes win a duplicate timestamp, but a
+    // persistence read can never drop newer in-memory changes or their gaps.
+    for (const point of [...persisted, ...recent]) {
+      const at = timestamp(point.timestamp);
+      if (at != null) points.set(at, point);
+    }
+    return [...points.values()].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+  };
+  const spreadHistory = mergeHistory(persistent.spreadHistory, fallback.spreadHistory);
+  const totalHistory = mergeHistory(persistent.totalHistory, fallback.totalHistory);
+  const spreadValues = spreadHistory.filter(point => point.spreadAvg != null);
+  const totalValues = totalHistory.filter(point => point.totalAvg != null);
+  const observedTimes = [persistent.lastObservedAt, fallback.lastObservedAt]
+    .flatMap(value => value && timestamp(value) != null ? [timestamp(value)!] : []);
+  observedTimes.push(...[...spreadHistory, ...totalHistory].map(point => Date.parse(point.timestamp)));
   return {
     gameKey: persistent.gameKey || fallback.gameKey,
-    openSpreadAvg: hasSpread ? persistent.openSpreadAvg : fallback.openSpreadAvg,
-    currentSpreadAvg: hasSpread ? persistent.currentSpreadAvg : fallback.currentSpreadAvg,
-    peakSpreadAvg: hasSpread ? persistent.peakSpreadAvg : fallback.peakSpreadAvg,
-    openTotalAvg: hasTotal ? persistent.openTotalAvg : fallback.openTotalAvg,
-    currentTotalAvg: hasTotal ? persistent.currentTotalAvg : fallback.currentTotalAvg,
-    peakTotalAvg: hasTotal ? persistent.peakTotalAvg : fallback.peakTotalAvg,
-    lastMovedAt: persistent.lastMovedAt ?? fallback.lastMovedAt,
-    spreadHistory: hasSpread ? persistent.spreadHistory : fallback.spreadHistory,
-    totalHistory: hasTotal ? persistent.totalHistory : fallback.totalHistory,
+    historySource: persistent.historySource ?? fallback.historySource,
+    lastObservedAt: observedTimes.length ? new Date(Math.max(...observedTimes)).toISOString() : undefined,
+    openSpreadAvg: spreadValues[0]?.spreadAvg ?? fallback.openSpreadAvg,
+    currentSpreadAvg: spreadHistory.length ? spreadHistory.at(-1)!.spreadAvg : fallback.currentSpreadAvg,
+    peakSpreadAvg: spreadValues.length ? furthestFromOpen(spreadValues, "spreads") : fallback.peakSpreadAvg,
+    openTotalAvg: totalValues[0]?.totalAvg ?? fallback.openTotalAvg,
+    currentTotalAvg: totalHistory.length ? totalHistory.at(-1)!.totalAvg : fallback.currentTotalAvg,
+    peakTotalAvg: totalValues.length ? furthestFromOpen(totalValues, "totals") : fallback.peakTotalAvg,
+    lastMovedAt: lastMovementAt(spreadHistory, totalHistory),
+    spreadHistory,
+    totalHistory,
   };
 }

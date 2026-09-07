@@ -1,5 +1,5 @@
 import type { OddsApiGame, SurfMarketType } from "@/lib/surf/types";
-import { isValidMLBRunLine } from "@/lib/surf/mlbRunLine";
+import { isValidMLBRunLine } from "./mlbRunLine.ts";
 
 export type MarketContext = {
   market: SurfMarketType;

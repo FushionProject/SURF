@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DemoDataNotice } from "@/components/surf/DemoDataNotice";
 import { SportSelector } from "@/components/surf/SportSelector";
@@ -8,10 +8,14 @@ import { SurfAppHeader } from "@/components/surf/SurfAppHeader";
 import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
 import { SurfFooter } from "@/components/surf/SurfFooter";
 import { useSurfSport } from "@/components/surf/useSurfSport";
+import { MarketMovementChart } from "@/components/surf/MarketMovementChart";
+import { PredictionMarketConsensusStrip } from "@/components/surf/PredictionMarketConsensusStrip";
+import { movementLabel } from "@/lib/surf/marketMovementTimeline";
+import { cfbRankForTeam, emptyCfbRankings, isTop25Game, matchesGameSearch, type CfbRankings } from "@/lib/surf/cfbRankings";
 import type { NflInjury, NflInjuryFeed } from "@/lib/surf/injuries";
 import type { CfbContext, CfbTeamContext } from "@/lib/surf/cfbContextCore";
 import { nextRefreshDelayMs } from "@/lib/surf/feedSchedule";
-import type { GameMarketAverage, MarketAverageHistoryPoint } from "@/lib/surf/marketAverage";
+import type { GameMarketAverage } from "@/lib/surf/marketAverage";
 import {
   buildGameOfferBoard,
   type BestMarketOffer,
@@ -150,7 +154,7 @@ function TeamMark({ name, league, compact = false, providerLogo }: { name: strin
   );
 }
 
-function TeamIdentity({ name, league, side, providerLogo, cfbTeam }: { name: string; league: SurfLeague; side: "away" | "home"; providerLogo?: string | null; cfbTeam?: CfbTeamContext }) {
+function TeamIdentity({ name, league, side, providerLogo, cfbTeam, rank }: { name: string; league: SurfLeague; side: "away" | "home"; providerLogo?: string | null; cfbTeam?: CfbTeamContext; rank?: number }) {
   const abbrev = getTeamAbbrev(name) ?? name.slice(0, 3).toUpperCase();
 
   return (
@@ -158,7 +162,7 @@ function TeamIdentity({ name, league, side, providerLogo, cfbTeam }: { name: str
       <TeamMark name={name} league={league} providerLogo={providerLogo} />
       <div className="mt-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-[color:var(--surf-ink-35)]">{side}</div>
       <div className="mt-1 max-w-[130px] truncate text-center text-[13px] font-semibold tracking-[-0.02em] text-[color:var(--surf-ink-90)] sm:max-w-[210px] sm:text-sm">
-        {name}
+        {rank != null ? <span className="mr-1.5 text-[color:var(--surf-primary)]" aria-label={`AP rank ${rank}`}>#{rank}</span> : null}{name}
       </div>
       <div className="mt-0.5 text-[10px] font-semibold tracking-[0.12em] text-[color:var(--surf-ink-40)]">
         {league === "CFB"
@@ -166,98 +170,6 @@ function TeamIdentity({ name, league, side, providerLogo, cfbTeam }: { name: str
           : abbrev}
       </div>
     </div>
-  );
-}
-
-function PredictionMarketConsensusStrip({
-  consensus,
-  league,
-}: {
-  consensus: GamePredictionMarketConsensus | undefined;
-  league: SurfLeague;
-}) {
-  if (!consensus) return null;
-  const away = getTeamAbbrev(consensus.awayTeam) ?? consensus.awayTeam;
-  const home = getTeamAbbrev(consensus.homeTeam) ?? consensus.homeTeam;
-  const awayProbability = Math.round(consensus.awayProbability * 100);
-  const homeProbability = 100 - awayProbability;
-  const sourceLabel = consensus.sources.map((source) => source.label).join(" + ");
-  const volumeSources = consensus.sources.filter(
-    (source) => typeof source.volume24hUsd === "number" && Number.isFinite(source.volume24hUsd) && source.volume24hUsd > 0,
-  );
-  const awayTeamRgb = getTeamPrimaryRgb(consensus.awayTeam, league);
-  const homeTeamRgb = getTeamPrimaryRgb(consensus.homeTeam, league);
-
-  return (
-    <section className="relative overflow-hidden rounded-[18px] border border-[color:var(--surf-line-08)] bg-black/[0.12]">
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-px"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(${awayTeamRgb},0.85), rgba(${homeTeamRgb},0.85))`,
-        }}
-      />
-      <div className="flex items-start justify-between gap-4 px-4 pb-3 pt-3.5">
-        <div>
-          <div className="text-[9px] text-[color:var(--surf-ink-35)]">Market-implied win probability · not a forecast</div>
-        </div>
-        <div className="rounded-full border border-[color:var(--surf-line-06)] bg-white/[0.025] px-2.5 py-1 text-[8px] font-medium text-[color:var(--surf-ink-40)]">
-          {sourceLabel}
-        </div>
-      </div>
-
-      <div className="border-t border-[color:var(--surf-line-06)] px-4 pb-4 pt-3">
-        <div className="mb-2.5 grid grid-cols-2 gap-4">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{away}</span>
-            <span className="text-[17px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-90)]">{awayProbability}%</span>
-          </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[17px] font-semibold tracking-[-0.03em] text-[color:var(--surf-ink-90)]">{homeProbability}%</span>
-            <span className="text-[10px] font-semibold text-[color:var(--surf-ink-55)]">{home}</span>
-          </div>
-        </div>
-
-        <div className="flex h-2 overflow-hidden rounded-full bg-white/[0.04] shadow-[inset_0_1px_2px_rgba(0,0,0,0.45)]">
-          <div
-            className="h-full"
-            style={{
-              width: `${awayProbability}%`,
-              backgroundImage: `linear-gradient(to right, rgba(${awayTeamRgb},0.72), rgba(${awayTeamRgb},1))`,
-              boxShadow: `0 0 16px rgba(${awayTeamRgb},0.34)`,
-            }}
-          />
-          <div
-            className="h-full"
-            style={{
-              width: `${homeProbability}%`,
-              backgroundImage: `linear-gradient(to right, rgba(${homeTeamRgb},1), rgba(${homeTeamRgb},0.72))`,
-              boxShadow: `0 0 16px rgba(${homeTeamRgb},0.34)`,
-            }}
-          />
-        </div>
-
-        {volumeSources.length > 0 ? (
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {volumeSources.map((source) => (
-              <div key={source.venue} className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--surf-line-06)] bg-white/[0.025] px-3 py-2.5">
-                <div>
-                  <div className="text-[9px] font-semibold text-[color:var(--surf-ink-55)]">{source.label}</div>
-                  <div className="mt-0.5 text-[8px] text-[color:var(--surf-ink-30)]">
-                    {source.volume24hIsEstimate ? "Estimated cash traded" : "Reported traded volume"}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[12px] font-semibold tracking-[-0.02em] text-[color:var(--surf-ink-85)]">
-                    {source.volume24hIsEstimate ? "≈" : ""}{compactMoney(source.volume24hUsd ?? 0)}
-                  </div>
-                  <div className="mt-0.5 text-[8px] font-medium uppercase tracking-[0.1em] text-[color:var(--surf-ink-30)]">24h volume</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </section>
   );
 }
 
@@ -329,7 +241,7 @@ function MarketRead({
     detail = `${consensus?.sources.map((source) => source.label).join(" and ")} currently imply about ${Math.round(leadProbability * 100)}% for ${leadLabel}. That is market pricing, not Surf's forecast.`;
   } else if (strongestMovement && Math.abs(strongestMovement.delta) >= 0.5) {
     headline = `The ${strongestMovement.label} has moved ${Math.abs(strongestMovement.delta)} points`;
-    detail = `The current market is ${strongestMovement.delta > 0 ? "above" : "below"} Surf's tracked opener while the best available numbers remain listed below.`;
+    detail = `The current market is ${strongestMovement.delta > 0 ? "above" : "below"} Surf's first tracked line. This is observed movement, not a comparison with the sportsbook's official opener.`;
   } else if (leadLabel && leadProbability != null && leadProbability >= 0.505) {
     headline = `Prediction markets narrowly lean ${leadLabel}`;
     detail = `${leadLabel} is priced near ${Math.round(leadProbability * 100)}% across ${consensus?.sources.length ?? 0} ${consensus?.sources.length === 1 ? "venue" : "venues"}; sportsbooks are otherwise relatively aligned.`;
@@ -381,7 +293,7 @@ function MarketRead({
           ) : null}
           {strongestMovement && Math.abs(strongestMovement.delta) >= 0.5 ? (
             <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/[0.12] px-2.5 py-1.5 text-[8px] font-semibold text-[color:var(--surf-ink-55)]">
-              {strongestMovement.label} {strongestMovement.delta > 0 ? "+" : ""}{strongestMovement.delta} from open
+              {strongestMovement.label} {strongestMovement.delta > 0 ? "+" : ""}{strongestMovement.delta} since first tracked
             </span>
           ) : null}
           <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/[0.12] px-2.5 py-1.5 text-[8px] font-semibold text-[color:var(--surf-ink-55)]">
@@ -396,14 +308,6 @@ function MarketRead({
       </div>
     </section>
   );
-}
-
-function movementLabel(mode: SurfMarketType, open: number | undefined, current: number | undefined, spreadName = "spread"): string {
-  if (typeof open !== "number" || typeof current !== "number") return "Awaiting movement history";
-  const delta = Math.round((current - open) * 2) / 2;
-  if (delta === 0) return "Holding at the opener";
-  if (mode === "totals") return delta > 0 ? `Total moved up ${Math.abs(delta)} pts` : `Total moved down ${Math.abs(delta)} pts`;
-  return `Home ${spreadName} moved ${delta > 0 ? "+" : ""}${delta} pts`;
 }
 
 function opportunityTag(opportunity: MarketOpportunity | undefined): string | undefined {
@@ -472,164 +376,6 @@ function BestOfferTile({
             : `Midpoint ${offer.market === "spreads" ? signed(offer.consensusPoint) : plain(offer.consensusPoint)}`} · {offer.booksCompared} books
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function historyValue(point: MarketAverageHistoryPoint, mode: SurfMarketType): number | null {
-  return mode === "spreads" ? point.spreadAvg : point.totalAvg;
-}
-
-function chartClock(timestamp: number | undefined): string {
-  if (timestamp == null || !Number.isFinite(timestamp)) return "—";
-  return new Date(timestamp).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function shouldLabelChange(index: number, total: number): boolean {
-  if (index === 0 || index === total - 1 || total <= 6) return true;
-  return index % Math.ceil((total - 1) / 5) === 0;
-}
-
-function MarketMovementChart({
-  mode,
-  open,
-  current,
-  history,
-  observedAt,
-  homeAbbrev,
-  spreadName,
-}: {
-  mode: SurfMarketType;
-  open: number | undefined;
-  current: number | undefined;
-  history: MarketAverageHistoryPoint[];
-  observedAt: number;
-  homeAbbrev: string;
-  spreadName: string;
-}) {
-  const rawId = useId();
-  const gradientId = `market-fill-${rawId.replace(/:/g, "")}`;
-  const lineColor = mode === "totals" ? "var(--surf-primary)" : "#8b9cff";
-  const tracked = history
-    .map((point) => ({ timestamp: new Date(point.timestamp).getTime(), value: historyValue(point, mode) }))
-    .filter((point): point is { timestamp: number; value: number } => Number.isFinite(point.timestamp) && typeof point.value === "number" && Number.isFinite(point.value))
-    .reduce<Array<{ timestamp: number; value: number }>>((points, point) => {
-      const last = points.at(-1);
-      if (last?.value !== point.value) {
-        points.push(point);
-      }
-      return points;
-    }, []);
-  const chartPoints = tracked.slice();
-  if (chartPoints.length === 0 && typeof current === "number" && Number.isFinite(current)) {
-    chartPoints.push({ timestamp: observedAt, value: current });
-  }
-  if (chartPoints.length >= 1 && typeof open === "number" && Number.isFinite(open) && chartPoints[0].value !== open) {
-    chartPoints.unshift({ timestamp: chartPoints[0].timestamp - 1, value: open });
-  }
-  if (chartPoints.length >= 1 && typeof current === "number" && Number.isFinite(current) && chartPoints.at(-1)?.value !== current) {
-    chartPoints.push({ timestamp: observedAt, value: current });
-  }
-  const values = chartPoints.map((point) => point.value);
-  const width = 640;
-  const height = 152;
-  const left = 32;
-  const right = width - 32;
-  const top = 25;
-  const bottom = height - 28;
-  const min = values.length > 0 ? Math.min(...values) : 0;
-  const max = values.length > 0 ? Math.max(...values) : 1;
-  const padding = Math.max(1, (max - min) * 0.65);
-  const low = min - padding;
-  const high = max + padding;
-  const y = (value: number) => top + ((high - value) / (high - low)) * (bottom - top);
-  const firstTimestamp = chartPoints[0]?.timestamp;
-  const lastTimestamp = chartPoints.at(-1)?.timestamp;
-  const timelineEnd = Math.max(lastTimestamp ?? 0, Number.isFinite(observedAt) ? observedAt : 0);
-  const span = Math.max(1, timelineEnd - (firstTimestamp ?? timelineEnd));
-  const plotted = chartPoints.map((point, index) => ({
-    ...point,
-    x: left + ((point.timestamp - (firstTimestamp ?? point.timestamp)) / span) * (right - left),
-    y: y(point.value),
-    index,
-  }));
-  const linePath = plotted.reduce(
-    (path, point, index) => index === 0 ? `M ${point.x} ${point.y}` : `${path} H ${point.x} V ${point.y}`,
-    "",
-  );
-  const timelinePath = plotted.length > 0 ? `${linePath} H ${right}` : "";
-  const areaPath = plotted.length > 0 ? `${timelinePath} L ${right} ${bottom + 8} L ${plotted[0].x} ${bottom + 8} Z` : "";
-  const formatter = mode === "spreads" ? signed : plain;
-  const accessibleTimeline = plotted
-    .map((point, index) => `${index === 0 ? "Open" : chartClock(point.timestamp)} ${formatter(point.value)}`)
-    .join(", ");
-
-  return (
-    <div className="relative overflow-hidden rounded-[18px] border border-[color:var(--surf-line-08)] bg-black/15 px-3 pb-2 pt-1.5">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[138px] w-full" role="img" aria-label={`${mode === "spreads" ? spreadName : "total"} timeline. ${accessibleTimeline || "Line history is not available yet."}`}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={lineColor} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0.22, 0.5, 0.78].map((position) => {
-          const gridY = top + (bottom - top) * position;
-          return <line key={position} x1={left} x2={right} y1={gridY} y2={gridY} stroke="var(--surf-line-06)" strokeWidth="1" strokeDasharray="4 7" />;
-        })}
-        {plotted.length > 0 ? (
-          <>
-            <path d={areaPath} fill={`url(#${gradientId})`} />
-            <path d={timelinePath} fill="none" stroke={lineColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            {plotted.map((point, index) => (
-              <circle
-                key={`${point.timestamp}:${point.index}`}
-                cx={point.x}
-                cy={point.y}
-                r={index === 0 ? 5 : index === plotted.length - 1 ? 6 : 3.5}
-                fill={index === 0 ? "var(--surf-surface)" : lineColor}
-                stroke={index === 0 ? lineColor : index === plotted.length - 1 ? "var(--surf-surface)" : lineColor}
-                strokeWidth={index === 0 || index === plotted.length - 1 ? 3 : 1}
-              >
-                <title>{index === 0 ? `Open ${formatter(point.value)}` : `${chartClock(point.timestamp)} ${formatter(point.value)}`}</title>
-              </circle>
-            ))}
-            <text x={plotted[0].x} y={Math.max(14, plotted[0].y - 12)} fill="var(--surf-ink-75)" fontSize="12" fontWeight="700">
-              {formatter(plotted[0].value)}
-            </text>
-            {plotted.length > 1 ? (
-              <text x={plotted.at(-1)?.x} y={Math.max(14, (plotted.at(-1)?.y ?? top) - 12)} fill="var(--surf-ink-90)" fontSize="12" fontWeight="700" textAnchor="end">
-                {formatter(plotted.at(-1)?.value)}
-              </text>
-            ) : (
-              <text x={width / 2} y={bottom + 1} fill="var(--surf-ink-40)" fontSize="11" textAnchor="middle">
-                No movement since open
-              </text>
-            )}
-            {plotted.map((point, index) => shouldLabelChange(index, plotted.length) ? (
-              <text
-                key={`label:${point.timestamp}:${point.index}`}
-                x={point.x}
-                y={height - 7}
-                fill="var(--surf-ink-35)"
-                fontSize="10"
-                fontWeight="700"
-                letterSpacing="1.1"
-                textAnchor={index === 0 ? "start" : point.x >= right - 28 ? "end" : "middle"}
-              >
-                {index === 0 ? "OPEN" : chartClock(point.timestamp).toUpperCase()}
-              </text>
-            ) : null)}
-          </>
-        ) : (
-          <text x={width / 2} y={height / 2} fill="var(--surf-ink-40)" fontSize="13" textAnchor="middle">
-            Line history is not available yet
-          </text>
-        )}
-      </svg>
-      <div className="pointer-events-none absolute right-5 top-3 text-[9px] font-medium text-[color:var(--surf-ink-35)]">
-        {mode === "spreads" ? `${homeAbbrev} ${spreadName}` : "Consensus O/U"}
-      </div>
     </div>
   );
 }
@@ -808,7 +554,7 @@ function InjuryDrawer({
   );
 }
 
-function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: GamesResponse; observedAt: number }) {
+function GameMarketCard({ game, data, observedAt, rankings }: { game: OddsApiGame; data: GamesResponse; observedAt: number; rankings: CfbRankings | null }) {
   const [marketMode, setMarketMode] = useState<SurfMarketType>("spreads");
   const config = getSurfSportConfig(data.sportKey);
   const home = getTeamAbbrev(game.home_team) ?? game.home_team;
@@ -865,11 +611,11 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
         </div>
 
         <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-8">
-          <TeamIdentity name={game.away_team} league={config.league} side="away" providerLogo={data.cfbContext?.teams[game.away_team]?.logo} cfbTeam={data.cfbContext?.teams[game.away_team]} />
+          <TeamIdentity name={game.away_team} league={config.league} side="away" providerLogo={data.cfbContext?.teams[game.away_team]?.logo} cfbTeam={data.cfbContext?.teams[game.away_team]} rank={config.league === "CFB" ? cfbRankForTeam(game.away_team, rankings) : undefined} />
           <div className="flex h-[68px] items-center">
             <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/15 px-2.5 py-1 text-[9px] font-semibold tracking-[0.13em] text-[color:var(--surf-ink-35)]">{config.league === "CFB" ? "VS" : "AT"}</span>
           </div>
-          <TeamIdentity name={game.home_team} league={config.league} side="home" providerLogo={data.cfbContext?.teams[game.home_team]?.logo} cfbTeam={data.cfbContext?.teams[game.home_team]} />
+          <TeamIdentity name={game.home_team} league={config.league} side="home" providerLogo={data.cfbContext?.teams[game.home_team]?.logo} cfbTeam={data.cfbContext?.teams[game.home_team]} rank={config.league === "CFB" ? cfbRankForTeam(game.home_team, rankings) : undefined} />
         </div>
 
         <div className="-mx-5 mt-5 border-t border-[color:var(--surf-line-06)] bg-black/[0.075] px-5 pt-5 sm:-mx-6 sm:px-6">
@@ -912,8 +658,8 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
             board={board}
             consensus={data.predictionMarketConsensus?.[game.id]}
             whaleSignals={data.predictionMarketWhaleSignals ?? []}
-            opening={opening}
-            current={current}
+            opening={{ spreads: marketHistory?.openSpreadAvg ?? undefined, totals: marketHistory?.openTotalAvg ?? undefined }}
+            current={{ spreads: marketHistory?.currentSpreadAvg ?? undefined, totals: marketHistory?.currentTotalAvg ?? undefined }}
             injuries={data.injuries}
             spreadName={spreadName}
             observedAt={observedAt}
@@ -923,7 +669,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[color:var(--surf-ink-45)]">Line movement</div>
-                <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">{movementLabel(marketMode, activeOpen, activeCurrent, spreadName)}</div>
+                <div className="mt-1 text-[10px] text-[color:var(--surf-ink-35)]">{movementLabel(marketMode, activeHistory, { current: activeCurrent, lastObservedAt: marketHistory?.lastObservedAt })}</div>
               </div>
               <div className="inline-flex rounded-xl border border-[color:var(--surf-line-08)] bg-black/20 p-1" aria-label="Select line history market">
                 <button
@@ -948,7 +694,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
                 </button>
               </div>
             </div>
-            <MarketMovementChart mode={marketMode} open={activeOpen} current={activeCurrent} history={activeHistory} observedAt={observedAt} homeAbbrev={home} spreadName={spreadName} />
+            <MarketMovementChart mode={marketMode} open={activeOpen} current={activeCurrent} history={activeHistory} observedAt={observedAt} homeAbbrev={home} spreadName={spreadName} historySource={marketHistory?.historySource} lastObservedAt={marketHistory?.lastObservedAt} />
           </section>
         </div>
       </div>
@@ -961,11 +707,20 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
 export default function GamesPage() {
   const { sport, sportSynced, selectSport } = useSurfSport();
   const initialLoadDone = useRef(false);
+  const loadGeneration = useRef(0);
   const [data, setData] = useState<GamesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [queries, setQueries] = useState<Partial<Record<SurfSportKey, string>>>({});
+  const [rankings, setRankings] = useState<CfbRankings | null>(null);
+  const [top25Only, setTop25Only] = useState(false);
+  const query = queries[sport] ?? "";
+  const visibleGames = useMemo(() => (data?.games ?? []).filter(game => {
+    const aliases = [getTeamAbbrev(game.away_team), getTeamAbbrev(game.home_team)].filter((name): name is string => Boolean(name));
+    return matchesGameSearch(game, query, aliases) && (sport !== "americanfootball_ncaaf" || !top25Only || rankings?.status !== "available" || isTop25Game(game, rankings));
+  }), [data, query, rankings, sport, top25Only]);
   const scheduledGameAt = useMemo(() => {
     const now = Date.now();
     const future = (data?.games ?? [])
@@ -979,18 +734,22 @@ export default function GamesPage() {
   }, []);
 
   const load = useCallback(async (mode: "initial" | "refresh", requestedSport: SurfSportKey) => {
+    const generation = ++loadGeneration.current;
     if (mode === "initial") setIsLoading(true);
     else setIsRefreshing(true);
     try {
       const next = await fetchGames(requestedSport);
+      if (generation !== loadGeneration.current) return;
       setData(next);
       setError(null);
       setUpdatedAt(Date.now());
     } catch {
-      setError("Surf could not reach the game market right now.");
+      if (generation === loadGeneration.current) setError("Surf could not reach the game market right now.");
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (generation === loadGeneration.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, []);
 
@@ -999,6 +758,17 @@ export default function GamesPage() {
     initialLoadDone.current = true;
     void load("initial", sport);
   }, [load, sport, sportSynced]);
+
+  useEffect(() => {
+    const ttl = rankings?.status === "available" ? 60 * 60 * 1000 : 5 * 60 * 1000;
+    if (sport !== "americanfootball_ncaaf" || (rankings && Date.now() - rankings.checkedAt < ttl)) return;
+    const controller = new AbortController();
+    void fetch("/api/cfb-rankings", { signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error("Rankings unavailable"); return response.json() as Promise<CfbRankings>; })
+      .then(next => { setRankings(next); if (next.status !== "available") setTop25Only(false); })
+      .catch(() => { if (!controller.signal.aborted) { setRankings(emptyCfbRankings(Date.now())); setTop25Only(false); } });
+    return () => controller.abort();
+  }, [sport, updatedAt, rankings]);
 
   useEffect(() => {
     if (!sportSynced) return;
@@ -1042,6 +812,24 @@ export default function GamesPage() {
             }}
           />
 
+          <div className="sports-game-filters" role="search" aria-label="Find a game">
+            <label className="sports-game-search">
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.7"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+              <span className="sr-only">Search {sportLabel} games</span>
+              <input type="search" value={query} placeholder="Search teams or matchup" onChange={event => setQueries(current => ({ ...current, [sport]: event.target.value }))} autoComplete="off" />
+            </label>
+            {sport === "americanfootball_ncaaf" ? (
+              <button type="button" className="sports-ranked-filter" aria-pressed={top25Only} disabled={!top25Only && rankings?.status !== "available"} onClick={() => setTop25Only(value => !value)}>
+                AP Top 25
+              </button>
+            ) : null}
+          </div>
+          {sport === "americanfootball_ncaaf" ? (
+            <p className="mb-5 text-xs leading-relaxed text-[color:var(--surf-ink-55)]">
+              {rankings?.status === "available" ? <><a className="text-[color:var(--surf-primary)]" href={rankings.sourceUrl} target="_blank" rel="noreferrer">AP poll via ESPN</a> · {rankings.edition} · {new Date(rankings.publishedAt!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}. {top25Only ? "Showing games with at least one ranked team." : "Filter games featuring a ranked team."}</> : rankings ? "AP rankings unavailable. All games remain available." : "Checking the latest AP poll…"}
+            </p>
+          ) : null}
+
           {data?.dataSource ? <DemoDataNotice source={data.dataSource} notice={data.dataNotice} /> : null}
           <div className="mb-4 flex items-end justify-between px-1">
             <div>
@@ -1054,7 +842,7 @@ export default function GamesPage() {
             </div>
             {data ? (
               <div className="rounded-full border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-03)] px-2.5 py-1 text-[9px] text-[color:var(--surf-ink-40)]">
-                {data.count} games
+                {query || (sport === "americanfootball_ncaaf" && top25Only) ? `${visibleGames.length} of ${data.count}` : data.count} games
               </div>
             ) : null}
           </div>
@@ -1072,10 +860,16 @@ export default function GamesPage() {
               <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">No games posted yet</div>
               <p className="mt-2 text-xs leading-5 text-[color:var(--surf-ink-45)]">The next {sportLabel} market may not be available yet.</p>
             </div>
+          ) : visibleGames.length === 0 ? (
+            <div className="rounded-[24px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] p-8 text-center" role="status">
+              <div className="text-base font-semibold text-[color:var(--surf-ink-80)]">No matching games</div>
+              <p className="mt-2 text-sm text-[color:var(--surf-ink-55)]">Try a different team or clear the filters to see the full slate.</p>
+              <button type="button" className="mt-4 text-sm font-semibold text-[color:var(--surf-primary)]" onClick={() => { setQueries(current => ({ ...current, [sport]: "" })); setTop25Only(false); }}>Clear filters</button>
+            </div>
           ) : (
             <main className="flex flex-col gap-4">
-              {data.games.map((game) => (
-                <GameMarketCard key={game.id} game={game} data={data} observedAt={updatedAt ?? 0} />
+              {visibleGames.map((game) => (
+                <GameMarketCard key={game.id} game={game} data={data} observedAt={updatedAt ?? 0} rankings={rankings} />
               ))}
             </main>
           )}
