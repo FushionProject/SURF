@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { SurfBrandMark } from "@/components/surf/SurfBrandMark";
 
 type Props = {
@@ -8,28 +9,43 @@ type Props = {
   subtitle: string;
 };
 
+const HEADER_LINKS = [
+  { label: "Games", href: "/games" },
+  { label: "Signals", href: "/feed" },
+  { label: "How to use", href: "/how-to-use" },
+] as const;
+
 export function SurfAppHeader({ title, subtitle }: Props) {
+  const pathname = usePathname();
+
   return (
     <header className="sports-header pb-5 pt-6">
       <div>
         <div className="sports-masthead">
-          <Link href="/games" className="sports-brand" aria-label="Surf home">
+          <Link href="/games" prefetch={false} className="sports-brand" aria-label="Surf home">
             <SurfBrandMark className="sports-brand-mark" />
             <span className="sports-wordmark">surf<span>.</span></span>
           </Link>
-          <svg
-            aria-hidden="true"
-            focusable="false"
-            viewBox="0 0 320 64"
-            fill="none"
-            className="sports-masthead-wave"
-          >
-            <path d="M1 40C45 40 53 14 96 14s52 36 96 36 73-28 127-28" />
-            <path d="M1 48C45 48 53 22 96 22s52 36 96 36 73-28 127-28" />
-            <path d="M1 32C45 32 53 6 96 6s52 36 96 36 73-28 127-28" />
-          </svg>
+          <nav aria-label="Header navigation" className="sports-header-tabs">
+            {HEADER_LINKS.map(({ label, href }) => {
+              const active = pathname === href || pathname?.startsWith(`${href}/`) ||
+                (href === "/feed" && (pathname === "/top" || pathname?.startsWith("/top/")));
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  prefetch={false}
+                  aria-current={active ? "page" : undefined}
+                  className="sports-header-tab"
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </nav>
           <Link
             href="/account"
+            prefetch={false}
             aria-label="Open your Surf account"
             className="sports-account-link flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--surf-line-08)] bg-transparent text-[color:var(--surf-ink-55)] transition-colors hover:border-[color:var(--surf-primary)] hover:text-[color:var(--surf-ink-solid)]"
           >
