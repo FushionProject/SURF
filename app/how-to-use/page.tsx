@@ -34,7 +34,8 @@ const definitions = [
     paragraphs: [
       "Best available compares the offers Surf currently tracks. The market midpoint is a reference from the books in that snapshot—not a prediction or the true value of a bet.",
       "Example—not live: +3.5 gives you an extra half-point versus +3 on the same team. But +3.5 at -130 costs more than +3 at -110. The number alone does not establish an edge.",
-      "Signal strength measures the card’s opportunity or activity evidence. It is not the probability a team wins, a confidence rating for a pick, or a promise of profit.",
+      "Signal relevance sets the feed’s priority. It weighs price and line advantages, middle width and both-leg costs, executed trade size, and confirmed movement. Longshot prices are given less priority; a larger payout alone does not make a stronger signal.",
+      "Strong signals score at least 80 on Surf’s relevance scale. Top signals only uses that same cutoff. This is a product ranking, not a measured win probability, a confidence rating for a pick, or a promise of profit.",
     ],
   },
   {

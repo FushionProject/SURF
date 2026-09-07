@@ -9,7 +9,6 @@ import type {
   MarketHorizonEvent,
   MarketTapeEvent,
   OddsApiGame,
-  SurfOpportunityMarketType,
 } from "@/lib/surf/types";
 import type { SignalCard } from "@/lib/surf/types";
 import type { SurfSignalDetection } from "@/lib/surf/types";
@@ -35,7 +34,9 @@ import { getDemoSurfFeed, isSurfDemoMode } from "@/lib/surf/demoData";
 import { getOvernightMarketSummary } from "@/lib/surf/overnightMarket";
 import { getMarketTapeEvents, recordMarketTapeSnapshot } from "@/lib/surf/marketTape";
 import { getMarketHorizonEvents, recordMarketHorizonSnapshot } from "@/lib/surf/marketHorizon";
-import { buildOpportunityBoards, type MarketOpportunity } from "@/lib/surf/opportunities";
+import { opportunityCards } from "@/lib/surf/opportunityCards";
+import { isTopRatedSignal, selectMovementSignals, trackedMovementStrength } from "@/lib/surf/marketSignalStrength";
+import { filterSignalFeed } from "@/lib/surf/signalFeed";
 import { getOddsRequestTelemetry, getSharedOddsSnapshot } from "@/lib/surf/sharedOddsSnapshot";
 import { captureMarketHistorySnapshot } from "@/lib/surf/persistentMarketHistory";
 import { isOvernightCapture, overnightWindowKey } from "@/lib/surf/feedSchedule";
@@ -48,7 +49,6 @@ import { buildRopeReport, recordRopeReport, type RopeAuditInput } from "@/lib/su
 import { persistRopeReport, ropePersistenceStatus } from "@/lib/surf/ropePersistence";
 import { verifySurfPersistence } from "@/lib/surf/supabasePersistence";
 import {
-  getSurfSportConfig,
   isNflSport,
   parseRequestedSport,
   SURF_ENABLED_SPORT_KEYS,
@@ -246,202 +246,6 @@ function nextGameAt(games: OddsApiGame[], now: number): number | undefined {
   return future.length > 0 ? Math.min(...future) : undefined;
 }
 
-function opportunityPoint(opportunity: MarketOpportunity): string {
-  if (opportunity.market === "h2h") {
-    return opportunity.price != null ? formatAmericanPrice(opportunity.price) : "—";
-  }
-  if (opportunity.point == null) return "—";
-  if (opportunity.market === "totals") return `${opportunity.point}`;
-  return opportunity.point > 0 ? `+${opportunity.point}` : `${opportunity.point}`;
-}
-
-function opportunityQuote(opportunity: MarketOpportunity): string {
-  const point = opportunityPoint(opportunity);
-  if (opportunity.market === "h2h" || opportunity.price == null) return point;
-  return `${point} (${formatAmericanPrice(opportunity.price)})`;
-}
-
-function opportunityCards(games: OddsApiGame[], sportKey: SurfSportKey, now: number): SignalCard[] {
-  const byId = new Map(games.map((game) => [game.id, game]));
-  return buildOpportunityBoards(games, sportKey, now)
-    .flatMap((board) => {
-      const game = byId.get(board.gameId);
-      if (!game) return [];
-      const grouped = new Map<SurfOpportunityMarketType, MarketOpportunity[]>();
-      for (const opportunity of board.opportunities) {
-        const group = grouped.get(opportunity.market) ?? [];
-        group.push(opportunity);
-        grouped.set(opportunity.market, group);
-      }
-
-      return [...grouped.entries()].map(([market, opportunities]) => {
-        const ranked = opportunities.slice().sort((a, b) => b.score - a.score);
-        const focus = ranked[0];
-        const arbitrage = focus.kind === "arbitrage" ? focus.arbitrage : undefined;
-        const firstSide = market === "spreads"
-          ? opportunities.find((opportunity) => opportunity.slot === "awaySpread")
-          : market === "totals"
-            ? opportunities.find((opportunity) => opportunity.slot === "over")
-            : undefined;
-        const secondSide = market === "spreads"
-          ? opportunities.find((opportunity) => opportunity.slot === "homeSpread")
-          : market === "totals"
-            ? opportunities.find((opportunity) => opportunity.slot === "under")
-            : undefined;
-        const rawMiddleWidth = firstSide?.point != null && secondSide?.point != null
-          ? market === "spreads"
-            ? firstSide.point + secondSide.point
-            : secondSide.point - firstSide.point
-          : undefined;
-        const middleWidth = rawMiddleWidth != null && rawMiddleWidth > 0
-          ? Math.round(rawMiddleWidth * 2) / 2
-          : undefined;
-        const isMiddle = arbitrage == null && middleWidth != null && firstSide != null && secondSide != null;
-        const selection = getTeamAbbrev(focus.selection) ?? focus.selection;
-        const currentLine = opportunityPoint(focus);
-        const marketLine = market === "h2h"
-          ? focus.consensusPrice != null
-            ? formatAmericanPrice(focus.consensusPrice)
-            : "—"
-          : market === "spreads" && (focus.consensusPoint ?? 0) > 0
-            ? `+${focus.consensusPoint}`
-            : `${focus.consensusPoint ?? "—"}`;
-        const currentPrice = market !== "h2h" && focus.price != null ? ` (${formatAmericanPrice(focus.price)})` : "";
-        const favoriteSplit = focus.kind === "favorite_split" ? focus.favoriteSplit : undefined;
-        const title =
-          arbitrage
-            ? `${arbitrage.estimatedReturnPercentage.toFixed(2)}% arbitrage available`
-          : favoriteSplit
-            ? `Books disagree on the MLB favorite`
-          : isMiddle
-            ? `${middleWidth}-point middle available: ${getTeamAbbrev(firstSide!.selection) ?? firstSide!.selection} ${opportunityPoint(firstSide!)} / ${getTeamAbbrev(secondSide!.selection) ?? secondSide!.selection} ${opportunityPoint(secondSide!)}`
-          : focus.kind === "key_number"
-            ? `${selection} ${currentLine} crosses NFL key number ${focus.keyNumber}`
-            : focus.kind === "best_price"
-              ? `Best ${selection} price: ${formatAmericanPrice(focus.price ?? 0)}`
-              : `Best ${selection} number: ${currentLine}`;
-        const reason = isMiddle
-          ? `${firstSide!.bookTitle} and ${secondSide!.bookTitle} leave a ${middleWidth}-point window between opposite sides. Prices and limits still determine whether it is usable.`
-          : focus.reason;
-        const sources = arbitrage
-          ? arbitrage.legs.map((leg) => ({
-              label: getTeamAbbrev(leg.selection) ?? leg.selection,
-              book: leg.bookTitle,
-              value: market === "h2h"
-                ? formatAmericanPrice(leg.price)
-                : `${market === "spreads" && (leg.point ?? 0) > 0 ? "+" : ""}${leg.point} (${formatAmericanPrice(leg.price)})`,
-            }))
-          : favoriteSplit
-          ? [favoriteSplit.away, favoriteSplit.home].map((side) => ({
-              label: `${getTeamAbbrev(side.team) ?? side.team} favored`,
-              book: side.bookTitle,
-              value: `${formatAmericanPrice(side.price)} vs ${formatAmericanPrice(side.opponentPrice)}`,
-            }))
-          : isMiddle
-          ? [firstSide!, secondSide!].map((opportunity) => ({
-              label: getTeamAbbrev(opportunity.selection) ?? opportunity.selection,
-              book: opportunity.bookTitle,
-              value: opportunityQuote(opportunity),
-            }))
-          : [
-              { label: "Available now", book: focus.bookTitle, value: opportunityQuote(focus) },
-              { label: market === "h2h" ? "Market median" : "Market midpoint", book: `${focus.booksCompared} books`, value: marketLine },
-            ];
-
-        return {
-          id: `feed:${focus.id}`,
-          game: {
-            id: game.id,
-            league: getSurfSportConfig(sportKey).league,
-            sportKey,
-            sportLabel: getSurfSportConfig(sportKey).label,
-            homeTeam: game.home_team,
-            awayTeam: game.away_team,
-          },
-          signalType: focus.kind === "arbitrage"
-            ? "Arbitrage" as const
-            : focus.kind === "favorite_split"
-            ? "Book Disagreement" as const
-            : focus.kind === "best_price"
-              ? "Best Price" as const
-              : "Best Number" as const,
-          market,
-          title,
-          detail: arbitrage || isMiddle || favoriteSplit
-            ? sources.map((source) => `${source.book} ${source.value}`).join(" · ")
-            : `${focus.bookTitle} ${currentLine}${currentPrice}`,
-          insight: reason,
-          sources,
-          valueOptions: arbitrage || isMiddle || favoriteSplit
-            ? undefined
-            : ranked.slice(0, 2).map((opportunity) => ({
-                selection: opportunity.selection,
-                book: opportunity.bookTitle,
-                line: opportunityPoint(opportunity),
-                price: opportunity.market !== "h2h" && opportunity.price != null ? formatAmericanPrice(opportunity.price) : undefined,
-              })),
-          commenceTime: game.commence_time,
-          gap: focus.lineEdge > 0 ? focus.lineEdge : undefined,
-          detectedAt: now,
-          signalChangedAt: now,
-          lastSeenAt: now,
-          status: "active" as const,
-          strengthScore: isMiddle ? Math.min(100, focus.score + Math.min(8, middleWidth * 3)) : focus.score,
-          isTopSignal: true,
-          topBadge: arbitrage ? "ARBITRAGE" : isMiddle ? "LINE MIDDLE" : focus.kind.replaceAll("_", " ").toUpperCase(),
-          opportunity: {
-            kind: focus.kind,
-            isMiddle,
-            middleWidth,
-            score: isMiddle ? Math.min(100, focus.score + Math.min(8, middleWidth * 3)) : focus.score,
-            reason,
-            selection: focus.selection,
-            bookTitle: focus.bookTitle,
-            point: focus.point,
-            price: focus.price,
-            consensusPoint: focus.consensusPoint,
-            consensusPrice: focus.consensusPrice,
-            lineEdge: focus.lineEdge,
-            priceEdgePercentagePoints: focus.priceEdgePercentagePoints,
-            keyNumber: focus.keyNumber,
-            booksCompared: focus.booksCompared,
-            favoriteSplit: favoriteSplit
-              ? {
-                  away: {
-                    team: favoriteSplit.away.team,
-                    bookTitle: favoriteSplit.away.bookTitle,
-                    price: favoriteSplit.away.price,
-                    opponentPrice: favoriteSplit.away.opponentPrice,
-                    booksFavoring: favoriteSplit.away.booksFavoring,
-                  },
-                  home: {
-                    team: favoriteSplit.home.team,
-                    bookTitle: favoriteSplit.home.bookTitle,
-                    price: favoriteSplit.home.price,
-                    opponentPrice: favoriteSplit.home.opponentPrice,
-                    booksFavoring: favoriteSplit.home.booksFavoring,
-                  },
-                }
-              : undefined,
-            arbitrage: arbitrage
-              ? {
-                  legs: arbitrage.legs.map((leg) => ({
-                    selection: leg.selection,
-                    bookTitle: leg.bookTitle,
-                    point: leg.point,
-                    price: leg.price,
-                    stakePercentage: leg.stakePercentage,
-                  })),
-                  combinedImpliedProbability: arbitrage.combinedImpliedProbability,
-                  estimatedReturnPercentage: arbitrage.estimatedReturnPercentage,
-                }
-              : undefined,
-          },
-        } satisfies SignalCard;
-      });
-    })
-    .sort((a, b) => (b.strengthScore ?? 0) - (a.strengthScore ?? 0));
-}
 
 function horizonSignalType(kind: MarketHorizonEvent["kind"]): SignalCard["signalType"] {
   if (kind === "price_pressure") return "Price Pressure";
@@ -500,7 +304,7 @@ function marketHorizonCards(events: MarketHorizonEvent[], now: number): SignalCa
       if (event.kind === "market_resolution") {
         return "A previously meaningful book split closed, so the outlier is no longer available."
       }
-      return `${event.booksInSample} books were sampled and ${event.currentConsensus != null ? formatTapePoint(event.currentConsensus, event.market) : "the new number"} is now the supported consensus.`;
+      return `${event.booksInSample} books were sampled and ${event.currentConsensus != null ? formatTapePoint(event.currentConsensus, event.market) : "the new number"} was the supported consensus when recorded.`;
     })();
 
     const sources = event.kind === "price_pressure"
@@ -577,19 +381,6 @@ function marketHorizonCards(events: MarketHorizonEvent[], now: number): SignalCa
   });
 }
 
-function tapeEventSupersededByHorizon(
-  tapeEvent: MarketTapeEvent,
-  horizonEvents: MarketHorizonEvent[],
-): boolean {
-  return horizonEvents.some(
-    (event) =>
-      event.kind !== "price_pressure" &&
-      event.game.id === tapeEvent.game.id &&
-      event.market === tapeEvent.market &&
-      Math.abs(event.observedAt - tapeEvent.lastMovedAt) <= 5 * 60 * 1000,
-  );
-}
-
 function marketTapeCards(events: MarketTapeEvent[], now: number): SignalCard[] {
   return events.map((event) => {
     const moved = event.movedBooks[0]!;
@@ -600,6 +391,7 @@ function marketTapeCards(events: MarketTapeEvent[], now: number): SignalCard[] {
       ? `${event.heldBooks.slice(0, 2).join(" and ")} did not make the same move during this window.`
       : "Every tracked book in the current sample participated in the move.";
     const lineMovement = Math.max(...event.movedBooks.map((book) => Math.abs(book.delta)));
+    const strengthScore = trackedMovementStrength(event);
 
     return {
       id: event.id,
@@ -630,8 +422,8 @@ function marketTapeCards(events: MarketTapeEvent[], now: number): SignalCard[] {
       signalChangedAt: event.lastMovedAt,
       lastSeenAt: now,
       status: "active",
-      strengthScore: Math.min(100, Math.round((lineMovement / 2) * 100) + (event.confidence === "confirmed" ? 15 : 0)),
-      isTopSignal: event.confidence === "confirmed" || lineMovement >= 1.5,
+      strengthScore,
+      isTopSignal: isTopRatedSignal({ strengthScore }),
       topBadge: event.confidence === "confirmed" ? "CONFIRMED" : "TRACKED",
       trackedMarket: {
         confidence: event.confidence,
@@ -933,11 +725,8 @@ async function getLiveSurfFeed(request: Request) {
   const tapeEvents = getMarketTapeEvents(sportKey, now);
   const horizonEvents = getMarketHorizonEvents(sportKey, now);
   const horizonSignals = marketHorizonCards(horizonEvents, now);
-  const tapeSignals = marketTapeCards(
-    tapeEvents.filter((event) => !tapeEventSupersededByHorizon(event, horizonEvents)),
-    now,
-  );
-  const supportingMarketSignals = [...horizonSignals, ...tapeSignals];
+  const tapeSignals = marketTapeCards(tapeEvents, now);
+  const supportingMarketSignals = selectMovementSignals(horizonSignals, tapeSignals, sportKey);
   const currentOpportunitySignals = opportunityCards(filteredGames, sportKey, now);
   const overnight = getOvernightMarketSummary(tapeEvents, sportKey, now);
 
@@ -953,8 +742,8 @@ async function getLiveSurfFeed(request: Request) {
     const detections = usefulFeedSnapshotDetections(allDetections, sportKey);
     const signals = formatSignalCards(detections, filteredGames);
     const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, true), true);
-    const taggedSignalsRaw = [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals, ...(sportKey === "americanfootball_ncaaf" ? supportingMarketSignals : [])];
-    const taggedSignals = addSignalLifecycle(taggedSignalsRaw, now);
+    const taggedSignalsRaw = [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals, ...supportingMarketSignals];
+    const taggedSignals = filterSignalFeed(addSignalLifecycle(taggedSignalsRaw, now), "all");
     if (sportKey === "americanfootball_ncaaf") await recordCfbMemory(filteredGames, taggedSignals, { predictions: predictionMarketSnapshot.providers, ncaa: cfbContext?.status, ncaaGames: cfbContext?.games }, now, cachedCfbFinals(now));
     await runRopeAudit({
       sportKey,
@@ -988,7 +777,7 @@ async function getLiveSurfFeed(request: Request) {
             sportKey,
             tapeRecord,
             horizonRecord,
-            supportingMarketEventsSuppressed: supportingMarketSignals.length,
+            supportingMarketEventsIncluded: supportingMarketSignals.length,
             snapshotSignalsSuppressed: currentSignals.length,
             cardsByLeague: leagueCounts,
             renderedCards: taggedSignals.length,
@@ -1021,10 +810,10 @@ async function getLiveSurfFeed(request: Request) {
   );
   const signals = formatSignalCards(detections, filteredGames);
   const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, isDebug), isDebug);
-  const taggedSignals = addSignalLifecycle(
-    [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals, ...(sportKey === "americanfootball_ncaaf" ? supportingMarketSignals : [])],
+  const taggedSignals = filterSignalFeed(addSignalLifecycle(
+    [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals, ...supportingMarketSignals],
     now,
-  );
+  ), "all");
   if (sportKey === "americanfootball_ncaaf") await recordCfbMemory(filteredGames, taggedSignals, { predictions: predictionMarketSnapshot.providers, ncaa: cfbContext?.status, ncaaGames: cfbContext?.games }, now, cachedCfbFinals(now));
   await runRopeAudit({
     sportKey,
@@ -1048,7 +837,7 @@ async function getLiveSurfFeed(request: Request) {
           surfFeedRenderDebug: {
             filteredGames: filteredGames.length,
             sportKey,
-            supportingMarketEventsSuppressed: supportingMarketSignals.length,
+            supportingMarketEventsIncluded: supportingMarketSignals.length,
             snapshotSignalsSuppressed: currentSignals.length,
             cardsByLeague: leagueCounts,
             renderedCards: taggedSignals.length,
@@ -1069,21 +858,7 @@ async function getLiveSurfFeed(request: Request) {
     overnight,
     predictionMarkets: predictionMarketSnapshot.providers,
     activityCoverage: predictionMarketSnapshot.activityCoverage,
-    signals: taggedSignals.slice().sort((a, b) => {
-      const as = typeof a.strengthScore === "number" && Number.isFinite(a.strengthScore) ? a.strengthScore : 0;
-      const bs = typeof b.strengthScore === "number" && Number.isFinite(b.strengthScore) ? b.strengthScore : 0;
-      if (bs !== as) return bs - as;
-
-      const ag = typeof a.gap === "number" && Number.isFinite(a.gap) ? a.gap : 0;
-      const bg = typeof b.gap === "number" && Number.isFinite(b.gap) ? b.gap : 0;
-      if (bg !== ag) return bg - ag;
-
-      const am = typeof a.lineMovement === "number" && Number.isFinite(a.lineMovement) ? a.lineMovement : 0;
-      const bm = typeof b.lineMovement === "number" && Number.isFinite(b.lineMovement) ? b.lineMovement : 0;
-      if (bm !== am) return bm - am;
-
-      return a.id.localeCompare(b.id);
-    }),
+    signals: taggedSignals,
   });
 }
 

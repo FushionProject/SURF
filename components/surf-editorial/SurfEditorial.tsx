@@ -9,6 +9,7 @@ import { EditorialSignal } from "./EditorialSignal";
 import { upcomingGames, upcomingSignals, matchesEditorialGame, matchesEditorialSignal, countNewSignals, nextEditorialRefreshDelay } from "@/lib/surf/editorialBoard";
 import { OvernightMoves } from "@/components/surf/OvernightMoves";
 import { filterSignalFeed } from "@/lib/surf/signalFeed";
+import { isTopRatedSignal } from "@/lib/surf/marketSignalStrength";
 import {
   cfbRankForTeam,
   isTop25Game,
@@ -518,7 +519,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
     [currentGames, data, search, view, saved, sport, sort, top25],
   );
   const signals = currentSignals
-    .filter((s) => !topSignals || s.isTopSignal)
+    .filter((s) => !topSignals || isTopRatedSignal(s))
     .filter((s) =>
       matchesEditorialSignal(s, search),
     );

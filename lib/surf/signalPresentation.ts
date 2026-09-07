@@ -59,9 +59,21 @@ export function signalStrength(signal: SignalCard) {
   if (!finite(signal.strengthScore)) return undefined;
   const score = Math.max(0, Math.min(100, Math.round(signal.strengthScore)));
   const label = score >= 80 ? "Strong" : score >= 60 ? "Solid" : score >= 40 ? "Moderate" : "Quiet";
-  const measure = signal.whaleActivity ? "Activity size" : signal.opportunity ? "Opportunity value"
-    : signal.marketHorizon ? "Event relevance" : "Market magnitude";
+  const measure = "Signal relevance";
   return { score, label, measure };
+}
+
+/** Explain easily misunderstood discounts without adding another panel. */
+export function signalRatingNote(signal: SignalCard): string | undefined {
+  const opportunity = signal.opportunity;
+  if (!opportunity || opportunity.arbitrage) return;
+  if (opportunity.isMiddle && finite(opportunity.middleOutsideCostPercentage) && opportunity.middleOutsideCostPercentage >= 10) {
+    return "Expensive two-leg prices lower this rating.";
+  }
+  if (signal.market === "h2h" && opportunity.kind === "best_price" && finite(opportunity.price)) {
+    if (opportunity.price > 400) return "Longshot price · lower priority, even with a better payout.";
+    if (opportunity.price < -300) return "Heavy favorite · the cost lowers this rating.";
+  }
 }
 
 function quoteValue(signal: SignalCard, point?: number, price?: number): string {

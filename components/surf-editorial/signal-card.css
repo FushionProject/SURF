@@ -35,7 +35,8 @@
 .bn-card-strength { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 24px 0 0; font-size: 12px; color: var(--ed-muted); }
 .bn-card-strength > div { height: 4px; flex: 1; min-width: 30px; max-width: 100px; background: var(--ed-line); }
 .bn-card-strength i { display: block; height: 100%; background: var(--ed-blue-ink); }
-.bn-card-strength strong { font-size: 11px; color: var(--ed-ink); font-weight: 500; }
+.bn-card-strength strong { font-size: 13px; color: var(--ed-ink); font-weight: 600; }
+.bn-card-rating-note { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--ed-muted); }
 .bn-card-flow-note a:focus-visible { outline: 2px solid var(--ed-blue-ink); outline-offset: 5px; }
 @media (max-width: 600px) {
   .bn-card-meta time { margin-left: 0; flex-basis: 100%; }

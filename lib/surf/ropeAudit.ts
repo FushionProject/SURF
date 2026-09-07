@@ -145,7 +145,7 @@ function quoteExists(
   );
 }
 
-function opportunityEvidenceProblems(signal: SignalCard, game: OddsApiGame | undefined): string[] {
+function opportunityEvidenceProblems(signal: SignalCard, game: OddsApiGame | undefined, auditedAt: number): string[] {
   const opportunity = signal.opportunity;
   if (!opportunity || !game) return [];
   const problems: string[] = [];
@@ -161,6 +161,65 @@ function opportunityEvidenceProblems(signal: SignalCard, game: OddsApiGame | und
       if (!quoteExists(game, signal.market, leg)) {
         problems.push(`${signal.id}: ${leg.bookTitle} ${leg.selection} quote is not present in the current snapshot`);
       }
+    }
+    return problems;
+  }
+
+  if (opportunity.isMiddle) {
+    const legs = opportunity.middleLegs ?? [];
+    if (legs.length !== 2) {
+      problems.push(`${signal.id}: middle does not contain two verifiable quoted legs`);
+    }
+    for (const leg of legs) {
+      if (!quoteExists(game, signal.market, leg)) {
+        problems.push(`${signal.id}: ${leg.bookTitle} ${leg.selection} middle quote is not present in the current snapshot`);
+      }
+    }
+    if (legs.length !== 2) return problems;
+    if (legs[0].bookTitle === legs[1].bookTitle) {
+      problems.push(`${signal.id}: middle legs must use distinct sportsbooks`);
+    }
+    if (legs.some(leg => !Number.isFinite(leg.point) || !Number.isInteger(leg.point * 2) ||
+        !Number.isFinite(leg.price) || Math.abs(leg.price) < 100)) {
+      problems.push(`${signal.id}: middle contains an invalid line or price`);
+      return problems;
+    }
+    const firstSelection = signal.market === "spreads" ? game.away_team : "Over";
+    const secondSelection = signal.market === "spreads" ? game.home_team : "Under";
+    const first = legs.find(leg => leg.selection === firstSelection);
+    const second = legs.find(leg => leg.selection === secondSelection);
+    if ((signal.market !== "spreads" && signal.market !== "totals") || !first || !second) {
+      problems.push(`${signal.id}: middle legs do not cover opposite selections in the same market`);
+      return problems;
+    }
+    const lower = signal.market === "spreads" ? -first.point : first.point;
+    const upper = second.point;
+    const width = upper - lower;
+    let winningOutcomes = Math.max(0, Math.ceil(upper) - Math.floor(lower) - 1);
+    if (signal.market === "spreads" && (game.sport_key === "baseball_mlb" || game.sport_key === "americanfootball_ncaaf") && lower < 0 && upper > 0) {
+      winningOutcomes -= 1;
+    }
+    if (!Number.isFinite(width) || width <= 0 || winningOutcomes < 1) {
+      problems.push(`${signal.id}: middle has no attainable double-win result; pushes do not count`);
+    }
+    if (!Number.isFinite(opportunity.middleWidth) || Math.abs(opportunity.middleWidth! - width) > 0.000001 ||
+        opportunity.middleWinningOutcomes !== winningOutcomes) {
+      problems.push(`${signal.id}: middle width or winning-result count disagrees with its quoted legs`);
+    }
+    const combined = impliedProbability(first.price) + impliedProbability(second.price);
+    const outsideCost = Math.max(0, 1 - 1 / combined) * 100;
+    if (!Number.isFinite(opportunity.middleOutsideCostPercentage) ||
+        Math.abs(opportunity.middleOutsideCostPercentage! - outsideCost) > 0.000001) {
+      problems.push(`${signal.id}: middle outside-cost estimate disagrees with its quoted prices`);
+    }
+    const providerTimes = legs.map(leg => {
+      const book = (game.bookmakers ?? []).find(entry => entry.title === leg.bookTitle);
+      const market = (book?.markets ?? []).find(entry => entry.key === signal.market);
+      return timestamp(market?.last_update) ?? timestamp(book?.last_update);
+    });
+    if (providerTimes.some(time => time == null || time > auditedAt + 60_000 || auditedAt - time > 10 * 60_000) ||
+        Math.abs(providerTimes[0]! - providerTimes[1]!) > 5 * 60_000) {
+      problems.push(`${signal.id}: middle quoted legs are not comparably fresh`);
     }
     return problems;
   }
@@ -357,7 +416,7 @@ function signalChecks(signals: SignalCard[], games: OddsApiGame[], auditedAt: nu
       if (signal.whaleActivity.committedUsd < 10_000) integrityProblems.push(`${signal.id}: whale activity is below the $10,000 policy`);
       if (!/^https:\/\//.test(signal.whaleActivity.sourceUrl)) integrityProblems.push(`${signal.id}: whale activity lacks a secure source link`);
     }
-    integrityProblems.push(...opportunityEvidenceProblems(signal, game));
+    integrityProblems.push(...opportunityEvidenceProblems(signal, game, auditedAt));
 
     const observedAt = signal.lastSeenAt ?? signal.detectedAt;
     if (observedAt == null || auditedAt - observedAt > MAX_SIGNAL_OBSERVATION_AGE_MS) {

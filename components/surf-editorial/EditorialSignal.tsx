@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { getTeamLogo } from "@/lib/teamLogos";
 import type { SignalCard } from "@/lib/surf/types";
-import { signalAdditionalQuotes, signalKindLabel, signalQuoteRows, signalStrength, signalTimestamp, signalTimingLabel, type SignalQuoteRow } from "@/lib/surf/signalPresentation";
+import { signalAdditionalQuotes, signalKindLabel, signalQuoteRows, signalStrength, signalRatingNote, signalTimestamp, signalTimingLabel, type SignalQuoteRow } from "@/lib/surf/signalPresentation";
 import "./signal-card.css";
 
 const subscribe = () => () => {};
@@ -40,6 +40,7 @@ export function EditorialSignal({ signal, index, now }: { signal: SignalCard; in
   const whale = signal.whaleActivity;
   const opportunity = signal.opportunity;
   const strength = signalStrength(signal);
+  const ratingNote = signalRatingNote(signal);
   const timestamp = signalTimestamp(signal);
   const rows = signalQuoteRows(signal);
   const extraRows = signalAdditionalQuotes(signal);
@@ -99,5 +100,6 @@ export function EditorialSignal({ signal, index, now }: { signal: SignalCard; in
     {strength && <div className="bn-card-strength" aria-label={`${strength.measure}: ${strength.label}, ${strength.score} out of 100. Not pick confidence.`}>
       <span>{strength.measure}</span><div aria-hidden="true"><i style={{ width: `${strength.score}%` }} /></div><strong>{strength.label}</strong>
     </div>}
+    {strength && ratingNote && <p className="bn-card-rating-note">{ratingNote}</p>}
   </article>;
 }

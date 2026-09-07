@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { whaleActivityStrength } from "../lib/surf/whaleStrength.ts";
 
 import {
   aggregateKalshiWhaleBuys,
@@ -14,6 +15,42 @@ import {
 } from "../lib/surf/predictionMarketCore.ts";
 
 assert.equal(DEFAULT_WHALE_THRESHOLD_USD, 10_000, "the launch whale threshold should be $10K cash committed");
+const cashRatings = [10_000, 20_000, 50_000, 100_000].map((committedUsd) => whaleActivityStrength({ committedUsd }));
+assert.deepEqual(cashRatings, [60, 70, 83, 93],
+  "executed cash earns increasing attention: entry-size buys stay solid, material $50K+ buys become strong");
+assert.equal(whaleActivityStrength({ committedUsd: 100_000 }, 50_000), cashRatings[3],
+  "raising an eligibility threshold does not change the relevance of the same completed buy");
+for (const committedUsd of [NaN, Infinity, -Infinity, -10_000, 0, 9_999.99, null, undefined]) {
+  assert.equal(whaleActivityStrength({ committedUsd }), 0,
+    "invalid or sub-threshold cash cannot become a ranked large buy");
+}
+for (const threshold of [NaN, Infinity, -Infinity, -1, 0, 9_999.99]) {
+  assert.equal(whaleActivityStrength({ committedUsd: 100_000 }, threshold), 0,
+    "invalid or relaxed thresholds cannot inflate the relevance of unqualified activity");
+}
+assert.equal(whaleActivityStrength({ committedUsd: 20_000 }, 50_000), 0);
+for (const priceImpactPercentagePoints of [undefined, NaN, Infinity, -Infinity, -5, 0]) {
+  assert.equal(whaleActivityStrength({ committedUsd: 20_000, priceImpactPercentagePoints }), 70,
+    "missing, malformed or negative impact never receives a positive relevance bonus");
+}
+assert.equal(whaleActivityStrength({ committedUsd: 20_000, priceImpactPercentagePoints: 2 }), 73);
+assert.equal(whaleActivityStrength({ committedUsd: 20_000, priceImpactPercentagePoints: 50 }), 75,
+  "observed price impact is a modest bonus and cannot turn a borderline buy into a top signal");
+for (const committedUsd of [10_000, 20_000, 50_000, 100_000, Number.MAX_VALUE]) {
+  const score = whaleActivityStrength({ committedUsd });
+  assert.ok(Number.isInteger(score) && score >= 0 && score <= 100, "finite cash always has a bounded finite score");
+  assert.equal(whaleActivityStrength({ committedUsd, isAnonymous: true, contracts: 1_000_000, averagePrice: 0.02 }),
+    whaleActivityStrength({ committedUsd, isAnonymous: false, contracts: 100, averagePrice: 0.8 }),
+    "the same cash rates equally regardless of identity, venue, share price or notional contract count");
+}
+assert.equal(whaleActivityStrength({ committedUsd: Number.MAX_VALUE, priceImpactPercentagePoints: Number.MAX_VALUE }), 100,
+  "extreme finite inputs saturate instead of overflowing the rating");
+let previousCashScore = 0;
+for (let committedUsd = 10_000; committedUsd <= 1_000_000; committedUsd += 250) {
+  const score = whaleActivityStrength({ committedUsd });
+  assert.ok(score >= previousCashScore, "more executed cash cannot reduce relevance");
+  previousCashScore = score;
+}
 assert.deepEqual(predictionSeriesForSport("americanfootball_nfl"), {
   kalshi: "KXNFLGAME", polymarket: "450", polymarketFilter: "tag_id",
 }, "NFL discovery must use the season-independent category, not the retired 2025 series");
