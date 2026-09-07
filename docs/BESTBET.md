@@ -2,7 +2,7 @@
 
 An isolated alternative to Surf, branched from main at `8bfab56`.
 
-- Light paper, mint and lime palette with forest-green typography.
+- Black and charcoal surfaces, electric lime accents, and crisp off-white typography.
 - New BestBet wordmark, favicon and geometric brand illustration.
 - Desktop sidebar and wide market board; dedicated mobile navigation.
 - Separate market, signal and personal-watchlist views.

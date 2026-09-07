@@ -1,13 +1,13 @@
-/* BestBet: soft paper, mint, and an editorial market board. */
+/* BestBet: electric lime, black, and an editorial market board. */
 :root {
-  color-scheme: light;
-  --bb-paper: #f7f9f2;
-  --bb-ink: #173e2e;
-  --bb-muted: #69786b;
-  --bb-line: #dce4d8;
-  --bb-mint: #d5ecc8;
-  --bb-lime: #bce66f;
-  --bb-deep: #234e37;
+  color-scheme: dark;
+  --bb-paper: #090b08;
+  --bb-ink: #f2f5ec;
+  --bb-muted: #a0a797;
+  --bb-line: #2a3024;
+  --bb-mint: #c6ff00;
+  --bb-lime: #c6ff00;
+  --bb-deep: #0c1006;
 }
 html,
 body {
@@ -43,14 +43,14 @@ body {
 .bb-app a:focus-visible,
 .bb-app input:focus-visible,
 .bb-app select:focus-visible {
-  outline: 2px solid #32804c;
+  outline: 2px solid #c6ff00;
   outline-offset: 4px;
 }
 .bb-sidebar {
   width: 230px;
   position: fixed;
   inset: 0 auto 0 0;
-  background: #edf2e7;
+  background: #0d100b;
   padding: 36px 25px 25px;
   border-right: 1px solid var(--bb-line);
   display: flex;
@@ -72,8 +72,8 @@ body {
   display: grid;
   place-content: center;
   border-radius: 50%;
-  background: var(--bb-ink);
-  color: #d5ecc8;
+  background: var(--bb-lime);
+  color: #101508;
   font-style: italic;
   font-size: 29px;
   line-height: 1;
@@ -111,23 +111,24 @@ body {
   padding: 14px 12px;
   font-size: 13px;
   font-weight: 600;
-  color: #6b7b6b;
+  color: #adb3a5;
   border-radius: 8px;
 }
 .bb-sidebar nav a:hover {
-  background: #e3ebdc;
+  background: #191c16;
   color: var(--bb-ink);
 }
 .bb-sidebar nav .bb-nav-active {
-  background: #d4e9be;
-  color: var(--bb-ink);
+  background: var(--bb-lime);
+  color: #101508;
 }
 .bb-nav-count {
   margin-left: auto;
   font-size: 10px;
-  background: #e0e8da;
+  background: #303a20;
   border-radius: 4px;
   padding: 2px 5px;
+  color: #e8f2d8;
 }
 .bb-sidebar-note {
   margin-top: auto;
@@ -135,7 +136,7 @@ body {
 }
 .bb-mini-flower {
   font-size: 42px;
-  color: #6c934f;
+  color: var(--bb-lime);
 }
 .bb-sidebar-note h3 {
   font-size: 17px;
@@ -151,7 +152,7 @@ body {
 }
 .bb-sidebar-bottom {
   margin-top: 38px;
-  border-top: 1px solid #d8e1d0;
+  border-top: 1px solid #30342b;
   padding-top: 20px;
 }
 .bb-sidebar-bottom a {
@@ -164,7 +165,7 @@ body {
   margin-top: 24px;
   font-size: 8px;
   letter-spacing: 1px;
-  color: #7b8976;
+  color: #adb3a5;
 }
 .bb-main-shell {
   margin-left: 230px;
@@ -179,10 +180,10 @@ body {
 }
 .bb-breadcrumb {
   font-size: 12px;
-  color: #49634c;
+  color: #adb3a5;
 }
 .bb-breadcrumb span {
-  color: #a5b19f;
+  color: #adb3a5;
   margin: 0 13px;
 }
 .bb-topbar-right {
@@ -195,12 +196,12 @@ body {
   align-items: center;
   gap: 7px;
   font-size: 11px;
-  color: #6d7d64;
+  color: #adb3a5;
 }
 .bb-avatar {
   width: 32px;
   height: 32px;
-  border: 1px solid #cbd9c4;
+  border: 1px solid #30342b;
   border-radius: 50%;
   display: grid;
   place-content: center;
@@ -216,8 +217,8 @@ body {
 .bb-hero {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
-  background: #d8ecc9;
-  border: 1px solid #d3e5c4;
+  background: #151b0e;
+  border: 1px solid #374724;
   min-height: 326px;
   border-radius: 14px;
   overflow: hidden;
@@ -237,7 +238,7 @@ body {
 }
 .bb-dot {
   display: inline-block;
-  background: #58884a;
+  background: var(--bb-lime);
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -247,18 +248,18 @@ body {
   margin: 21px 0 16px;
   font-size: clamp(42px, 4.2vw, 67px);
   line-height: 0.98;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -3.7px;
 }
 .bb-hero h1 em {
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 400;
-  color: #507044;
+  color: var(--bb-lime);
 }
 .bb-hero-copy > p:not(.bb-eyebrow) {
   line-height: 1.7;
   font-size: 12px;
-  color: #4f6c45;
+  color: #adb3a5;
 }
 .bb-hero-link {
   display: inline-flex;
@@ -266,21 +267,22 @@ body {
   gap: 24px;
   margin-top: 22px;
   font-size: 11px;
-  border-bottom: 1px solid #759b63;
+  border-bottom: 1px solid #668321;
   padding-bottom: 7px;
   font-weight: 600;
+  color: var(--bb-lime);
 }
 .bb-hero-art {
   position: relative;
   overflow: hidden;
   min-height: 320px;
-  background: radial-gradient(circle at 58% 54%, #cae7b8 0, transparent 64%);
+  background: radial-gradient(circle at 58% 54%, #c6ff001c 0, transparent 64%);
 }
 .bb-orbit {
   position: absolute;
   width: 300px;
   height: 300px;
-  border: 1px solid #8ead773d;
+  border: 1px solid #c6ff002b;
   border-radius: 50%;
   left: 50%;
   top: 50%;
@@ -295,7 +297,7 @@ body {
   position: absolute;
   height: 1px;
   width: 110%;
-  background: #8ead7730;
+  background: #c6ff0025;
   left: 0;
   top: 50%;
   transform: rotate(-28deg);
@@ -304,15 +306,15 @@ body {
   position: absolute;
   width: 183px;
   height: 183px;
-  background: #badc92;
+  background: #c6ff00;
   border-radius: 50%;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%) rotate(-14deg);
   box-shadow:
-    13px 19px 0 #accf863a,
-    inset -14px -12px 22px #9bbf7180,
-    inset 7px 5px 15px #edffcb7a;
+    13px 19px 0 #c6ff0010,
+    inset -14px -12px 22px #759a0080,
+    inset 7px 5px 15px #eeffb97a;
   font-family: Georgia, serif;
   font-style: italic;
   font-weight: bold;
@@ -320,7 +322,7 @@ body {
   line-height: 1.15;
   text-align: center;
   padding-right: 27px;
-  color: #325831;
+  color: #111806;
   z-index: 1;
 }
 .bb-art-ball span {
@@ -336,7 +338,7 @@ body {
   left: 16%;
   top: 22%;
   font-size: 22px;
-  color: #6f9561;
+  color: var(--bb-lime);
 }
 .bb-art-label {
   position: absolute;
@@ -344,7 +346,7 @@ body {
   top: 35px;
   font-size: 8px;
   letter-spacing: 2px;
-  color: #618353;
+  color: #adb3a5;
 }
 .bb-art-bottom {
   position: absolute;
@@ -354,14 +356,14 @@ body {
   font-size: 8px;
   letter-spacing: 2px;
   white-space: nowrap;
-  color: #648151;
+  color: #adb3a5;
 }
 .bb-art-star {
   position: absolute;
   font-size: 54px;
   right: 12%;
   bottom: 17%;
-  color: #779b5f;
+  color: var(--bb-lime);
   z-index: 2;
 }
 .bb-stats {
@@ -432,7 +434,7 @@ body {
   margin-bottom: 22px;
 }
 .bb-section-title .bb-eyebrow {
-  color: #7a8872;
+  color: #adb3a5;
   font-size: 8px;
 }
 .bb-section-title h2 {
@@ -443,12 +445,12 @@ body {
 }
 .bb-section-title h2 span {
   margin-left: 20px;
-  color: #8aa177;
+  color: #adb3a5;
 }
 .bb-small-label {
   font-size: 8px;
   letter-spacing: 1px;
-  color: #8a9583;
+  color: #adb3a5;
   padding-bottom: 5px;
 }
 .bb-toolbar {
@@ -467,23 +469,23 @@ body {
   padding: 9px 12px;
   font-size: 11px;
   border-radius: 6px;
-  color: #71816a;
+  color: #adb3a5;
   white-space: nowrap;
 }
 .bb-sport-tabs button[aria-pressed="true"] {
-  background: #254c35;
-  color: #f1f7e9;
+  background: var(--bb-lime);
+  color: #101508;
 }
 .bb-search {
   display: flex;
   align-items: center;
   gap: 8px;
   max-width: 174px;
-  border: 1px solid #dde5d7;
+  border: 1px solid #30342b;
   padding: 9px 10px;
   border-radius: 6px;
-  color: #89987f;
-  background: #fafbf7;
+  color: #adb3a5;
+  background: #191c16;
 }
 .bb-search input {
   min-width: 0;
@@ -507,16 +509,16 @@ body {
 .bb-market-tabs button {
   font-size: 10px;
   padding: 6px 0;
-  color: #7b8874;
+  color: #adb3a5;
   border-bottom: 2px solid transparent;
 }
 .bb-market-tabs button[aria-pressed="true"] {
-  color: var(--bb-ink);
-  border-color: #476b36;
+  color: var(--bb-lime);
+  border-color: var(--bb-lime);
 }
 .bb-sort {
   font-size: 9px;
-  color: #86917f;
+  color: #adb3a5;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -524,7 +526,7 @@ body {
 .bb-sort select {
   font-size: 9px;
   max-width: 108px;
-  color: #4c6445;
+  color: #adb3a5;
   background: transparent;
   border: 0;
 }
@@ -536,26 +538,26 @@ body {
   align-items: start;
 }
 .bb-game {
-  border: 1px solid #dce4d7;
+  border: 1px solid #30342b;
   border-radius: 10px;
   overflow: hidden;
-  background: #fffefa;
+  background: #141811;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
 }
 .bb-game:hover {
-  border-color: #a5c28e;
-  box-shadow: 0 5px 20px #233e2c08;
+  border-color: #6b892d;
+  box-shadow: 0 5px 20px #00000030;
 }
 .bb-game-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 11px 15px;
-  border-bottom: 1px solid #edf0e7;
+  border-bottom: 1px solid #30342b;
   font-size: 9px;
-  color: #7e8a76;
+  color: #adb3a5;
 }
 .bb-game-meta > span {
   display: flex;
@@ -563,24 +565,24 @@ body {
   align-items: center;
 }
 .bb-game-meta i {
-  color: #b3bcae;
+  color: #adb3a5;
   font-style: normal;
 }
 .bb-icon-button {
   display: grid;
   place-content: center;
-  color: #a3ae9b;
+  color: #adb3a5;
   width: 26px;
   height: 26px;
   border-radius: 4px;
 }
 .bb-icon-button:hover,
 .bb-icon-button.is-saved {
-  background: #e3efcf;
-  color: #356332;
+  background: #191c16;
+  color: var(--bb-lime);
 }
 .bb-icon-button.is-saved svg {
-  fill: #c5df9c;
+  fill: #c6ff00;
 }
 .bb-matchup {
   padding: 17px 15px 10px;
@@ -599,9 +601,10 @@ body {
   place-content: center;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #f3f5ee;
+  background: #e9eddf;
   font-size: 10px;
   font-weight: bold;
+  color: #101508;
 }
 .bb-team-logo img {
   width: 28px;
@@ -615,7 +618,7 @@ body {
 .bb-team-name small {
   font-size: 7px;
   letter-spacing: 1px;
-  color: #929c88;
+  color: #adb3a5;
 }
 .bb-team-name h3 {
   font-size: 12px;
@@ -637,7 +640,7 @@ body {
 .bb-offer small {
   display: block;
   font-size: 7px;
-  color: #85917a;
+  color: #adb3a5;
   line-height: 1.5;
   margin-top: 2px;
 }
@@ -650,26 +653,26 @@ body {
 }
 .bb-game-read > span:last-child {
   font-size: 8px;
-  color: #8a967f;
+  color: #adb3a5;
 }
 .bb-tag {
   display: inline-block;
   padding: 5px 7px;
-  background: #e5efcf;
-  color: #587340;
+  background: #2b3818;
+  color: #c6ff00;
   border-radius: 4px;
   font-size: 8px;
   font-weight: 600;
 }
 .bb-tag-neutral {
-  background: #f1f3eb;
-  color: #8a937f;
+  background: #22271d;
+  color: #a0a797;
 }
 .bb-opportunity-copy {
   padding: 0 15px 12px;
   font-size: 10px;
   line-height: 1.6;
-  color: #6f7e64;
+  color: #adb3a5;
 }
 .bb-compare {
   display: flex;
@@ -677,11 +680,11 @@ body {
   align-items: center;
   width: 100%;
   padding: 12px 15px;
-  background: #f8faf3;
-  border-top: 1px solid #e7ecde;
+  background: #191f13;
+  border-top: 1px solid #30342b;
   font-size: 9px !important;
   font-weight: 600 !important;
-  color: #4e6b40;
+  color: #c6ff00;
 }
 .bb-compare span {
   font-size: 17px;
@@ -703,11 +706,11 @@ body {
 .bb-detail th {
   font-weight: 500;
   text-align: left;
-  color: #89917f;
+  color: #adb3a5;
   padding: 7px 0;
 }
 .bb-detail td {
-  border-top: 1px solid #eef0e8;
+  border-top: 1px solid #30342b;
   padding: 8px 0;
 }
 .bb-detail td:not(:first-child),
@@ -717,14 +720,14 @@ body {
 .bb-fine {
   font-size: 9px;
   line-height: 1.7;
-  color: #8b9582;
+  color: #adb3a5;
 }
 .bb-right-rail {
   padding-top: 4px;
 }
 .bb-shortlist {
-  background: #eef3e7;
-  border: 1px solid #dce5d2;
+  background: #12170e;
+  border: 1px solid #30342b;
   border-radius: 10px;
   padding: 20px;
 }
@@ -740,19 +743,19 @@ body {
   letter-spacing: -0.4px;
 }
 .bb-rail-heading svg {
-  color: #728769;
+  color: #adb3a5;
 }
 .bb-rail-intro {
-  color: #8a977d;
+  color: #adb3a5;
   font-size: 10px;
   margin: 10px 0 23px;
 }
 .bb-rail-signal {
-  border-top: 1px solid #dce5d3;
+  border-top: 1px solid #30342b;
   padding: 18px 0;
 }
 .bb-rail-signal > span {
-  color: #819471;
+  color: #adb3a5;
   font-size: 8px;
   letter-spacing: 0.4px;
 }
@@ -764,7 +767,7 @@ body {
 }
 .bb-rail-signal p {
   font-size: 9px;
-  color: #8a9780;
+  color: #adb3a5;
   line-height: 1.6;
   margin-top: 9px;
 }
@@ -777,30 +780,31 @@ body {
   justify-content: space-between;
   align-items: center;
   padding-top: 15px;
-  border-top: 1px solid #dce5d3;
+  border-top: 1px solid #30342b;
   font-size: 10px;
   font-weight: 600;
 }
 .bb-rail-quiet {
   font-size: 12px;
   line-height: 1.7;
-  color: #7f9273;
+  color: #adb3a5;
   margin: 25px 0;
 }
 .bb-note {
-  background: #c8e7a0;
-  border: 1px solid #bddf93;
+  background: var(--bb-lime);
+  border: 1px solid #c6ff00;
   border-radius: 10px;
   margin-top: 19px;
   padding: 23px;
   position: relative;
   overflow: hidden;
+  color: #101508;
 }
 .bb-note-icon {
   display: block;
   width: 41px;
   height: 41px;
-  border: 1px solid #91ba6c;
+  border: 1px solid #729600;
   border-radius: 50%;
   font-size: 28px;
   line-height: 1.25;
@@ -809,7 +813,7 @@ body {
 }
 .bb-note .bb-eyebrow {
   font-size: 8px;
-  color: #5e8147;
+  color: #344609;
 }
 .bb-note h3 {
   font-family: Georgia, serif;
@@ -822,20 +826,20 @@ body {
 .bb-note > p:not(.bb-eyebrow) {
   font-size: 11px;
   line-height: 1.8;
-  color: #608047;
+  color: #344609;
 }
 .bb-note > div {
-  border-top: 1px solid #a8cd85;
+  border-top: 1px solid #96c200;
   margin-top: 23px;
   padding-top: 15px;
   font-size: 9px;
   line-height: 1.8;
-  color: #6a884f;
+  color: #344609;
 }
 .bb-rail-footnote {
   font-size: 9px;
   line-height: 1.8;
-  color: #95a08a;
+  color: #adb3a5;
   text-align: center;
   margin: 20px;
 }
@@ -843,7 +847,7 @@ body {
   margin-top: 20px;
 }
 .bb-signal {
-  background: #fffefa;
+  background: #191c16;
   border: 1px solid var(--bb-line);
   border-radius: 10px;
   padding: 20px;
@@ -855,7 +859,7 @@ body {
 }
 .bb-signal-number {
   font-family: Georgia, serif;
-  color: #91a182;
+  color: #adb3a5;
   font-size: 22px;
 }
 .bb-signal h3 {
@@ -868,7 +872,7 @@ body {
 .bb-signal p {
   font-size: 11px;
   line-height: 1.75;
-  color: #7c8a71;
+  color: #adb3a5;
   overflow-wrap: anywhere;
 }
 .bb-strength {
@@ -877,19 +881,19 @@ body {
   gap: 9px;
   margin: 20px 0;
   font-size: 8px;
-  color: #8b987e;
+  color: #adb3a5;
 }
 .bb-strength > div {
   height: 4px;
   flex: 1;
   border-radius: 4px;
-  background: #e8eddf;
+  background: #191c16;
   overflow: hidden;
 }
 .bb-strength i {
   display: block;
   height: 100%;
-  background: #86af5e;
+  background: var(--bb-lime);
 }
 .bb-strength b {
   font-size: 9px;
@@ -897,8 +901,8 @@ body {
 }
 .bb-text-button {
   font-size: 10px !important;
-  color: #53773c;
-  border-bottom: 1px solid #b4c8a2;
+  color: var(--bb-lime);
+  border-bottom: 1px solid #30342b;
   padding-bottom: 5px;
 }
 .bb-signal-evidence {
@@ -915,12 +919,12 @@ body {
 .bb-empty,
 .bb-loading {
   grid-column: 1/-1;
-  border: 1px dashed #cddbc1;
+  border: 1px dashed #30342b;
   border-radius: 10px;
   padding: 55px 35px;
   text-align: center;
-  background: #f2f6ea;
-  color: #6d8560;
+  background: #191c16;
+  color: #adb3a5;
 }
 .bb-empty svg {
   margin: 0 auto 16px;
@@ -930,7 +934,7 @@ body {
   font-family: Georgia, serif;
   font-size: 26px;
   font-weight: 400;
-  color: #40623c;
+  color: #f2f5ec;
   margin-bottom: 12px;
 }
 .bb-empty p,
@@ -944,7 +948,7 @@ body {
   display: inline-block;
   margin-top: 20px;
   font-size: 12px;
-  border-bottom: 1px solid #95b37c;
+  border-bottom: 1px solid #30342b;
 }
 .bb-loading-flower {
   display: block;
@@ -956,9 +960,9 @@ body {
   margin-top: 15px;
 }
 .bb-notice {
-  background: #f0ebd3;
-  color: #7a6b38;
-  border: 1px solid #ddd2a7;
+  background: #302b17;
+  color: #e6d79b;
+  border: 1px solid #5c5128;
   border-radius: 7px;
   padding: 14px 20px;
   margin-bottom: 22px;
@@ -991,17 +995,18 @@ body {
   top: 3px;
 }
 .bb-footer p {
-  color: #87947e;
+  color: #adb3a5;
   font-size: 10px;
 }
 .bb-footer > span {
   font-size: 7px;
   letter-spacing: 1px;
-  color: #96a18e;
+  color: #adb3a5;
   margin-left: auto;
 }
 .bb-mobile-nav {
   display: none;
+  background: #0d100bf5;
 }
 @keyframes bb-spin {
   to {
@@ -1362,9 +1367,9 @@ body {
     left: 0;
     right: 0;
     z-index: 30;
-    background: #f8faf2f5;
+    background: #0d100bf5;
     backdrop-filter: blur(12px);
-    border-top: 1px solid #d5e1ca;
+    border-top: 1px solid #30342b;
     padding: 11px 15px max(11px, env(safe-area-inset-bottom));
     justify-content: space-around;
   }
@@ -1373,12 +1378,12 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 5px;
-    color: #7e8d73;
+    color: #adb3a5;
     font-size: 9px;
     min-width: 75px;
   }
   .bb-mobile-nav a[aria-current="page"] {
-    color: #315b2d;
+    color: var(--bb-lime);
     font-weight: 600;
   }
   .bb-signal h3 {
@@ -1411,43 +1416,43 @@ body {
     transition: none !important;
   }
 }
-/* Keep the existing account and utility screens in the same light brand. */
+/* Keep the existing account and utility screens in the same lime-and-black brand. */
 :root {
-  --foreground: #173e2e;
-  --surf-base: #f7f9f2;
-  --surf-surface: #fffefa;
-  --surf-inner: #edf3e5;
-  --surf-sunken: #eef3e8;
-  --surf-primary: #487b35;
-  --surf-primary-dark: #315f2b;
-  --surf-primary-rgb: 72, 123, 53;
-  --surf-positive: #427c35;
-  --surf-negative: #b95342;
-  --surf-neutral: #947128;
-  --surf-ink: #173e2e;
-  --surf-ink-muted: #71836b;
-  --surf-ink-rgb: 23, 62, 46;
-  --surf-ink-solid: #173e2e;
-  --surf-line: #dce4d8;
-  --surf-line-strong: #cedcc5;
-  --surf-line-10: #cedcc5;
-  --surf-line-09: #d5e0ce;
-  --surf-line-08: #dce4d8;
-  --surf-line-06: #e4eadf;
-  --surf-line-05: #e8eddf;
-  --surf-fill-1: #f0f5e9;
-  --surf-fill-2: #e5efd9;
-  --surf-fill-3: #d9eac8;
-  --surf-fill-02: #f4f7ef;
-  --surf-fill-03: #f0f5e9;
-  --surf-fill-04: #edf3e5;
-  --surf-fill-06: #e5efd9;
-  --surf-fill-08: #d9eac8;
-  --surf-chrome-bg: #f7f9f2;
-  --surf-card-shadow: 0 7px 24px #28402608;
+  --foreground: #f2f5ec;
+  --surf-base: #090b08;
+  --surf-surface: #151912;
+  --surf-inner: #1b2116;
+  --surf-sunken: #0e120b;
+  --surf-primary: #c6ff00;
+  --surf-primary-dark: #a3d600;
+  --surf-primary-rgb: 198, 255, 0;
+  --surf-positive: #c6ff00;
+  --surf-negative: #ff8875;
+  --surf-neutral: #e6c764;
+  --surf-ink: #f2f5ec;
+  --surf-ink-muted: #a0a797;
+  --surf-ink-rgb: 242, 245, 236;
+  --surf-ink-solid: #f2f5ec;
+  --surf-line: #2a3024;
+  --surf-line-strong: #2a3024;
+  --surf-line-10: #2a3024;
+  --surf-line-09: #2a3024;
+  --surf-line-08: #2a3024;
+  --surf-line-06: #2a3024;
+  --surf-line-05: #2a3024;
+  --surf-fill-1: #1b2116;
+  --surf-fill-2: #1b2116;
+  --surf-fill-3: #1b2116;
+  --surf-fill-02: #1b2116;
+  --surf-fill-03: #1b2116;
+  --surf-fill-04: #1b2116;
+  --surf-fill-06: #1b2116;
+  --surf-fill-08: #1b2116;
+  --surf-chrome-bg: #090b08;
+  --surf-card-shadow: 0 7px 24px #00000040;
 }
 .surf-bg {
-  background: #f7f9f2 !important;
+  background: #090b08 !important;
 }
 .surf-bg:before,
 .surf-bg:after {
@@ -1471,10 +1476,10 @@ body {
 .bb-account-header p {
   font-size: 13px;
   line-height: 1.7;
-  color: #71836b;
+  color: #adb3a5;
   margin-top: 10px;
 }
 .bb-account-back {
   font-size: 11px;
-  color: #71836b;
+  color: #adb3a5;
 }
