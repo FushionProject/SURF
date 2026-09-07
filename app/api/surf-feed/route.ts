@@ -41,6 +41,7 @@ import { isOvernightCapture, overnightWindowKey } from "@/lib/surf/feedSchedule"
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { usefulFeedSnapshotDetections } from "@/lib/surf/usefulness";
 import { getPredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
+import { getRecentWhaleActivity } from "@/lib/surf/recentWhaleActivity";
 import { filterSurfBookmakers } from "@/lib/surf/bookmakers";
 import { persistentMarketHistoryStatus } from "@/lib/surf/persistentMarketHistory";
 import { buildRopeReport, recordRopeReport, type RopeAuditInput } from "@/lib/surf/ropeAudit";
@@ -902,7 +903,10 @@ async function getLiveSurfFeed(request: Request) {
   // Signals visitors contribute the same scheduled observations to Games'
   // timeline. Cached snapshot reuse performs no duplicate history write.
   await captureMarketHistorySnapshot(filteredGames, sportKey, marketObservedAt);
-  const predictionMarketSnapshot = await getPredictionMarketSnapshot(filteredGames, sportKey, now);
+  const [predictionMarketSnapshot, recentWhaleActivity] = await Promise.all([
+    getPredictionMarketSnapshot(filteredGames, sportKey, now),
+    getRecentWhaleActivity(sportKey, now),
+  ]);
   if (sportKey === "americanfootball_ncaaf") {
     for (const previous of await loadCfbMemory(filteredGames.filter(g=>!cfbHydratedGames.has(g.id)), now)) {
       const current = filteredGames.find(game => game.id === previous.snapshot.id);
@@ -1008,6 +1012,8 @@ async function getLiveSurfFeed(request: Request) {
       nextGameAt: nextGameAt(filteredGames, now),
       overnight,
       predictionMarkets: predictionMarketSnapshot.providers,
+      activityCoverage: predictionMarketSnapshot.activityCoverage,
+      recentWhaleActivity,
       debug,
       coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
     });
@@ -1067,6 +1073,8 @@ async function getLiveSurfFeed(request: Request) {
     nextGameAt: nextGameAt(filteredGames, now),
     overnight,
     predictionMarkets: predictionMarketSnapshot.providers,
+    activityCoverage: predictionMarketSnapshot.activityCoverage,
+    recentWhaleActivity,
     signals: taggedSignals.slice().sort((a, b) => {
       const as = typeof a.strengthScore === "number" && Number.isFinite(a.strengthScore) ? a.strengthScore : 0;
       const bs = typeof b.strengthScore === "number" && Number.isFinite(b.strengthScore) ? b.strengthScore : 0;

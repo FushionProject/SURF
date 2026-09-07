@@ -50,6 +50,8 @@ const definitions = [
       "Surf flags qualifying $10K+ buying activity in game-winner markets. A card can represent an individual large trade, a Polymarket wallet’s buys grouped within 90 seconds, or a Kalshi buying burst across nearby trades.",
       "Kalshi activity is anonymous. A burst is not proof that one person placed the entire amount. A Polymarket wallet is also not a verified person or proof of an informed bettor.",
       "The activity is an observed sample, not all trading volume or net positions. Check the venue, team, amount, and activity label—not just the headline.",
+      "Use the Whales filter to see this activity separately from sportsbook prices. Recent whale activity also shows NFL and MLB Polymarket individual $10K+ pregame buys from the past 24 hours after their games start. Those are historical trade records, not current offers; recent Kalshi and college-football history are not included yet.",
+      "Surf checks on its market-refresh schedule, not continuously when nobody is using it. Public trade searches are bounded and incomplete scans are labeled. It does not claim to capture every fill, maker trade, or historical position.",
     ],
   },
   {
@@ -77,7 +79,7 @@ const definitions = [
     title: "Why Signals can be empty",
     paragraphs: [
       "Nothing to flag means no currently available data passed the signal filters. Surf does not fill quiet periods with weaker cards or invented activity.",
-      "Signals can disappear when quotes change, data becomes stale, or a game starts. Pregame activity expires at kickoff or first pitch. If Surf reports a data-source problem, that is different from a genuinely quiet market.",
+      "Current opportunities can disappear when quotes change, data becomes stale, or a game starts. Recent whale records retain their original execution time and expire after 24 hours. If Surf reports a data-source problem, that is different from a genuinely quiet market.",
     ],
   },
 ];

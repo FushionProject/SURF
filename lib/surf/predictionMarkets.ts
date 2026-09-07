@@ -23,16 +23,40 @@ const KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 const POLYMARKET_GAMMA_BASE = "https://gamma-api.polymarket.com";
 const POLYMARKET_DATA_BASE = "https://data-api.polymarket.com";
 const REQUEST_TIMEOUT_MS = 8_000;
+const TRADE_SCAN_TIMEOUT_MS = 20_000;
 const SNAPSHOT_CACHE_MS = 2 * 60 * 1000;
-const POLYMARKET_MIN_FILL_USD = 1_000;
+// Every matched market gets a first page before any market gets a second one.
+// Hard per-snapshot limits keep college-football slates and provider failures bounded.
+const TRADE_CONCURRENCY = 6;
+const TRADE_MAX_SCOPES = 160;
+const TRADE_MAX_PAGES = 3;
+const KALSHI_REQUEST_BUDGET = 192;
+const POLYMARKET_REQUEST_BUDGET = 128;
+const POLYMARKET_LARGE_BUY_REQUEST_BUDGET = 12;
+const POLYMARKET_PAGE_SIZE = 500;
+const RETAINED_SLATE_LIMIT = 8;
+const RETAINED_TRADES_PER_VENUE = 20_000;
 
 type ProviderStatus = "available" | "partial" | "unavailable" | "no_coverage" | "disabled";
 type TradeSample<T> = { trades: T[]; incomplete: boolean };
+type ActivityCoverageStatus = "sampled" | "partial" | "unavailable" | "no_coverage" | "disabled";
+export type PredictionActivityCoverage = {
+  evaluatedAt: number;
+  thresholdUsd: number;
+  windowStart: number;
+  windowEnd: number;
+  providers: Record<"kalshi" | "polymarket", {
+    matchedGames: number;
+    sampledTrades: number;
+    coverage: ActivityCoverageStatus;
+  }>;
+};
 
 export type PredictionMarketSnapshot = {
   generatedAt: number;
   consensusByGame: Record<string, GamePredictionMarketConsensus>;
   whaleSignals: SignalCard[];
+  activityCoverage: PredictionActivityCoverage;
   providers: {
     kalshi: ProviderStatus;
     polymarket: ProviderStatus;
@@ -47,10 +71,19 @@ type SnapshotCacheEntry = {
 
 declare global {
   var __surfPredictionMarketSnapshotCache: Map<string, SnapshotCacheEntry> | undefined;
+  var __surfPredictionTradeMemory: Map<string, {
+    observedAt: number;
+    kalshi: KalshiTrade[];
+    polymarket: PolymarketTrade[];
+    kalshiGameIdentity: Map<string, string>;
+    polymarketGameIdentity: Map<string, string>;
+  }> | undefined;
 }
 
 const SNAPSHOT_CACHE = globalThis.__surfPredictionMarketSnapshotCache ?? new Map<string, SnapshotCacheEntry>();
 globalThis.__surfPredictionMarketSnapshotCache = SNAPSHOT_CACHE;
+const TRADE_MEMORY: NonNullable<typeof globalThis.__surfPredictionTradeMemory> = globalThis.__surfPredictionTradeMemory ?? new Map();
+globalThis.__surfPredictionTradeMemory = TRADE_MEMORY;
 
 function emptySnapshot(now: number, status: ProviderStatus = "disabled"): PredictionMarketSnapshot {
   return {
@@ -58,6 +91,14 @@ function emptySnapshot(now: number, status: ProviderStatus = "disabled"): Predic
     consensusByGame: {},
     whaleSignals: [],
     providers: { kalshi: status, polymarket: status },
+    activityCoverage: {
+      evaluatedAt: now, thresholdUsd: configuredThreshold(),
+      windowStart: now - WHALE_LOOKBACK_MS, windowEnd: now,
+      providers: {
+        kalshi: { matchedGames: 0, sampledTrades: 0, coverage: status === "available" ? "sampled" : status },
+        polymarket: { matchedGames: 0, sampledTrades: 0, coverage: status === "available" ? "sampled" : status },
+      },
+    },
   };
 }
 
@@ -67,10 +108,10 @@ function configuredThreshold(): number {
   return configured;
 }
 
-async function fetchJson<T>(url: URL | string): Promise<T> {
+async function fetchJson<T>(url: URL | string, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   const response = await fetch(url, {
     headers: { accept: "application/json" },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(Math.max(1, Math.min(REQUEST_TIMEOUT_MS, Math.floor(timeoutMs)))),
     cache: "no-store",
   });
   if (!response.ok) throw new Error(`Prediction market request failed (${response.status})`);
@@ -87,60 +128,66 @@ async function fetchKalshiMarkets(seriesTicker: string): Promise<KalshiWinnerMar
     url.searchParams.set("limit", "1000");
     if (cursor) url.searchParams.set("cursor", cursor);
     const payload = await fetchJson<{ markets?: KalshiWinnerMarket[]; cursor?: string }>(url);
-    markets.push(...(payload.markets ?? []));
+    if (!Array.isArray(payload.markets)) throw new Error("Invalid prediction market response");
+    markets.push(...payload.markets);
     cursor = payload.cursor ?? "";
     if (!cursor) break;
   }
+  if (cursor) throw new Error("Prediction discovery page limit reached");
   return markets;
 }
 
-async function fetchKalshiTickerTrades(ticker: string, now: number): Promise<TradeSample<KalshiTrade>> {
-  const trades: KalshiTrade[] = [];
-  let cursor = "";
-  for (let page = 0; page < 3; page += 1) {
+async function scanTradePages<T>(
+  scopes: string[],
+  requestBudget: number,
+  readPage: (scope: string, page: number, cursor: string, timeoutMs: number) => Promise<{ trades: T[]; cursor: string; more: boolean }>,
+): Promise<TradeSample<T>> {
+  const uniqueScopes = [...new Set(scopes)].sort();
+  const states = uniqueScopes.slice(0, TRADE_MAX_SCOPES).map((scope) => ({ scope, cursor: "", done: false, failed: false }));
+  const trades: T[] = [];
+  let successes = 0;
+  let requests = 0;
+  const deadline = Date.now() + TRADE_SCAN_TIMEOUT_MS;
+  for (let page = 0; page < TRADE_MAX_PAGES && requests < requestBudget && Date.now() < deadline; page += 1) {
+    const pending = states.filter((state) => !state.done);
+    for (let index = 0; index < pending.length && requests < requestBudget && Date.now() < deadline; index += TRADE_CONCURRENCY) {
+      const batch = pending.slice(index, index + Math.min(TRADE_CONCURRENCY, requestBudget - requests));
+      requests += batch.length;
+      await Promise.all(batch.map(async (state) => {
+        try {
+          const result = await readPage(state.scope, page, state.cursor, deadline - Date.now());
+          trades.push(...result.trades);
+          successes += 1;
+          // Repeated cursors cannot make progress. Keep already observed fills,
+          // flag the gap, and stop rather than repeating requests or losing page 1.
+          state.failed = result.more && Boolean(result.cursor) && result.cursor === state.cursor;
+          state.done = !result.more || state.failed;
+          state.cursor = result.cursor;
+        } catch {
+          state.failed = true;
+          state.done = true;
+        }
+      }));
+    }
+  }
+  if (uniqueScopes.length > 0 && successes === 0) throw new Error("Prediction activity source unavailable");
+  return { trades, incomplete: states.some((state) => state.failed || !state.done) || uniqueScopes.length > states.length };
+}
+
+async function fetchKalshiTrades(matched: MatchedWinnerMarket[], now: number): Promise<TradeSample<KalshiTrade>> {
+  const tickers = matched.flatMap((market) => market.selections.map((selection) => selection.providerMarketId));
+  // Market volume is a lagging discovery statistic, not proof that no trade exists.
+  return scanTradePages(tickers, KALSHI_REQUEST_BUDGET, async (ticker, _page, cursor, timeoutMs) => {
     const url = new URL(`${KALSHI_API_BASE}/markets/trades`);
     url.searchParams.set("ticker", ticker);
     url.searchParams.set("min_ts", String(Math.floor((now - WHALE_LOOKBACK_MS) / 1000)));
+    url.searchParams.set("max_ts", String(Math.floor(now / 1000)));
     url.searchParams.set("limit", "1000");
     if (cursor) url.searchParams.set("cursor", cursor);
-    const payload = await fetchJson<{ trades?: KalshiTrade[]; cursor?: string }>(url);
-    trades.push(...(payload.trades ?? []));
-    cursor = payload.cursor ?? "";
-    if (!cursor) break;
-  }
-  return { trades, incomplete: Boolean(cursor) };
-}
-
-async function fetchKalshiTrades(
-  matched: MatchedWinnerMarket[],
-  rawMarkets: KalshiWinnerMarket[],
-  thresholdUsd: number,
-  now: number,
-): Promise<TradeSample<KalshiTrade>> {
-  const rawByTicker = new Map(rawMarkets.map((market) => [market.ticker, market]));
-  const tickers = matched
-    .flatMap((market) => market.selections.map((selection) => selection.providerMarketId))
-    .filter((ticker, index, all) => all.indexOf(ticker) === index)
-    // A qualifying buy cannot exist in a 24-hour window with fewer contracts
-    // than the cash threshold because every contract costs at most $1.
-    .filter((ticker) => Number(rawByTicker.get(ticker)?.volume_24h_fp ?? 0) >= thresholdUsd);
-
-  const trades: KalshiTrade[] = [];
-  let incomplete = false;
-  let successes = 0;
-  for (let index = 0; index < tickers.length; index += 8) {
-    const batch = tickers.slice(index, index + 8);
-    const settled = await Promise.allSettled(batch.map((ticker) => fetchKalshiTickerTrades(ticker, now)));
-    for (const result of settled) {
-      if (result.status === "fulfilled") {
-        trades.push(...result.value.trades);
-        incomplete ||= result.value.incomplete;
-        successes += 1;
-      } else incomplete = true;
-    }
-  }
-  if (tickers.length > 0 && successes === 0) throw new Error("Prediction activity source unavailable");
-  return { trades, incomplete };
+    const payload = await fetchJson<{ trades?: KalshiTrade[]; cursor?: string }>(url, timeoutMs);
+    if (!Array.isArray(payload.trades)) throw new Error("Invalid prediction trade response");
+    return { trades: payload.trades, cursor: payload.cursor ?? "", more: Boolean(payload.cursor) };
+  });
 }
 
 function slateTimeRange(games: OddsApiGame[]): { min: string; max: string } {
@@ -164,7 +211,8 @@ async function fetchPolymarketEvents(discoveryId: string, games: OddsApiGame[], 
   const events: PolymarketEvent[] = [];
   for (let page = 0; page < 5; page += 1) {
     const payload = await fetchJson<{ events?: PolymarketEvent[]; next_cursor?: string }>(url);
-    events.push(...(payload.events ?? []));
+    if (!Array.isArray(payload.events)) throw new Error("Invalid prediction discovery response");
+    events.push(...payload.events);
     if (!payload.next_cursor) return events;
     url.searchParams.set("after_cursor", payload.next_cursor);
   }
@@ -173,19 +221,116 @@ async function fetchPolymarketEvents(discoveryId: string, games: OddsApiGame[], 
 }
 
 async function fetchPolymarketTrades(markets: MatchedWinnerMarket[], thresholdUsd: number): Promise<TradeSample<PolymarketTrade>> {
-  const conditionIds = markets
-    .filter((market) => (market.volume24hUsd ?? 0) >= thresholdUsd)
-    .map((market) => market.marketId);
+  const conditionIds = [...new Set(markets.map((market) => market.marketId))].sort();
   if (conditionIds.length === 0) return { trades: [], incomplete: false };
-  const url = new URL(`${POLYMARKET_DATA_BASE}/trades`);
-  url.searchParams.set("market", conditionIds.join(","));
-  url.searchParams.set("side", "BUY");
-  url.searchParams.set("takerOnly", "true");
-  url.searchParams.set("filterType", "CASH");
-  url.searchParams.set("filterAmount", String(Math.min(POLYMARKET_MIN_FILL_USD, thresholdUsd)));
-  url.searchParams.set("limit", "1000");
-  const trades = await fetchJson<PolymarketTrade[]>(url);
-  return { trades, incomplete: trades.length >= 1000 };
+  const largeBuyScopes: string[] = [];
+  for (let index = 0; index < conditionIds.length; index += 20) {
+    largeBuyScopes.push(conditionIds.slice(index, index + 20).join(","));
+  }
+  const read = (minimumCash?: number) => async (scope: string, page: number, _cursor: string, timeoutMs: number) => {
+    const url = new URL(`${POLYMARKET_DATA_BASE}/trades`);
+    url.searchParams.set("market", scope);
+    url.searchParams.set("side", "BUY");
+    url.searchParams.set("takerOnly", "true");
+    url.searchParams.set("limit", String(POLYMARKET_PAGE_SIZE));
+    url.searchParams.set("offset", String(page * POLYMARKET_PAGE_SIZE));
+    if (minimumCash != null) {
+      url.searchParams.set("filterType", "CASH");
+      url.searchParams.set("filterAmount", String(minimumCash));
+    }
+    const trades = await fetchJson<PolymarketTrade[]>(url, timeoutMs);
+    if (!Array.isArray(trades)) throw new Error("Invalid prediction trade response");
+    return { trades, cursor: "", more: trades.length >= POLYMARKET_PAGE_SIZE };
+  };
+  // All-size, per-market samples can reveal a wallet accumulating $10K through
+  // smaller fills. The independent cash-filtered query protects single large buys
+  // from being crowded out by a busy market's hundreds of small trades.
+  const results = await Promise.allSettled([
+    scanTradePages(conditionIds, POLYMARKET_REQUEST_BUDGET, read()),
+    scanTradePages(largeBuyScopes, POLYMARKET_LARGE_BUY_REQUEST_BUDGET, read(thresholdUsd)),
+  ]);
+  if (results.every((result) => result.status === "rejected")) throw new Error("Prediction activity source unavailable");
+  return {
+    trades: results.flatMap((result) => result.status === "fulfilled" ? result.value.trades : []),
+    incomplete: results.some((result) => result.status === "rejected" || result.value.incomplete),
+  };
+}
+
+function retainTradeSample<T>(
+  fresh: TradeSample<T>,
+  previous: T[],
+  now: number,
+  identity: (trade: T) => string | undefined,
+  timestamp: (trade: T) => number,
+): TradeSample<T> {
+  const byId = new Map<string, T>();
+  const freshIds = new Set<string>();
+  const add = (trade: T, isFresh = false) => {
+    if (!trade || typeof trade !== "object") return;
+    const id = identity(trade);
+    const time = timestamp(trade);
+    if (!id || !Number.isFinite(time) || time < now - WHALE_LOOKBACK_MS || time > now) return;
+    byId.set(id, trade);
+    if (isFresh) freshIds.add(id);
+  };
+  previous.forEach((trade) => add(trade));
+  fresh.trades.forEach((trade) => add(trade, true));
+  const merged = [...byId.values()].sort((a, b) => timestamp(b) - timestamp(a));
+  return {
+    trades: merged.slice(0, RETAINED_TRADES_PER_VENUE),
+    // Missing previously observed rows and memory bounds are coverage gaps, not
+    // evidence that the original trade vanished. Event timestamps stay unchanged.
+    incomplete: fresh.incomplete || merged.length > RETAINED_TRADES_PER_VENUE || byId.size > freshIds.size,
+  };
+}
+
+function mergeObservedTrades(
+  key: string,
+  kalshiResult: PromiseSettledResult<TradeSample<KalshiTrade>>,
+  polymarketResult: PromiseSettledResult<TradeSample<PolymarketTrade>>,
+  kalshiMarkets: MatchedWinnerMarket[],
+  polymarketMarkets: MatchedWinnerMarket[],
+  now: number,
+): { kalshi: TradeSample<KalshiTrade>; polymarket: TradeSample<PolymarketTrade> } {
+  for (const [entryKey, entry] of TRADE_MEMORY) {
+    if (entry.observedAt < now - WHALE_LOOKBACK_MS) TRADE_MEMORY.delete(entryKey);
+  }
+  const previous = TRADE_MEMORY.get(key);
+  const kalshiGameIdentity = new Map(kalshiMarkets.flatMap((market) => market.selections
+    .map((selection) => [selection.providerMarketId, gameIdentity(market.game)] as const)));
+  const polymarketGameIdentity = new Map(polymarketMarkets.map((market) => [market.marketId, gameIdentity(market.game)]));
+  const kalshi = retainTradeSample(
+    kalshiResult.status === "fulfilled" ? kalshiResult.value : { trades: [], incomplete: true },
+    previous?.kalshi.filter((trade) => kalshiGameIdentity.get(trade.ticker) != null &&
+      previous.kalshiGameIdentity?.get(trade.ticker) === kalshiGameIdentity.get(trade.ticker)) ?? [], now,
+    (trade) => kalshiGameIdentity.has(trade.ticker) && trade.trade_id ? `${trade.ticker}:${trade.trade_id}` : undefined,
+    (trade) => new Date(trade.created_time).getTime(),
+  );
+  const polymarket = retainTradeSample(
+    polymarketResult.status === "fulfilled" ? polymarketResult.value : { trades: [], incomplete: true },
+    previous?.polymarket.filter((trade) => polymarketGameIdentity.get(trade.conditionId) != null &&
+      previous.polymarketGameIdentity?.get(trade.conditionId) === polymarketGameIdentity.get(trade.conditionId)) ?? [], now,
+    (trade) => polymarketGameIdentity.has(trade.conditionId) && typeof trade.transactionHash === "string" &&
+      typeof trade.proxyWallet === "string" && typeof trade.side === "string"
+      ? `${trade.conditionId}:${trade.transactionHash.toLowerCase()}:${trade.proxyWallet.toLowerCase()}:${trade.asset}:${trade.side.toUpperCase()}:${trade.timestamp}:${trade.size}:${trade.price}`
+      : undefined,
+    (trade) => Number(trade.timestamp) * 1000,
+  );
+  // Process-local observation memory only: this is neither a durable archive
+  // nor a collector that runs when there are no requests to Surf.
+  TRADE_MEMORY.delete(key);
+  TRADE_MEMORY.set(key, { observedAt: now, kalshi: kalshi.trades, polymarket: polymarket.trades, kalshiGameIdentity, polymarketGameIdentity });
+  while (TRADE_MEMORY.size > RETAINED_SLATE_LIMIT) {
+    const oldest = TRADE_MEMORY.keys().next().value;
+    if (oldest == null) break;
+    TRADE_MEMORY.delete(oldest);
+  }
+  return { kalshi, polymarket };
+}
+
+function sampleCoverage<T>(result: PromiseSettledResult<TradeSample<T>>, sample: TradeSample<T>): "sampled" | "partial" | "unavailable" {
+  if (result.status === "rejected" && sample.trades.length === 0) return "unavailable";
+  return result.status === "rejected" || sample.incomplete ? "partial" : "sampled";
 }
 
 function money(value: number): string {
@@ -275,40 +420,44 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
   ]);
 
   const kalshiMarkets = kalshiResult.status === "fulfilled"
-    ? matchKalshiWinnerMarkets(games, kalshiResult.value, now)
+    ? matchKalshiWinnerMarkets(games, kalshiResult.value, now, { forActivity: true })
     : [];
   const polymarketMarkets = polymarketResult.status === "fulfilled"
-    ? matchPolymarketWinnerMarkets(games, polymarketResult.value, now)
+    ? matchPolymarketWinnerMarkets(games, polymarketResult.value, now, { forActivity: true })
     : [];
 
   const [kalshiTradesResult, polymarketTradesResult] = await Promise.allSettled([
     kalshiResult.status === "fulfilled"
-      ? fetchKalshiTrades(kalshiMarkets, kalshiResult.value, thresholdUsd, now)
+      ? fetchKalshiTrades(kalshiMarkets, now)
       : Promise.resolve({ trades: [], incomplete: false }),
     polymarketResult.status === "fulfilled"
       ? fetchPolymarketTrades(polymarketMarkets, thresholdUsd)
       : Promise.resolve({ trades: [], incomplete: false }),
   ]);
 
+  const samples = mergeObservedTrades(
+    `whales-v2:${configuredThreshold()}:${sportKey}`, kalshiTradesResult, polymarketTradesResult,
+    kalshiMarkets, polymarketMarkets, now,
+  );
   const activities = [
-    ...(kalshiTradesResult.status === "fulfilled"
-      ? aggregateKalshiWhaleBuys(kalshiTradesResult.value.trades, kalshiMarkets, now, thresholdUsd)
-      : []),
-    ...(polymarketTradesResult.status === "fulfilled"
-      ? aggregatePolymarketWhaleBuys(polymarketTradesResult.value.trades, polymarketMarkets, now, thresholdUsd)
-      : []),
+    ...aggregateKalshiWhaleBuys(samples.kalshi.trades, kalshiMarkets, now, thresholdUsd),
+    ...aggregatePolymarketWhaleBuys(samples.polymarket.trades, polymarketMarkets, now, thresholdUsd),
   ];
+  const kalshiCoverage = sampleCoverage(kalshiTradesResult, samples.kalshi);
+  const polymarketCoverage = sampleCoverage(polymarketTradesResult, samples.polymarket);
 
-  const consensusByGame = mergePredictionConsensus([...kalshiMarkets, ...polymarketMarkets]);
+  const consensusByGame = mergePredictionConsensus([
+    ...(kalshiResult.status === "fulfilled" ? matchKalshiWinnerMarkets(games, kalshiResult.value, now) : []),
+    ...(polymarketResult.status === "fulfilled" ? matchPolymarketWinnerMarkets(games, polymarketResult.value, now) : []),
+  ]);
   const gamesById = new Map(games.map((game) => [game.id, game]));
   for (const consensus of Object.values(consensusByGame)) {
     const game = gamesById.get(consensus.gameId);
     if (!game) continue;
     for (const source of consensus.sources) {
-      const tradesResult = source.venue === "kalshi" ? kalshiTradesResult : polymarketTradesResult;
       source.largeTradeActivity = summarizeLargeTradeActivity(
         game, source.venue, activities, now, thresholdUsd,
-        tradesResult.status === "rejected" ? "unavailable" : tradesResult.value.incomplete ? "partial" : "sampled",
+        source.venue === "kalshi" ? kalshiCoverage : polymarketCoverage,
       );
     }
   }
@@ -317,33 +466,54 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
     generatedAt: now,
     consensusByGame,
     whaleSignals: activityCards(activities, sportKey, thresholdUsd),
+    activityCoverage: {
+      evaluatedAt: now, thresholdUsd, windowStart: now - WHALE_LOOKBACK_MS, windowEnd: now,
+      providers: {
+        kalshi: {
+          matchedGames: new Set(kalshiMarkets.map((market) => market.game.id)).size,
+          sampledTrades: samples.kalshi.trades.length,
+          coverage: kalshiResult.status === "rejected" ? "unavailable" : kalshiMarkets.length === 0 ? "no_coverage"
+            : kalshiCoverage === "sampled" && kalshiMarkets.length < games.length ? "partial" : kalshiCoverage,
+        },
+        polymarket: {
+          matchedGames: new Set(polymarketMarkets.map((market) => market.game.id)).size,
+          sampledTrades: samples.polymarket.trades.length,
+          coverage: polymarketResult.status === "rejected" ? "unavailable" : polymarketMarkets.length === 0 ? "no_coverage"
+            : polymarketCoverage === "sampled" && polymarketMarkets.length < games.length ? "partial" : polymarketCoverage,
+        },
+      },
+    },
     providers: {
       kalshi:
         kalshiResult.status === "rejected"
           ? "unavailable"
           : kalshiMarkets.length > 0
-            ? kalshiTradesResult.status === "rejected" || kalshiTradesResult.value.incomplete
+            ? kalshiCoverage !== "sampled"
               ? "partial"
-              : sportKey === "americanfootball_ncaaf" && kalshiMarkets.length < games.length ? "partial" : "available"
+              : kalshiMarkets.length < games.length ? "partial" : "available"
             : "no_coverage",
       polymarket:
         polymarketResult.status === "rejected"
           ? "unavailable"
           : polymarketMarkets.length > 0
-            ? polymarketTradesResult.status === "rejected" || polymarketTradesResult.value.incomplete
+            ? polymarketCoverage !== "sampled"
               ? "partial"
-              : sportKey === "americanfootball_ncaaf" && polymarketMarkets.length < games.length ? "partial" : "available"
+              : polymarketMarkets.length < games.length ? "partial" : "available"
             : "no_coverage",
     },
   };
 }
 
+function gameIdentity(game: OddsApiGame): string {
+  return JSON.stringify([game.id, game.commence_time, game.away_team, game.home_team]);
+}
+
 function snapshotCacheKey(games: OddsApiGame[], sportKey: SurfSportKey): string {
   const slate = games
-    .map((game) => `${game.id}:${game.commence_time}`)
+    .map(gameIdentity)
     .sort()
     .join("|");
-  return `${sportKey}:${slate}`;
+  return `whales-v2:${configuredThreshold()}:${sportKey}:${slate}`;
 }
 
 export async function getPredictionMarketSnapshot(
@@ -356,6 +526,9 @@ export async function getPredictionMarketSnapshot(
   }
 
   const key = snapshotCacheKey(games, sportKey);
+  for (const [cacheKey, entry] of SNAPSHOT_CACHE) {
+    if (!entry.pending && entry.expiresAt <= now) SNAPSHOT_CACHE.delete(cacheKey);
+  }
   const cached = SNAPSHOT_CACHE.get(key);
   if (cached?.value && cached.expiresAt > now) return cached.value;
   if (cached?.pending) return cached.pending;
@@ -363,7 +536,11 @@ export async function getPredictionMarketSnapshot(
   const pending = buildSnapshot(games, sportKey, now)
     .catch(() => emptySnapshot(now, "unavailable"))
     .then((value) => {
-      SNAPSHOT_CACHE.set(key, { value, expiresAt: Date.now() + SNAPSHOT_CACHE_MS });
+      SNAPSHOT_CACHE.set(key, { value, expiresAt: now + SNAPSHOT_CACHE_MS });
+      for (const [cacheKey, entry] of SNAPSHOT_CACHE) {
+        if (SNAPSHOT_CACHE.size <= RETAINED_SLATE_LIMIT) break;
+        if (cacheKey !== key && !entry.pending) SNAPSHOT_CACHE.delete(cacheKey);
+      }
       return value;
     });
   SNAPSHOT_CACHE.set(key, { pending, expiresAt: now + SNAPSHOT_CACHE_MS });

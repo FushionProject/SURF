@@ -9,8 +9,12 @@ import { SportSelector } from "@/components/surf/SportSelector";
 import { SurfAppHeader } from "@/components/surf/SurfAppHeader";
 import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
 import { SurfFooter } from "@/components/surf/SurfFooter";
+import { WhaleTrackingStatus } from "@/components/surf/WhaleTrackingStatus";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import { isOvernight, nextRefreshDelayMs, refreshScheduleLabel } from "@/lib/surf/feedSchedule";
+import { filterSignalFeed, type SignalFeedFilter } from "@/lib/surf/signalFeed";
+import type { PredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
+import type { getRecentWhaleActivity } from "@/lib/surf/recentWhaleActivity";
 import { getSurfSportConfig, type SurfSportKey, type SurfSportLabel } from "@/lib/surf/sports";
 import type { OvernightMarketSummary, SignalCard } from "@/lib/surf/types";
 
@@ -26,6 +30,8 @@ type SurfFeedResponse = {
   overnight?: OvernightMarketSummary;
   dataSource?: "demo" | "fallback";
   dataNotice?: string;
+  activityCoverage?: PredictionMarketSnapshot["activityCoverage"];
+  recentWhaleActivity?: Awaited<ReturnType<typeof getRecentWhaleActivity>>;
 };
 
 async function fetchSurfFeed(sport: SurfSportKey): Promise<SurfFeedResponse> {
@@ -33,22 +39,6 @@ async function fetchSurfFeed(sport: SurfSportKey): Promise<SurfFeedResponse> {
   const response = await fetch(`/api/surf-feed?${params.toString()}`, { cache: "no-store" });
   if (!response.ok) throw new Error(`Failed to load surf feed (${response.status})`);
   return (await response.json()) as SurfFeedResponse;
-}
-
-function signalEventTime(signal: SignalCard, fallback?: number | null): number {
-  if (signal.whaleActivity) return signal.whaleActivity.occurredAt;
-  if (signal.opportunity && typeof signal.lastSeenAt === "number") return signal.lastSeenAt;
-  if (
-    (signal.signalType === "Line Movement" || signal.signalType === "Market Movement") &&
-    typeof signal.lastMovedAt === "number"
-  ) {
-    return signal.lastMovedAt;
-  }
-  return signal.signalChangedAt ?? signal.detectedAt ?? fallback ?? 0;
-}
-
-function isVerifiedEvent(signal: SignalCard): boolean {
-  return Boolean(signal.opportunity || signal.marketHorizon || signal.trackedMarket || signal.whaleActivity);
 }
 
 function signalChangeTime(signal: SignalCard): number {
@@ -59,6 +49,8 @@ export default function Home() {
   const { sport, sportSynced, selectSport } = useSurfSport();
   const initialLoadDone = useRef(false);
   const visitRecorded = useRef(false);
+  const requestSequence = useRef(0);
+  const [filter, setFilter] = useState<SignalFeedFilter>("all");
 
   const [data, setData] = useState<SurfFeedResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,22 +69,31 @@ export default function Home() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
+    const timer = window.setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get("type") === "whales") setFilter("whales");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const load = useCallback(async (mode: "initial" | "refresh", requestedSport: SurfSportKey) => {
+    const sequence = ++requestSequence.current;
     if (mode === "initial") setIsLoading(true);
     else setIsRefreshing(true);
 
     try {
       const next = await fetchSurfFeed(requestedSport);
+      if (sequence !== requestSequence.current) return;
       setData(next);
       setError(null);
       setUpdatedAt(Date.now());
     } catch {
+      if (sequence !== requestSequence.current) return;
       setError("Surf could not reach market signals right now.");
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (sequence === requestSequence.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, []);
 
@@ -131,18 +132,22 @@ export default function Home() {
 
   const now = updatedAt ?? data?.generatedAt ?? 0;
   const visibleSignals = useMemo(() => {
-    return (data?.signals ?? [])
-      .sort((a, b) => {
-        const verifiedDifference = Number(isVerifiedEvent(b)) - Number(isVerifiedEvent(a));
-        if (verifiedDifference !== 0) return verifiedDifference;
-        const strengthDifference = (b.strengthScore ?? 0) - (a.strengthScore ?? 0);
-        if (strengthDifference !== 0) return strengthDifference;
-        return (
-          signalEventTime(b, data?.generatedAt ?? updatedAt) -
-          signalEventTime(a, data?.generatedAt ?? updatedAt)
-        );
-      });
-  }, [data, updatedAt]);
+    return filterSignalFeed(data?.signals ?? [], filter);
+  }, [data, filter]);
+  const whaleCount = (data?.signals ?? []).filter((signal) => signal.whaleActivity).length;
+  const recentWhales = data?.recentWhaleActivity?.signals ?? [];
+  const showRecentWhales = filter !== "opportunities" && recentWhales.length > 0;
+  const whaleSources = data?.activityCoverage ? Object.values(data.activityCoverage.providers) : [];
+  const whaleScanLimited = whaleSources.some((source) => source.coverage !== "sampled")
+    || data?.recentWhaleActivity?.coverage === "partial" || data?.recentWhaleActivity?.coverage === "unavailable";
+
+  const selectFilter = (value: SignalFeedFilter) => {
+    setFilter(value);
+    const url = new URL(window.location.href);
+    if (value === "whales") url.searchParams.set("type", "whales");
+    else url.searchParams.delete("type");
+    window.history.replaceState(null, "", url.toString());
+  };
 
   const sinceLastVisit = useMemo(() => {
     if (!lastVisitAt) return null;
@@ -191,10 +196,20 @@ export default function Home() {
 
           <OvernightMoves summary={data?.overnight} sportKey={sport} />
 
+          <div role="group" aria-label="Signal type" className="mb-4 grid grid-cols-3 gap-2">
+            {([ ["all", "All", (data?.signals.length ?? 0) + recentWhales.length], ["whales", "Whales", whaleCount + recentWhales.length], ["opportunities", "Markets", (data?.signals.length ?? 0) - whaleCount] ] as const).map(([value, label, count]) => (
+              <button key={value} type="button" aria-pressed={filter === value} onClick={() => selectFilter(value)}
+                className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold ${filter === value ? "border-[color:var(--surf-primary)] bg-[rgba(var(--surf-primary-rgb),0.06)] text-[color:var(--surf-primary)]" : "border-[color:var(--surf-line-08)] bg-[color:var(--surf-sunken)] text-[color:var(--surf-ink-55)]"}`}>
+                {label} <span className="ml-1 opacity-70">{count}</span>
+              </button>
+            ))}
+          </div>
+          {filter === "whales" && !isLoading && !error ? <WhaleTrackingStatus coverage={data?.activityCoverage} recent={data?.recentWhaleActivity} /> : null}
+
           <div className="mb-3 flex items-center justify-between px-1">
             <div>
               <div className="text-xs font-semibold text-[color:var(--surf-ink-75)]">
-                {visibleSignals.length} current {visibleSignals.length === 1 ? "signal" : "signals"}
+                {visibleSignals.length} current {visibleSignals.length === 1 ? "signal" : "signals"}{showRecentWhales ? ` · ${recentWhales.length} recent whale records` : ""}
               </div>
               <div className="mt-0.5 text-[10px] text-[color:var(--surf-ink-35)]">
                 Strictly qualified across sportsbooks and prediction markets
@@ -216,11 +231,12 @@ export default function Home() {
               <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">Market signals unavailable</div>
               <p className="mt-1 text-xs leading-5 text-[color:var(--surf-ink-45)]">{error}</p>
             </div>
-          ) : visibleSignals.length === 0 ? (
+          ) : visibleSignals.length === 0 && !showRecentWhales ? (
             <div className="rounded-[22px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] p-6 text-center">
-              <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">Nothing worth flagging right now</div>
+              <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">{filter === "whales" ? (whaleScanLimited ? "No whale activity found in the available sample" : "No qualifying whale activity found") : "Nothing worth flagging right now"}</div>
               <p className="mx-auto mt-2 max-w-xs text-xs leading-5 text-[color:var(--surf-ink-45)]">
-                The available {sportLabel} books are closely aligned. Games still shows every matchup, best current offer, history, and injury context.
+                {filter === "whales" ? "No observed buy or qualifying burst met the cash threshold in this scan. This does not mean there were no large trades outside our coverage."
+                  : "No current opportunities passed Surf’s checks in the available data. Games still shows every matchup, best current offer, history, and injury context."}
               </p>
             </div>
           ) : (
@@ -234,6 +250,17 @@ export default function Home() {
               ))}
             </main>
           )}
+          {!isLoading && !error && showRecentWhales ? (
+            <section aria-label="Recent whale activity" className="mt-5">
+              <div className="mb-4 border-t border-[color:var(--surf-line-08)] pt-5">
+                <h2 className="text-lg font-bold text-[color:var(--surf-ink-solid)]">Recent whale activity</h2>
+                <p className="mt-1 text-sm leading-6 text-[color:var(--surf-ink-45)]">Real pregame buys from the past 24 hours. These games have started; the cards are trade records, not available bets.</p>
+              </div>
+              <div className="flex flex-col gap-3">
+                {recentWhales.map((card) => <MarketEventCard key={card.id} card={card} now={now} historical />)}
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <SurfFooter updatedAt={updatedAt} isSimulated={Boolean(data?.dataSource)} />
