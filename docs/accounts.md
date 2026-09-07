@@ -32,6 +32,13 @@ public launch dependency until email delivery is configured and tested.
 
 ## Local and mobile previews
 
+Put shared local preview settings in the ignored `.env.local`, not only in
+`.env.development.local`: `next build` and `next start` do not read the latter.
+Public variables are also compiled into browser bundles, so rebuild and restart
+after changing them. The production-mode account page was checked after making
+the existing public configuration available this way; no new project or key
+was created.
+
 When the configured site is explicitly localhost/LAN, confirmation links
 use the requesting preview's actual origin and port. This prevents a preview on
 port 3158 from sending the user to an old server on port 3000. Only host-matched
