@@ -1,3 +1,4 @@
+import { pricePressureTitle } from "@/lib/surf/marketHorizonCopy";
 import { getCfbContext, cachedCfbFinals } from "@/lib/surf/cfbContext";
 import { cfbMarketEligible } from "@/lib/surf/cfbContextCore";
 import { surfPersistenceStatus } from "@/lib/surf/supabasePersistence";
@@ -462,8 +463,7 @@ function marketHorizonCards(events: MarketHorizonEvent[], now: number): SignalCa
 
     const title = (() => {
       if (event.kind === "price_pressure") {
-        const actor = event.priceMoves.length >= 2 ? `${event.priceMoves.length} books` : firstPriceMove?.bookTitle ?? "A book";
-        return `${actor} tightened the price on ${selection}`;
+        return pricePressureTitle(selection, event.priceMoves, event.market);
       }
       if (event.kind === "key_number_cross") {
         return event.favoriteFlip

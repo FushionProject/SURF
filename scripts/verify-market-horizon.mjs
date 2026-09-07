@@ -245,3 +245,11 @@ assert.equal(
 }
 
 console.log("Market horizon fixtures passed: useful price pressure, consensus shifts, key numbers, resolution, and noise rejection.");
+
+// Live CFB regression: the same selection at +2.5 and +3.5 must not share a title.
+const { pricePressureTitle } = await import("../lib/surf/marketHorizonCopy.ts");
+const movesAt = point => [{ bookTitle: "DraftKings", point }, { bookTitle: "FanDuel", point }];
+assert.notEqual(pricePressureTitle("Florida State", movesAt(2.5), "spreads"), pricePressureTitle("Florida State", movesAt(3.5), "spreads"));
+assert.match(pricePressureTitle("Florida State", movesAt(2.5), "spreads"), /at \+2\.5$/);
+assert.match(pricePressureTitle("Over", movesAt(45.5), "totals"), /at 45\.5$/);
+console.log("Price pressure copy distinguishes separately quoted lines.");
