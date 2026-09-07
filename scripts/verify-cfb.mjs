@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolveCfbTeam, normalizeCfbName, cfbSeasonAt } from '../lib/surf/cfbIdentity.ts';
+import { CFB_TEAM_CATALOG } from '../lib/surf/cfbTeamCatalog.ts';
+import { buildCfbTeamContext, matchCfbGame, isCfbFinal, cfbMarketEligible } from '../lib/surf/cfbContextCore.ts';
+import { buildGameOfferBoard } from '../lib/surf/opportunities.ts';
+import { matchPolymarketWinnerMarkets, matchKalshiWinnerMarkets, predictionSeriesForSport } from '../lib/surf/predictionMarketCore.ts';
+import { createMarketTapeStore, recordMarketTapeSnapshot, getMarketTapeEvents } from '../lib/surf/marketTape.ts';
+import { parseRequestedSport } from '../lib/surf/sports.ts';
+import { getSharedOddsSnapshot, getOddsRequestTelemetry } from '../lib/surf/sharedOddsSnapshot.ts';
+const SPORT='americanfootball_ncaaf', NOW=Date.parse('2026-09-12T16:00:00Z'), START='2026-09-12T19:00:00Z';
+const home=resolveCfbTeam('Ohio State Buckeyes',CFB_TEAM_CATALOG), away=resolveCfbTeam('Texas Longhorns',CFB_TEAM_CATALOG);
+assert.equal(home.id,107);
+assert.equal(resolveCfbTeam('#2 Ohio St. Buckeyes',CFB_TEAM_CATALOG)?.id,home.id);
+assert.notEqual(resolveCfbTeam('Ohio Bobcats',CFB_TEAM_CATALOG)?.id,home.id);
+assert.equal(resolveCfbTeam('Miami',CFB_TEAM_CATALOG),undefined);
+assert.notEqual(resolveCfbTeam('Miami (OH)',CFB_TEAM_CATALOG)?.id,resolveCfbTeam('Miami Hurricanes',CFB_TEAM_CATALOG)?.id);
+assert.equal(resolveCfbTeam('Tigers',CFB_TEAM_CATALOG),undefined);
+assert.equal(resolveCfbTeam('Unknown College',CFB_TEAM_CATALOG),undefined);
+assert.equal(normalizeCfbName("Hawai’i"),normalizeCfbName('Hawaii'));
+assert.equal(parseRequestedSport(SPORT).ok,true);
+assert.equal(parseRequestedSport('americanfootball_ncaaf_fcs').ok,false);
+assert.equal(cfbSeasonAt(Date.parse('2027-01-12T00:00:00Z')),2026);
+assert.equal(cfbSeasonAt(NOW),2026);
+function odds(point=35,total=80){return {id:'cfb-test',sport_key:SPORT,home_team:'Ohio State Buckeyes',away_team:'Texas Longhorns',commence_time:START,
+bookmakers:['draftkings','fanduel','betmgm','williamhill_us'].map((key,i)=>({key,title:key,last_update:new Date(NOW).toISOString(),markets:[
+{key:'spreads',outcomes:[{name:'Ohio State Buckeyes',point:-(point+(i===0?1:0)),price:-110},{name:'Texas Longhorns',point:point+(i===0?1:0),price:-110}]},
+{key:'totals',outcomes:[{name:'Over',point:total,price:-110},{name:'Under',point:total,price:-110}]},
+{key:'h2h',outcomes:[{name:'Ohio State Buckeyes',price:-250},{name:'Texas Longhorns',price:200}]}]}))};}
+const game=odds();
+assert.equal(buildGameOfferBoard(game,SPORT,NOW).offers.awaySpread.point,36);
+assert.equal(buildGameOfferBoard(game,SPORT,NOW).opportunities.length,0,'one point in a giant spread is not calibrated as meaningful');
+assert.equal(buildGameOfferBoard(game,'americanfootball_nfl',NOW).booksInSample,0);
+assert.equal(buildGameOfferBoard(game,SPORT,NOW+16*60*1000).booksInSample,0,'stale quotes are excluded');
+const provider={game:{id:100,stage:'FBS (Division I-A)',date:{timestamp:Date.parse(START)/1000},status:{short:'NS'}},league:{id:2,season:2026},teams:{home,away},scores:{home:{total:null},away:{total:null}}};
+assert.equal(matchCfbGame(game,CFB_TEAM_CATALOG,[provider])?.game.id,100);
+for (const status of ['CANC','PST','SUSP','FT','AOT']) assert.equal(cfbMarketEligible(game,{games:{[game.id]:{status}}}),false);
+assert.equal(cfbMarketEligible(game,{games:{[game.id]:{status:'NS',stage:'Conference Championship'}}}),true);
+assert.equal(cfbMarketEligible(game,{games:{[game.id]:{status:'NS',stage:'FCS (Division I-AA)'}}}),false);
+assert.equal(matchCfbGame(game,CFB_TEAM_CATALOG,[{...provider,teams:{home:away,away:home}}])?.game.id,100,'neutral site ordering');
+assert.equal(matchCfbGame(game,CFB_TEAM_CATALOG,[provider, {...provider,game:{...provider.game,id:101}}]),undefined,'ambiguous duplicates');
+assert.equal(matchCfbGame({...game,commence_time:'2026-09-13T19:00:00Z'},CFB_TEAM_CATALOG,[provider]),undefined,'reschedule is not joined to old kickoff');
+for(const status of ['CANC','PST','SUSP','NS','Q4']) assert.equal(isCfbFinal({...provider,game:{...provider.game,status:{short:status}}}),false);
+const final={...provider,game:{...provider.game,date:{timestamp:NOW/1000-86400},status:{short:'AOT'}},scores:{home:{total:38},away:{total:35}}};
+assert.equal(isCfbFinal(final),true);
+const context=buildCfbTeamContext(home,[final,final],[],NOW);
+assert.equal(context.record,'1–0');assert.equal(context.pointsFor,38);assert.equal(context.standing,null);assert.equal(context.recentForm,'W');
+assert.equal(buildCfbTeamContext(home,[],[],NOW).record,null,'no fake 0–0');
+const poly={id:'p',slug:'cfb-tex-osu-2026-09-12',startTime:START,markets:[{id:'m',conditionId:'condition',sportsMarketType:'moneyline',active:true,outcomes:'["Texas", "Ohio State"]',outcomePrices:'["0.4", "0.6"]',clobTokenIds:'["1","2"]',liquidity:3000}]};
+assert.equal(matchPolymarketWinnerMarkets([game],[poly,poly],NOW).length,1,'dedupe');
+assert.equal(matchPolymarketWinnerMarkets([game],[{...poly,slug:'nfl-tex-osu'}],NOW).length,0);
+assert.equal(matchPolymarketWinnerMarkets([game],[{...poly,startTime:'2026-09-13T19:00:00Z'}],NOW).length,0);
+assert.equal(matchPolymarketWinnerMarkets([game],[],NOW).length,0);
+const kalshi=['Ohio State','Texas'].map((name,i)=>({ticker:`KXNCAAFGAME-26SEP12TEXOSU-${i}`,event_ticker:'KXNCAAFGAME-26SEP12TEXOSU',yes_sub_title:name,expected_expiration_time:'2026-09-12T23:00:00Z',yes_bid_dollars:'0.49',yes_ask_dollars:'0.51',volume_24h_fp:'1000'}));
+assert.equal(matchKalshiWinnerMarkets([game],kalshi,NOW).length,1);
+assert.equal(matchKalshiWinnerMarkets([game],kalshi.slice(0,1),NOW).length,0);
+assert.deepEqual(predictionSeriesForSport(SPORT),{kalshi:'KXNCAAFGAME',polymarket:'12756'});
+const store=createMarketTapeStore();
+recordMarketTapeSnapshot([game],SPORT,NOW,{},store);
+const moved=odds(38,84);moved.bookmakers.forEach(b=>b.last_update=new Date(NOW+120000).toISOString());
+recordMarketTapeSnapshot([moved],SPORT,NOW+120000,{},store);
+assert.ok(getMarketTapeEvents(SPORT,NOW+120000,undefined,store).length > 0);
+assert.ok(getMarketTapeEvents(SPORT,NOW+120000,undefined,store).every(e=>e.game.league==='CFB'));
+assert.equal(getMarketTapeEvents('americanfootball_nfl',NOW+120000,undefined,store).length,0);
+const originalFetch=globalThis.fetch;let calls=0;
+globalThis.fetch=async url=>{calls++;assert.ok(String(url).includes('markets=h2h%2Cspreads%2Ctotals'));await new Promise(r=>setTimeout(r,10));return new Response(JSON.stringify([...Array.from({length:175},(_,i)=>({...game,id:'slate-'+i})),{...game,id:'slate-0'},{...game,id:'fcs',sport_key:'americanfootball_ncaaf_fcs'}]),{headers:{'x-requests-used':'503','x-requests-last':'3','x-requests-remaining':'19497'}});};
+try {const results=await Promise.all(Array.from({length:80},()=>getSharedOddsSnapshot({sportKey:SPORT,apiKey:'fixture'})));assert.equal(calls,1);assert.ok(results.every(r=>r.games.length===175));assert.equal(getOddsRequestTelemetry(SPORT).maxConcurrentRequests,1);assert.equal(getOddsRequestTelemetry('americanfootball_nfl').externalRequestCount,0);} finally {globalThis.fetch=originalFetch;}
+const migration=readFileSync(new URL('../supabase/migrations/20260907022743_add_cfb_market_memory.sql',import.meta.url),'utf8');
+assert.match(migration,/security_invoker = true/);assert.match(migration,/enable row level security/);assert.doesNotMatch(migration,/security definer/i);
+console.log('CFB fixtures passed: identities, neutral sites, reschedules, final/OT records, missing coverage, giant spreads, stale quotes, prediction matching, dedupe, 80 concurrent requests, FCS isolation, tape, and private schema.');

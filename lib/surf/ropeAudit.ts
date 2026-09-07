@@ -444,7 +444,7 @@ function pollingAndBudgetChecks(sportKey: SurfSportKey, telemetry: OddsRequestTe
   ];
   const pollingStatus: RopeCheckStatus = pollingProblems.length > 0 ? "fail" : telemetry.failureCount > 0 ? "warn" : "pass";
 
-  const expectedCost = sportKey === "baseball_mlb" ? 3 : 2;
+  const expectedCost = (sportKey === "baseball_mlb" || sportKey === "americanfootball_ncaaf") ? 3 : 2;
   const quotaProblems = [
     ...(telemetry.quota?.lastCost != null && telemetry.quota.lastCost > expectedCost
       ? [`Last request cost ${telemetry.quota.lastCost}; policy allows ${expectedCost}`]

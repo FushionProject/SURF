@@ -1,3 +1,7 @@
+import { cfbMarketEligible } from "@/lib/surf/cfbContextCore";
+import { recordCfbMemory } from "@/lib/surf/cfbMemory";
+import { getCfbContext, cachedCfbFinals } from "@/lib/surf/cfbContext";
+import type { CfbContext } from "@/lib/surf/cfbContextCore";
 import { NextResponse } from "next/server";
 
 import type { GamePredictionMarketConsensus, OddsApiGame, SignalCard, SurfSignalDetection } from "@/lib/surf/types";
@@ -91,6 +95,9 @@ function readMlbTotalsOverPoints(game: OddsApiGame): number[] {
 }
 
 export type GameSummariesResponse = {
+  cfbContext?: CfbContext;
+  cfbMemoryVerified?: boolean;
+  predictionMarketProviders?: Record<"kalshi" | "polymarket", string>;
   sportKey: SurfSportKey;
   sportLabel: SurfSportLabel;
   count: number;
@@ -237,10 +244,12 @@ async function getLiveGameSummaries(request: Request) {
         .slice(0, 16)
     : upcomingGames;
 
-  const filteredGames: OddsApiGame[] = slateGames.map((g) => ({
+  let filteredGames: OddsApiGame[] = slateGames.map((g) => ({
     ...g,
     bookmakers: filterSurfBookmakers(g.bookmakers),
   }));
+  const cfbContext = sportKey === "americanfootball_ncaaf" ? await getCfbContext(filteredGames, now) : undefined;
+  if (cfbContext) filteredGames = filteredGames.filter(game => cfbMarketEligible(game, cfbContext));
 
   if (isDebug) {
     console.log(
@@ -674,7 +683,13 @@ async function getLiveGameSummaries(request: Request) {
     getPredictionMarketSnapshot(filteredGames, sportKey, now),
   ]);
 
+
+  const cfbMemoryVerified = cfbContext ? await recordCfbMemory(filteredGames, predictionMarketSnapshot.whaleSignals, { predictions: predictionMarketSnapshot.providers, ncaa: cfbContext.status, ncaaGames: cfbContext.games }, now, cachedCfbFinals(now)) : undefined;
+
   const payload: GameSummariesResponse = {
+    cfbMemoryVerified,
+    predictionMarketProviders: predictionMarketSnapshot.providers,
+    cfbContext,
     sportKey,
     sportLabel: sportConfig.label,
     count: filteredGames.length,
@@ -717,18 +732,18 @@ async function getLiveGameSummaries(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (isSurfDemoMode()) {
+  if (isSurfDemoMode() && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
     return NextResponse.json(getDemoGameSummaries("demo"));
   }
 
   try {
     const response = await getLiveGameSummaries(request);
-    if (response.status >= 500 && process.env.NODE_ENV === "development") {
+    if (response.status >= 500 && process.env.NODE_ENV === "development" && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
       return NextResponse.json(getDemoGameSummaries("fallback"));
     }
     return response;
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === "development" && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
       console.warn("[SURF] Live game summaries failed; serving simulated fallback data.", error);
       return NextResponse.json(getDemoGameSummaries("fallback"));
     }

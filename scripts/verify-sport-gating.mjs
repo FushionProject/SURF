@@ -15,8 +15,9 @@ assert.equal(SURF_ENABLED_SPORT_KEYS.includes("basketball_nba"), false, "NBA mus
 assert.equal(isSurfVisibleSportKey("americanfootball_nfl_preseason"), false);
 assert.deepEqual(parseRequestedSport("americanfootball_nfl_preseason"), { ok: false, value: "americanfootball_nfl_preseason" });
 
-for (const sport of ["americanfootball_nfl", "baseball_mlb"]) {
+for (const sport of ["americanfootball_nfl", "americanfootball_ncaaf", "baseball_mlb"]) {
   assert.equal(parseRequestedSport(sport).ok, true, `${sport} should remain enabled`);
+  assert.equal(isSurfVisibleSportKey(sport), true, `${sport} should remain visible`);
 }
 
 console.log("Sport gating fixtures passed: NBA and preseason blocked from UI and live routes.");

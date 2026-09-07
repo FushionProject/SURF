@@ -1,6 +1,7 @@
 export const SURF_SPORT_KEYS = [
   "americanfootball_nfl_preseason",
   "americanfootball_nfl",
+  "americanfootball_ncaaf",
   "basketball_nba",
   "baseball_mlb",
 ] as const;
@@ -8,9 +9,10 @@ export const SURF_SPORT_KEYS = [
 export type SurfSportKey = (typeof SURF_SPORT_KEYS)[number];
 export const SURF_ENABLED_SPORT_KEYS = [
   "americanfootball_nfl",
+  "americanfootball_ncaaf",
   "baseball_mlb",
 ] as const satisfies readonly SurfSportKey[];
-export type SurfLeague = "NFL" | "NBA" | "MLB";
+export type SurfLeague = "NFL" | "NBA" | "MLB" | "CFB";
 export type SurfSportLabel = "NFL Preseason" | SurfLeague;
 
 export type SurfSportConfig = {
@@ -22,6 +24,8 @@ export type SurfSportConfig = {
 };
 
 export const DEFAULT_SURF_SPORT_KEY: SurfSportKey = "americanfootball_nfl";
+
+export const CFB_FCS_SPORT_KEY = "americanfootball_ncaaf_fcs" as const;
 
 export const SURF_SPORTS: readonly SurfSportConfig[] = [
   {
@@ -36,6 +40,13 @@ export const SURF_SPORTS: readonly SurfSportConfig[] = [
     league: "NFL",
     label: "NFL",
     selectorLabel: "NFL",
+    seasonType: "regular",
+  },
+  {
+    key: "americanfootball_ncaaf",
+    league: "CFB",
+    label: "CFB",
+    selectorLabel: "CFB",
     seasonType: "regular",
   },
   {

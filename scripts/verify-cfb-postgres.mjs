@@ -1,0 +1,13 @@
+import { PGlite } from '@electric-sql/pglite';
+import {readFileSync,readdirSync} from 'node:fs';import assert from 'node:assert/strict';
+const db=new PGlite();await db.exec('create role anon; create role authenticated; create role service_role bypassrls;');
+for(const file of readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort()) await db.exec(readFileSync('supabase/migrations/'+file,'utf8'));
+await db.exec(readFileSync('supabase/migrations/20260907022743_add_cfb_market_memory.sql','utf8'));
+await db.exec('set role service_role');
+assert.equal((await db.query('select public.surf_cfb_memory_health() as ok')).rows[0].ok,true);
+const game={sport_key:'americanfootball_ncaaf',game_id:'fixture',game_key:'americanfootball_ncaaf:fixture',commence_time:'2026-09-12T19:00:00Z',home_team:'Ohio State Buckeyes',away_team:'Texas Longhorns',spread_value:-35,spread_books:4,total_value:80,total_books:4};
+assert.equal((await db.query('select public.record_surf_market_history($1::jsonb,$2::timestamptz) as n',[JSON.stringify([game]),new Date().toISOString()])).rows[0].n,2);
+await db.exec('reset role; set role anon');
+await assert.rejects(db.query('select * from public.surf_cfb_observations'));
+await assert.rejects(db.query('select * from public.surf_cfb_results'));
+console.log('Local PostgreSQL engine: all migrations applied, CFB migration idempotent, CFB atomic history capture passed, anonymous reads denied.');await db.close();

@@ -504,7 +504,7 @@ function buildSlot(
       ? Math.max(0, (bestProbability - consensusProbability) * 100)
       : 0;
   const lineQualifies =
-    (lineEdge >= LINE_EDGE_THRESHOLD || keyNumber != null) &&
+    (lineEdge >= (sportKey === "americanfootball_ncaaf" ? (best.market === "totals" ? 2 : Math.abs(consensus) >= 28 ? 2 : 1) : LINE_EDGE_THRESHOLD) || keyNumber != null) &&
     pricePenaltyPp <= MAX_LINE_PRICE_PENALTY_PP;
 
   const priceEdgePercentagePoints =
@@ -519,7 +519,7 @@ function buildSlot(
   if (!lineQualifies && !priceQualifies) return { offer };
   const kind: MarketOpportunityKind = keyNumber != null ? "key_number" : lineQualifies ? "best_line" : "best_price";
   const score = Math.min(
-    100,
+    sportKey === "americanfootball_ncaaf" && Math.abs(consensus) >= 28 && best.market === "spreads" ? 78 : 100,
     Math.round(
       kind === "key_number"
         ? 86 + Math.min(8, lineEdge * 4)
@@ -651,7 +651,9 @@ export function buildGameOfferBoard(
   sportKey: SurfSportKey,
   observedAt: number = Date.now(),
 ): GameOfferBoard {
-  const samples = collectSamples(game);
+  if (game.sport_key !== sportKey) return { gameId: game.id, offers: {}, opportunities: [], booksInSample: 0 };
+  const samples = collectSamples(game).filter(sample => sportKey !== "americanfootball_ncaaf" ||
+    (sample.providerUpdatedAt != null && observedAt - sample.providerUpdatedAt <= 15*60*1000 && sample.providerUpdatedAt <= observedAt+60_000));
   const offers: Partial<Record<OfferSlot, BestMarketOffer>> = {};
   const opportunities: MarketOpportunity[] = [];
 

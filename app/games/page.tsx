@@ -9,6 +9,7 @@ import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
 import { SurfFooter } from "@/components/surf/SurfFooter";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import type { NflInjury, NflInjuryFeed } from "@/lib/surf/injuries";
+import type { CfbContext, CfbTeamContext } from "@/lib/surf/cfbContextCore";
 import { nextRefreshDelayMs } from "@/lib/surf/feedSchedule";
 import type { GameMarketAverage, MarketAverageHistoryPoint } from "@/lib/surf/marketAverage";
 import {
@@ -36,6 +37,9 @@ type GamesResponse = {
   sportKey: SurfSportKey;
   sportLabel: SurfSportLabel;
   count: number;
+  cfbContext?: CfbContext;
+  cfbMemoryVerified?: boolean;
+  predictionMarketProviders?: Record<"kalshi" | "polymarket", string>;
   games: OddsApiGame[];
   detections: SurfSignalDetection[];
   openingMedianSnapshot: LineSnapshot;
@@ -110,8 +114,10 @@ function activityAge(timestamp: number, now: number): string {
   return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
 }
 
-function TeamMark({ name, league, compact = false }: { name: string; league: SurfLeague; compact?: boolean }) {
-  const logo = getTeamLogo(name, league);
+function TeamMark({ name, league, compact = false, providerLogo }: { name: string; league: SurfLeague; compact?: boolean; providerLogo?: string | null }) {
+  const logo = league === "CFB" && providerLogo?.startsWith("https://media.api-sports.io/american-football/teams/")
+    ? providerLogo
+    : getTeamLogo(name, league);
   const abbrev = getTeamAbbrev(name) ?? name.slice(0, 3).toUpperCase();
   const teamRgb = getTeamPrimaryRgb(name, league);
 
@@ -144,17 +150,21 @@ function TeamMark({ name, league, compact = false }: { name: string; league: Sur
   );
 }
 
-function TeamIdentity({ name, league, side }: { name: string; league: SurfLeague; side: "away" | "home" }) {
+function TeamIdentity({ name, league, side, providerLogo, cfbTeam }: { name: string; league: SurfLeague; side: "away" | "home"; providerLogo?: string | null; cfbTeam?: CfbTeamContext }) {
   const abbrev = getTeamAbbrev(name) ?? name.slice(0, 3).toUpperCase();
 
   return (
     <div className={`sports-team flex min-w-0 flex-col items-center ${side === "home" ? "text-right" : "text-left"}`}>
-      <TeamMark name={name} league={league} />
+      <TeamMark name={name} league={league} providerLogo={providerLogo} />
       <div className="mt-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-[color:var(--surf-ink-35)]">{side}</div>
       <div className="mt-1 max-w-[130px] truncate text-center text-[13px] font-semibold tracking-[-0.02em] text-[color:var(--surf-ink-90)] sm:max-w-[210px] sm:text-sm">
         {name}
       </div>
-      <div className="mt-0.5 text-[10px] font-semibold tracking-[0.12em] text-[color:var(--surf-ink-40)]">{abbrev}</div>
+      <div className="mt-0.5 text-[10px] font-semibold tracking-[0.12em] text-[color:var(--surf-ink-40)]">
+        {league === "CFB"
+          ? cfbTeam?.record ? `${cfbTeam.record} · ${cfbTeam.completedGames} verified finals` : "Record unavailable"
+          : abbrev}
+      </div>
     </div>
   );
 }
@@ -410,18 +420,22 @@ function BestOfferTile({
   offer,
   opportunity,
   accentRgb,
+  compactSelection = false,
 }: {
   label: string;
   offer: BestMarketOffer | undefined;
   opportunity: MarketOpportunity | undefined;
   accentRgb: string;
+  compactSelection?: boolean;
 }) {
   const selection = offer ? getTeamAbbrev(offer.selection) ?? offer.selection : "—";
+  // College names stay in the matchup header; the away/home label identifies each quote.
+  const selectionPrefix = compactSelection ? "" : `${selection} `;
   const line = offer
     ? offer.market === "h2h"
-      ? `${selection} ${american(offer.price)}`
+      ? `${selectionPrefix}${american(offer.price)}`
       : offer.market === "spreads"
-      ? `${selection} ${signed(offer.point)}`
+      ? `${selectionPrefix}${signed(offer.point)}`
       : plain(offer.point)
     : "Not posted";
   const tag = opportunityTag(opportunity);
@@ -445,7 +459,7 @@ function BestOfferTile({
           </span>
         ) : null}
       </div>
-      <div className="sports-offer-value">
+      <div className="sports-offer-value" aria-label={compactSelection && offer ? `${offer.selection} ${line}${offer.market !== "h2h" ? ` at ${american(offer.price)}` : ""}` : undefined}>
         <span>{line}</span>{offer?.market !== "h2h" && offer?.price != null ? <span className="sports-offer-price">{american(offer.price)}</span> : null}
       </div>
       <div className="sports-offer-book">
@@ -628,38 +642,57 @@ function injuryStatusTone(status: string): string {
   return "border-[color:var(--surf-neutral)]/20 bg-[color:var(--surf-neutral)]/10 text-[color:var(--surf-neutral)]";
 }
 
+type InjuryDisplay = Pick<NflInjury, "playerName" | "status" | "description"> & { displayKey: string };
+
 function InjuryTeam({
   teamName,
   league,
   injuries,
   isLoading,
+  cfbTeam,
 }: {
   teamName: string;
   league: SurfLeague;
-  injuries: NflInjury[];
+  injuries: InjuryDisplay[];
   isLoading: boolean;
+  cfbTeam?: CfbTeamContext;
 }) {
   const abbrev = getTeamAbbrev(teamName) ?? teamName;
+  const isCfb = league === "CFB";
+  const availability = cfbTeam?.availability ?? "Availability not verified";
 
   return (
     <section className="min-w-0 rounded-[16px] border border-[color:var(--surf-line-06)] bg-black/10 p-3.5">
       <div className="flex items-center justify-between gap-3 border-b border-[color:var(--surf-line-06)] pb-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <TeamMark name={teamName} league={league} compact />
+          <TeamMark name={teamName} league={league} compact providerLogo={cfbTeam?.logo} />
           <div className="min-w-0">
             <div className="truncate text-xs font-semibold text-[color:var(--surf-ink-85)]">{abbrev}</div>
             <div className="mt-0.5 text-[9px] uppercase tracking-[0.13em] text-[color:var(--surf-ink-35)]">Team report</div>
           </div>
         </div>
         <span className="rounded-full bg-[color:var(--surf-fill-06)] px-2 py-1 text-[10px] font-semibold text-[color:var(--surf-ink-55)]">
-          {isLoading ? "…" : injuries.length}
+          {isLoading ? "…" : isCfb && injuries.length === 0 ? "—" : injuries.length}
         </span>
       </div>
 
       <div className="mt-3 max-h-64 space-y-2.5 overflow-y-auto pr-1">
+        {isCfb ? (
+          <>
+            <p className="mt-1.5 text-[10px] leading-4 text-[color:var(--surf-ink-40)]">
+              {cfbTeam?.record ? `${cfbTeam.record} from ${cfbTeam.completedGames} verified finals` : "Record unavailable"}
+            </p>
+            {cfbTeam?.recentForm ? <p className="mt-1.5 text-[10px] leading-4 text-[color:var(--surf-ink-40)]">Recent: {cfbTeam.recentForm}</p> : null}
+            {cfbTeam?.pointsFor != null && cfbTeam.pointsAgainst != null ? (
+              <p className="mt-1.5 text-[10px] leading-4 text-[color:var(--surf-ink-40)]">{cfbTeam.pointsFor} scored / {cfbTeam.pointsAgainst} allowed per verified game</p>
+            ) : null}
+            {cfbTeam?.standing ? <p className="mt-1.5 text-[10px] leading-4 text-[color:var(--surf-ink-40)]">{cfbTeam.standing}</p> : null}
+            {injuries.length > 0 ? <p className="mt-1.5 text-[10px] leading-4 text-[color:var(--surf-ink-40)]">{availability}</p> : null}
+          </>
+        ) : null}
         {injuries.length > 0 ? (
           injuries.map((injury) => (
-            <div key={`${injury.teamId}:${injury.playerId}`} className="rounded-xl border border-[color:var(--surf-line-05)] bg-[color:var(--surf-fill-02)] px-3 py-2.5">
+            <div key={injury.displayKey} className="rounded-xl border border-[color:var(--surf-line-05)] bg-[color:var(--surf-fill-02)] px-3 py-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 text-[11px] font-semibold text-[color:var(--surf-ink-80)]">{injury.playerName}</div>
                 <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.08em] ${injuryStatusTone(injury.status)}`}>
@@ -671,7 +704,7 @@ function InjuryTeam({
           ))
         ) : (
           <div className="py-5 text-center text-[10px] leading-4 text-[color:var(--surf-ink-35)]">
-            {isLoading ? "Report is still loading." : "No current injuries reported."}
+            {isCfb ? availability : isLoading ? "Report is still loading." : "No current injuries reported."}
           </div>
         )}
       </div>
@@ -684,19 +717,33 @@ function InjuryDrawer({
   awayTeam,
   homeTeam,
   league,
+  cfbContext,
 }: {
   feed: NflInjuryFeed;
   awayTeam: string;
   homeTeam: string;
   league: SurfLeague;
+  cfbContext?: CfbContext;
 }) {
-  if (league !== "NFL") return null;
-  const awayInjuries = feed.injuriesByTeam[awayTeam] ?? [];
-  const homeInjuries = feed.injuriesByTeam[homeTeam] ?? [];
+  if (league !== "NFL" && league !== "CFB") return null;
+  const isCfb = league === "CFB";
+  const displayInjuries = (teamName: string): InjuryDisplay[] => isCfb
+    ? (cfbContext?.teams[teamName]?.injuries ?? []).map((injury, index) => ({
+        displayKey: `${teamName}:${injury.player}:${index}`,
+        playerName: injury.player,
+        status: injury.status,
+        description: injury.description,
+      }))
+    : (feed.injuriesByTeam[teamName] ?? []).map((injury) => ({
+        ...injury,
+        displayKey: `${injury.teamId}:${injury.playerId}`,
+      }));
+  const awayInjuries = displayInjuries(awayTeam);
+  const homeInjuries = displayInjuries(homeTeam);
   const total = awayInjuries.length + homeInjuries.length;
-  const isAvailable = feed.status === "available";
-  const awayIsLoading = Boolean(feed.isPartial && feed.missingTeams.includes(awayTeam));
-  const homeIsLoading = Boolean(feed.isPartial && feed.missingTeams.includes(homeTeam));
+  const isAvailable = !isCfb && feed.status === "available";
+  const awayIsLoading = !isCfb && Boolean(feed.isPartial && feed.missingTeams.includes(awayTeam));
+  const homeIsLoading = !isCfb && Boolean(feed.isPartial && feed.missingTeams.includes(homeTeam));
   const awayAbbrev = getTeamAbbrev(awayTeam) ?? awayTeam;
   const homeAbbrev = getTeamAbbrev(homeTeam) ?? homeTeam;
   const awaySummary = awayIsLoading ? `${awayAbbrev} loading` : `${awayAbbrev} ${awayInjuries.length}`;
@@ -714,13 +761,13 @@ function InjuryDrawer({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.13em] text-[color:var(--surf-ink-65)]">Injury reports</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.13em] text-[color:var(--surf-ink-65)]">{isCfb ? "Team and injury reports" : "Injury reports"}</span>
               {isAvailable ? <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--surf-positive)]" /> : null}
             </div>
             <div className="mt-0.5 text-[10px] text-[color:var(--surf-ink-35)]">
-              {isAvailable
-                ? `${awaySummary} · ${homeSummary} · ${totalSummary}`
-                : "Verified context is not available yet"}
+              {isCfb
+                ? "Season results and reported availability"
+                : isAvailable ? `${awaySummary} · ${homeSummary} · ${totalSummary}` : "Verified context is not available yet"}
             </div>
           </div>
         </div>
@@ -734,19 +781,21 @@ function InjuryDrawer({
       </summary>
 
       <div className="border-t border-[color:var(--surf-line-06)] px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-        {isAvailable ? (
+        {isCfb || isAvailable ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <InjuryTeam
               teamName={awayTeam}
               league={league}
               injuries={awayInjuries}
               isLoading={awayIsLoading}
+              cfbTeam={isCfb ? cfbContext?.teams[awayTeam] : undefined}
             />
             <InjuryTeam
               teamName={homeTeam}
               league={league}
               injuries={homeInjuries}
               isLoading={homeIsLoading}
+              cfbTeam={isCfb ? cfbContext?.teams[homeTeam] : undefined}
             />
           </div>
         ) : (
@@ -816,11 +865,11 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
         </div>
 
         <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-start gap-3 sm:gap-8">
-          <TeamIdentity name={game.away_team} league={config.league} side="away" />
+          <TeamIdentity name={game.away_team} league={config.league} side="away" providerLogo={data.cfbContext?.teams[game.away_team]?.logo} cfbTeam={data.cfbContext?.teams[game.away_team]} />
           <div className="flex h-[68px] items-center">
-            <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/15 px-2.5 py-1 text-[9px] font-semibold tracking-[0.13em] text-[color:var(--surf-ink-35)]">AT</span>
+            <span className="rounded-full border border-[color:var(--surf-line-08)] bg-black/15 px-2.5 py-1 text-[9px] font-semibold tracking-[0.13em] text-[color:var(--surf-ink-35)]">{config.league === "CFB" ? "VS" : "AT"}</span>
           </div>
-          <TeamIdentity name={game.home_team} league={config.league} side="home" />
+          <TeamIdentity name={game.home_team} league={config.league} side="home" providerLogo={data.cfbContext?.teams[game.home_team]?.logo} cfbTeam={data.cfbContext?.teams[game.home_team]} />
         </div>
 
         <div className="-mx-5 mt-5 border-t border-[color:var(--surf-line-06)] bg-black/[0.075] px-5 pt-5 sm:-mx-6 sm:px-6">
@@ -836,14 +885,14 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
             </div>
             <div className="overflow-hidden rounded-[18px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-line-06)] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
               <div className="grid grid-cols-2 gap-px">
-                {config.league === "MLB" ? (
+                {config.league === "MLB" || config.league === "CFB" ? (
                   <>
-                    <BestOfferTile label="Away moneyline" offer={board.offers.awayMoneyline} opportunity={opportunitiesBySlot.get("awayMoneyline")} accentRgb={awayTeamRgb} />
-                    <BestOfferTile label="Home moneyline" offer={board.offers.homeMoneyline} opportunity={opportunitiesBySlot.get("homeMoneyline")} accentRgb={homeTeamRgb} />
+                    <BestOfferTile label="Away moneyline" offer={board.offers.awayMoneyline} opportunity={opportunitiesBySlot.get("awayMoneyline")} accentRgb={awayTeamRgb} compactSelection={config.league === "CFB"} />
+                    <BestOfferTile label="Home moneyline" offer={board.offers.homeMoneyline} opportunity={opportunitiesBySlot.get("homeMoneyline")} accentRgb={homeTeamRgb} compactSelection={config.league === "CFB"} />
                   </>
                 ) : null}
-                <BestOfferTile label={`Away ${spreadName}`} offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} accentRgb={awayTeamRgb} />
-                <BestOfferTile label={`Home ${spreadName}`} offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} accentRgb={homeTeamRgb} />
+                <BestOfferTile label={`Away ${spreadName}`} offer={board.offers.awaySpread} opportunity={opportunitiesBySlot.get("awaySpread")} accentRgb={awayTeamRgb} compactSelection={config.league === "CFB"} />
+                <BestOfferTile label={`Home ${spreadName}`} offer={board.offers.homeSpread} opportunity={opportunitiesBySlot.get("homeSpread")} accentRgb={homeTeamRgb} compactSelection={config.league === "CFB"} />
                 <BestOfferTile label="Over" offer={board.offers.over} opportunity={opportunitiesBySlot.get("over")} accentRgb={awayTeamRgb} />
                 <BestOfferTile label="Under" offer={board.offers.under} opportunity={opportunitiesBySlot.get("under")} accentRgb={homeTeamRgb} />
               </div>
@@ -904,7 +953,7 @@ function GameMarketCard({ game, data, observedAt }: { game: OddsApiGame; data: G
         </div>
       </div>
 
-      <InjuryDrawer feed={data.injuries} awayTeam={game.away_team} homeTeam={game.home_team} league={config.league} />
+      <InjuryDrawer feed={data.injuries} awayTeam={game.away_team} homeTeam={game.home_team} league={config.league} cfbContext={data.cfbContext} />
     </article>
   );
 }

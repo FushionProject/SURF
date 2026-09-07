@@ -19,7 +19,9 @@
     "test:bookmakers": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-bookmakers.mjs",
     "test:prediction-markets": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-prediction-markets.mjs",
     "test:feed-schedule": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-feed-schedule.mjs",
-    "test:sport-gating": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-sport-gating.mjs"
+    "test:sport-gating": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-sport-gating.mjs",
+    "test:cfb": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-cfb.mjs",
+    "test:cfb-postgres": "node scripts/verify-cfb-postgres.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",
@@ -30,6 +32,7 @@
     "server-only": "0.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

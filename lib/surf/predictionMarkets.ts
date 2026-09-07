@@ -129,6 +129,7 @@ async function fetchKalshiTrades(
     const settled = await Promise.allSettled(batch.map((ticker) => fetchKalshiTickerTrades(ticker, now)));
     for (const result of settled) {
       if (result.status === "fulfilled") trades.push(...result.value);
+      else throw new Error("Prediction activity source partially unavailable");
     }
   }
   return trades;
@@ -144,16 +145,23 @@ function slateTimeRange(games: OddsApiGame[]): { min: string; max: string } {
   return { min: new Date(min - padding).toISOString(), max: new Date(max + padding).toISOString() };
 }
 
-async function fetchPolymarketEvents(seriesId: string, games: OddsApiGame[]): Promise<PolymarketEvent[]> {
+async function fetchPolymarketEvents(discoveryId: string, games: OddsApiGame[], filter: "series_id" | "tag_id" = "series_id"): Promise<PolymarketEvent[]> {
   const range = slateTimeRange(games);
   const url = new URL(`${POLYMARKET_GAMMA_BASE}/events/keyset`);
-  url.searchParams.set("series_id", seriesId);
+  url.searchParams.set(filter, discoveryId);
   url.searchParams.set("closed", "false");
   url.searchParams.set("start_time_min", range.min);
   url.searchParams.set("start_time_max", range.max);
   url.searchParams.set("limit", "500");
-  const payload = await fetchJson<{ events?: PolymarketEvent[] }>(url);
-  return payload.events ?? [];
+  const events: PolymarketEvent[] = [];
+  for (let page = 0; page < 5; page += 1) {
+    const payload = await fetchJson<{ events?: PolymarketEvent[]; next_cursor?: string }>(url);
+    events.push(...(payload.events ?? []));
+    if (!payload.next_cursor) return events;
+    url.searchParams.set("after_cursor", payload.next_cursor);
+  }
+  // Do not report full coverage when a large slate exceeds the bounded discovery budget.
+  throw new Error("Prediction discovery page limit reached");
 }
 
 async function fetchPolymarketTrades(markets: MatchedWinnerMarket[], thresholdUsd: number): Promise<PolymarketTrade[]> {
@@ -254,7 +262,7 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
   const series = predictionSeriesForSport(sportKey);
   const [kalshiResult, polymarketResult] = await Promise.allSettled([
     fetchKalshiMarkets(series.kalshi),
-    fetchPolymarketEvents(series.polymarket, games),
+    fetchPolymarketEvents(series.polymarket, games, series.polymarketFilter),
   ]);
 
   const kalshiMarkets = kalshiResult.status === "fulfilled"
@@ -293,7 +301,7 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
           : kalshiMarkets.length > 0
             ? kalshiTradesResult.status === "rejected"
               ? "partial"
-              : "available"
+              : sportKey === "americanfootball_ncaaf" && kalshiMarkets.length < games.length ? "partial" : "available"
             : "no_coverage",
       polymarket:
         polymarketResult.status === "rejected"
@@ -301,7 +309,7 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
           : polymarketMarkets.length > 0
             ? polymarketTradesResult.status === "rejected"
               ? "partial"
-              : "available"
+              : sportKey === "americanfootball_ncaaf" && polymarketMarkets.length < games.length ? "partial" : "available"
             : "no_coverage",
     },
   };

@@ -117,6 +117,7 @@ function roundProbability(value: number): number {
 }
 
 function sportMeta(sportKey: SurfSportKey): { league: SurfLeague; label: SurfSportLabel } {
+  if (sportKey === "americanfootball_ncaaf") return { league: "CFB", label: "CFB" };
   if (sportKey === "basketball_nba") return { league: "NBA", label: "NBA" };
   if (sportKey === "baseball_mlb") return { league: "MLB", label: "MLB" };
   if (sportKey === "americanfootball_nfl_preseason") return { league: "NFL", label: "NFL Preseason" };
@@ -125,6 +126,7 @@ function sportMeta(sportKey: SurfSportKey): { league: SurfLeague; label: SurfSpo
 
 function isPlausibleLine(sportKey: SurfSportKey, market: SurfMarketType, point: number): boolean {
   if (!Number.isFinite(point) || !isHalfPointed(point)) return false;
+  if (sportKey === "americanfootball_ncaaf") return market === "spreads" ? Math.abs(point) <= 80 : point >= 20 && point <= 120;
   if (sportKey === "baseball_mlb") {
     return market === "spreads" ? Math.abs(point) >= 0.5 && Math.abs(point) <= 3.5 : point >= 3 && point <= 25;
   }
@@ -388,7 +390,7 @@ function storeLineHorizonEvent(
     rangeContraction >= 1 &&
     lineMoves.length >= 1;
   const consensusChanged =
-    Math.abs(consensusDelta) >= MIN_LINE_CHANGE &&
+    Math.abs(consensusDelta) >= (sportKey === "americanfootball_ncaaf" ? (current.market === "totals" || Math.abs(current.consensus) >= 28 ? 2 : 1) : MIN_LINE_CHANGE) &&
     lineMoves.length >= 1 &&
     current.consensusSupport >= 2;
   const keyCross =

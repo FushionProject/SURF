@@ -11,7 +11,7 @@ import {
 
 export const SURF_PERSISTENCE_SCHEMA_VERSION = 2;
 
-export type PersistenceSubsystem = "schema-health" | "market-history" | "rope-audit";
+export type PersistenceSubsystem = "schema-health" | "market-history" | "rope-audit" | "cfb-memory";
 
 export type SurfPersistenceStatus = {
   configured: boolean;

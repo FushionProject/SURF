@@ -1,3 +1,5 @@
+import { cfbNamesMatch } from "./cfbIdentity.ts";
+import { CFB_TEAM_CATALOG } from "./cfbTeamCatalog.ts";
 import type { SurfSportKey } from "./sports";
 import type {
   GamePredictionMarketConsensus,
@@ -278,6 +280,10 @@ export function matchKalshiWinnerMarkets(
   const candidates = markets.flatMap((market) => {
     const probability = marketMidpoint(market);
     if (probability == null) return [];
+    if (market.event_ticker.startsWith("KXNCAAFGAME-")) {
+      const bid = finiteNumber(market.yes_bid_dollars), ask = finiteNumber(market.yes_ask_dollars);
+      if (bid == null || ask == null || bid <= 0 || ask >= 1 || bid > ask || ask-bid > 0.15) return [];
+    }
     const providerCode = market.ticker.split("-").at(-1)?.toUpperCase();
     if (!providerCode) return [];
     const timestampValue = market.expected_expiration_time ?? market.close_time;
@@ -285,10 +291,13 @@ export function matchKalshiWinnerMarkets(
     if (!Number.isFinite(timestamp)) return [];
 
     const game = closestGame(games, timestamp, (candidateGame) =>
-      [candidateGame.away_team, candidateGame.home_team].some((team) => teamCodes(team).includes(providerCode)),
+      [candidateGame.away_team, candidateGame.home_team].some((team) => candidateGame.sport_key === "americanfootball_ncaaf"
+        ? market.event_ticker.startsWith("KXNCAAFGAME-") && cfbNamesMatch(market.yes_sub_title ?? "", team, CFB_TEAM_CATALOG)
+        : teamCodes(team).includes(providerCode)),
     );
     if (!game) return [];
-    const team = [game.away_team, game.home_team].find((name) => teamCodes(name).includes(providerCode));
+    const team = [game.away_team, game.home_team].find((name) => game.sport_key === "americanfootball_ncaaf"
+      ? cfbNamesMatch(market.yes_sub_title ?? "", name, CFB_TEAM_CATALOG) : teamCodes(name).includes(providerCode));
     if (!team) return [];
     return [{ market, game, team, probability }];
   });
@@ -307,6 +316,7 @@ export function matchKalshiWinnerMarkets(
     const away = group.find((candidate) => candidate.team === game.away_team);
     const home = group.find((candidate) => candidate.team === game.home_team);
     if (!away || !home) continue;
+    if (game.sport_key === "americanfootball_ncaaf" && matched.some(m=>m.game.id === game.id)) continue;
     const probabilities = normalizePair(away.probability, home.probability);
     if (!probabilities) continue;
 
@@ -370,15 +380,21 @@ export function matchPolymarketWinnerMarkets(
       const outcomes = parseJsonArray(market.outcomes);
       const prices = parseJsonArray(market.outcomePrices).map(Number);
       const assets = parseJsonArray(market.clobTokenIds);
-      if (outcomes.length !== 2 || prices.length !== 2 || prices.some((price) => !Number.isFinite(price))) continue;
+      if (outcomes.length !== 2 || prices.length !== 2 || prices.some((price) => !Number.isFinite(price) || price <= 0 || price >= 1)) continue;
 
       const game = closestGame(games, timestamp, (candidateGame) => {
         const teams = [candidateGame.away_team, candidateGame.home_team];
-        return teams.every((team) => outcomes.some((outcome) => teamNameMatches(outcome, team)));
+        return teams.every((team) => outcomes.some((outcome) => (candidateGame.sport_key === "americanfootball_ncaaf" ? cfbNamesMatch(outcome, team, CFB_TEAM_CATALOG) : teamNameMatches(outcome, team))));
       });
       if (!game) continue;
-      const awayIndex = outcomes.findIndex((outcome) => teamNameMatches(outcome, game.away_team));
-      const homeIndex = outcomes.findIndex((outcome) => teamNameMatches(outcome, game.home_team));
+      if ((game.sport_key === "americanfootball_nfl" || game.sport_key === "americanfootball_nfl_preseason") && (
+        !/^nfl-[a-z0-9]+-[a-z0-9]+-\d{4}-\d{2}-\d{2}$/.test(event.slug ?? "") ||
+        /(?:half|quarter|\b[12]h\b|\bq[1-4]\b)/i.test(market.question ?? "")
+      )) continue;
+      if (game.sport_key === "americanfootball_ncaaf" && (!event.slug?.startsWith("cfb-") || Math.abs(Date.parse(game.commence_time)-timestamp) > 3*60*60*1000 || /(?:1h|2h|quarter|half)/i.test(market.question ?? ""))) continue;
+      if (matched.some(m => m.game.id === game.id || m.marketId === market.conditionId)) continue;
+      const awayIndex = outcomes.findIndex((outcome) => (game.sport_key === "americanfootball_ncaaf" ? cfbNamesMatch(outcome, game.away_team, CFB_TEAM_CATALOG) : teamNameMatches(outcome, game.away_team)));
+      const homeIndex = outcomes.findIndex((outcome) => (game.sport_key === "americanfootball_ncaaf" ? cfbNamesMatch(outcome, game.home_team, CFB_TEAM_CATALOG) : teamNameMatches(outcome, game.home_team)));
       if (awayIndex < 0 || homeIndex < 0 || awayIndex === homeIndex) continue;
       const probabilities = normalizePair(prices[awayIndex], prices[homeIndex]);
       if (!probabilities) continue;
@@ -626,10 +642,14 @@ export function aggregatePolymarketWhaleBuys(
 }
 
 export function predictionSeriesForSport(sportKey: SurfSportKey): {
-  kalshi: "KXNFLGAME" | "KXMLBGAME";
-  polymarket: "10187" | "3";
+  kalshi: "KXNFLGAME" | "KXMLBGAME" | "KXNCAAFGAME";
+  polymarket: "450" | "3" | "12756";
+  polymarketFilter?: "tag_id";
 } {
+  if (sportKey === "americanfootball_ncaaf") return { kalshi: "KXNCAAFGAME", polymarket: "12756" };
   return sportKey === "baseball_mlb"
     ? { kalshi: "KXMLBGAME", polymarket: "3" }
-    : { kalshi: "KXNFLGAME", polymarket: "10187" };
+    // NFL season series rotate (10187 was 2025, 12185 is 2026). The NFL
+    // category spans seasons; exact team/time/winner matching still gates joins.
+    : { kalshi: "KXNFLGAME", polymarket: "450", polymarketFilter: "tag_id" };
 }

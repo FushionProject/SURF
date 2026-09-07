@@ -1,3 +1,7 @@
+import { getCfbContext, cachedCfbFinals } from "@/lib/surf/cfbContext";
+import { cfbMarketEligible } from "@/lib/surf/cfbContextCore";
+import { surfPersistenceStatus } from "@/lib/surf/supabasePersistence";
+import { recordCfbMemory, loadCfbMemory } from "@/lib/surf/cfbMemory";
 import { NextResponse } from "next/server";
 
 import type {
@@ -64,6 +68,8 @@ const SIGNAL_LIFECYCLE_STORE: Map<string, SignalLifecycleEntry> =
   globalThis.__surfSignalLifecycleStore ?? new Map<string, SignalLifecycleEntry>();
 globalThis.__surfSignalLifecycleStore = SIGNAL_LIFECYCLE_STORE;
 
+const cfbHydratedGames = new Set<string>();
+
 async function runRopeAudit(options: {
   sportKey: SurfSportKey;
   auditedAt: number;
@@ -75,6 +81,7 @@ async function runRopeAudit(options: {
   await verifySurfPersistence({ timeoutMs: 650 });
   const marketPersistence = persistentMarketHistoryStatus();
   const auditPersistence = ropePersistenceStatus();
+  const cfbMemory = surfPersistenceStatus("cfb-memory");
   let auditInput: RopeAuditInput = {
     ...options,
     oddsTelemetry: getOddsRequestTelemetry(options.sportKey),
@@ -82,8 +89,8 @@ async function runRopeAudit(options: {
       demoMode: false,
       oddsApiConfigured: Boolean(process.env.ODDS_API_KEY),
       persistentHistoryConfigured: marketPersistence.configured,
-      persistentHistoryVerified: marketPersistence.verified,
-      persistentHistoryError: marketPersistence.lastError,
+      persistentHistoryVerified: marketPersistence.verified && (options.sportKey !== "americanfootball_ncaaf" || cfbMemory.state === "healthy"),
+      persistentHistoryError: options.sportKey === "americanfootball_ncaaf" && cfbMemory.state !== "healthy" ? "CFB memory migration/capture not verified" : marketPersistence.lastError,
       auditPersistenceConfigured: auditPersistence.configured,
       auditPersistenceVerified: auditPersistence.verified,
       auditPersistenceError: auditPersistence.lastError,
@@ -883,11 +890,29 @@ async function getLiveSurfFeed(request: Request) {
         .slice(0, 16)
     : targetGames;
 
-  const filteredGames: OddsApiGame[] = slateGames.map((g) => ({
+  let filteredGames: OddsApiGame[] = slateGames.map((g) => ({
     ...g,
     bookmakers: filterSurfBookmakers(g.bookmakers),
   }));
+  const cfbContext = sportKey === "americanfootball_ncaaf" ? await getCfbContext(filteredGames, now) : undefined;
+  if (cfbContext) filteredGames = filteredGames.filter(game => cfbMarketEligible(game, cfbContext));
   const predictionMarketSnapshot = await getPredictionMarketSnapshot(filteredGames, sportKey, now);
+  if (sportKey === "americanfootball_ncaaf") {
+    for (const previous of await loadCfbMemory(filteredGames.filter(g=>!cfbHydratedGames.has(g.id)), now)) {
+      const current = filteredGames.find(game => game.id === previous.snapshot.id);
+      if (previous.snapshot.sport_key !== sportKey || !current ||
+        current.commence_time !== previous.snapshot.commence_time ||
+        current.home_team !== previous.snapshot.home_team || current.away_team !== previous.snapshot.away_team) continue;
+      const observed = Date.parse(previous.observed_at);
+      if (!Number.isFinite(observed) || observed >= now) continue;
+      recordMarketTapeSnapshot([previous.snapshot], sportKey, observed);
+      recordMarketHorizonSnapshot([previous.snapshot], sportKey, observed);
+    }
+  }
+  if (sportKey === "americanfootball_ncaaf") {
+    if (cfbHydratedGames.size > 2000) cfbHydratedGames.clear();
+    filteredGames.forEach(g=>cfbHydratedGames.add(g.id));
+  }
   const overnightCapture = isOvernightCapture(now);
   const tapeRecord = recordMarketTapeSnapshot(filteredGames, sportKey, now, {
     qualificationWindowMs: overnightCapture ? 3 * 60 * 60 * 1000 : 15 * 60 * 1000,
@@ -922,8 +947,9 @@ async function getLiveSurfFeed(request: Request) {
     const detections = usefulFeedSnapshotDetections(allDetections, sportKey);
     const signals = formatSignalCards(detections, filteredGames);
     const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, true), true);
-    const taggedSignalsRaw = [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals];
+    const taggedSignalsRaw = [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals, ...(sportKey === "americanfootball_ncaaf" ? supportingMarketSignals : [])];
     const taggedSignals = addSignalLifecycle(taggedSignalsRaw, now);
+    if (sportKey === "americanfootball_ncaaf") await recordCfbMemory(filteredGames, taggedSignals, { predictions: predictionMarketSnapshot.providers, ncaa: cfbContext?.status, ncaaGames: cfbContext?.games }, now, cachedCfbFinals(now));
     await runRopeAudit({
       sportKey,
       auditedAt: now,
@@ -989,9 +1015,10 @@ async function getLiveSurfFeed(request: Request) {
   const signals = formatSignalCards(detections, filteredGames);
   const currentSignals = collapseMLBSignalsByGame(enrichSignals(signals, filteredGames, detections, isDebug), isDebug);
   const taggedSignals = addSignalLifecycle(
-    [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals],
+    [...predictionMarketSnapshot.whaleSignals, ...currentOpportunitySignals, ...(sportKey === "americanfootball_ncaaf" ? supportingMarketSignals : [])],
     now,
   );
+  if (sportKey === "americanfootball_ncaaf") await recordCfbMemory(filteredGames, taggedSignals, { predictions: predictionMarketSnapshot.providers, ncaa: cfbContext?.status, ncaaGames: cfbContext?.games }, now, cachedCfbFinals(now));
   await runRopeAudit({
     sportKey,
     auditedAt: now,
@@ -1053,18 +1080,18 @@ async function getLiveSurfFeed(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (isSurfDemoMode()) {
+  if (isSurfDemoMode() && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
     return NextResponse.json(getDemoSurfFeed("demo"));
   }
 
   try {
     const response = await getLiveSurfFeed(request);
-    if (response.status >= 500 && process.env.NODE_ENV === "development") {
+    if (response.status >= 500 && process.env.NODE_ENV === "development" && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
       return NextResponse.json(getDemoSurfFeed("fallback"));
     }
     return response;
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === "development" && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
       console.warn("[SURF] Live feed failed; serving simulated fallback data.", error);
       return NextResponse.json(getDemoSurfFeed("fallback"));
     }

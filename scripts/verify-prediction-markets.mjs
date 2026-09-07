@@ -7,9 +7,16 @@ import {
   matchKalshiWinnerMarkets,
   matchPolymarketWinnerMarkets,
   mergePredictionConsensus,
+  predictionSeriesForSport,
 } from "../lib/surf/predictionMarketCore.ts";
 
 assert.equal(DEFAULT_WHALE_THRESHOLD_USD, 10_000, "the launch whale threshold should be $10K cash committed");
+assert.deepEqual(predictionSeriesForSport("americanfootball_nfl"), {
+  kalshi: "KXNFLGAME", polymarket: "450", polymarketFilter: "tag_id",
+}, "NFL discovery must use the season-independent category, not the retired 2025 series");
+assert.deepEqual(predictionSeriesForSport("baseball_mlb"), {
+  kalshi: "KXMLBGAME", polymarket: "3",
+}, "MLB discovery must remain isolated from NFL");
 
 const NOW = Date.parse("2026-08-24T18:00:00Z");
 const COMMENCE = "2026-08-29T23:00:00Z";
@@ -123,6 +130,19 @@ const event = {
 const polymarketMatched = matchPolymarketWinnerMarkets([game], [event], NOW);
 assert.equal(polymarketMatched.length, 1, "Polymarket moneyline outcomes should match both Surf teams");
 assert.equal(polymarketMatched[0].volume24hIsEstimate, false, "Polymarket 24-hour USD volume is provider reported");
+
+const regularSeasonGame = { ...game, sport_key: "americanfootball_nfl" };
+assert.equal(matchPolymarketWinnerMarkets([regularSeasonGame], [event], NOW).length, 1,
+  "regular-season NFL uses the same exact winner matcher as preseason");
+for (const unrelated of [
+  { ...event, slug: "cfb-chi-ten-2026-08-29" },
+  { ...event, slug: `${event.slug}-first-half` },
+  { ...event, markets: [{ ...event.markets[0], question: "Chicago Bears vs Tennessee Titans first half winner" }] },
+  { ...event, markets: [{ ...event.markets[0], sportsMarketType: "spreads" }] },
+]) {
+  assert.equal(matchPolymarketWinnerMarkets([regularSeasonGame], [unrelated], NOW).length, 0,
+    "broader NFL category discovery must reject other leagues, partial games, and non-winner markets");
+}
 
 const polymarketActivities = aggregatePolymarketWhaleBuys(
   [

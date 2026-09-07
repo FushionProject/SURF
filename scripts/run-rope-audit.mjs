@@ -5,8 +5,8 @@ const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
 
 const allowedSports = new Set([
-  "americanfootball_nfl_preseason",
   "americanfootball_nfl",
+  "americanfootball_ncaaf",
   "baseball_mlb",
 ]);
 

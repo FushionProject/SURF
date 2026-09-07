@@ -1,7 +1,7 @@
 import type { SurfSportKey } from "./sports";
 import type { OddsApiGame } from "./types";
-import { refreshIntervalMs } from "./feedSchedule";
-import { SURF_ODDS_API_BOOKMAKER_KEYS } from "./bookmakers";
+import { refreshIntervalMs } from "./feedSchedule.ts";
+import { SURF_ODDS_API_BOOKMAKER_KEYS } from "./bookmakers.ts";
 
 const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
 
@@ -74,7 +74,9 @@ function telemetryFor(sportKey: SurfSportKey): OddsRequestTelemetry {
 }
 
 function numericHeader(response: Response, name: string): number | undefined {
-  const value = Number(response.headers.get(name));
+  const raw = response.headers.get(name);
+  if (raw == null || raw.trim() === "") return undefined;
+  const value = Number(raw);
   return Number.isFinite(value) ? value : undefined;
 }
 
@@ -116,7 +118,7 @@ function oddsUrl(sportKey: SurfSportKey, apiKey: string): string {
   url.searchParams.set("bookmakers", SURF_ODDS_API_BOOKMAKER_KEYS.join(","));
   // Moneylines are especially useful in baseball, where the price is the line.
   // Keep NFL at two requested markets so MLB support does not increase NFL quota use.
-  url.searchParams.set("markets", sportKey === "baseball_mlb" ? "h2h,spreads,totals" : "spreads,totals");
+  url.searchParams.set("markets", (sportKey === "baseball_mlb" || sportKey === "americanfootball_ncaaf") ? "h2h,spreads,totals" : "spreads,totals");
   url.searchParams.set("oddsFormat", "american");
   url.searchParams.set("dateFormat", "iso");
   return url.toString();
@@ -169,16 +171,20 @@ export async function getSharedOddsSnapshot(options: {
       const response = await fetch(oddsUrl(options.sportKey, options.apiKey), {
         method: "GET",
         cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
       });
       telemetry.lastResponseStatus = response.status;
       recordQuota(telemetry, response);
       if (!response.ok) {
-        const body = await response.text().catch(() => "");
-        throw new Error(`Failed to fetch odds (${response.status}): ${body}`);
+        throw new Error(`Failed to fetch odds (${response.status})`);
       }
       const raw: unknown = await response.json().catch(() => null);
       if (!Array.isArray(raw)) throw new Error("Unexpected Odds API response shape");
-      const games = raw as OddsApiGame[];
+      const games = [...new Map((raw as OddsApiGame[]).filter(game =>
+        game.sport_key === options.sportKey && typeof game.id === "string" &&
+        typeof game.home_team === "string" && typeof game.away_team === "string" &&
+        game.home_team !== game.away_team && Number.isFinite(Date.parse(game.commence_time))
+      ).map(game => [game.id, game])).values()];
       telemetry.lastFetchedGameCount = games.length;
       telemetry.lastFetchedBookmakerCount = new Set(
         games.flatMap((game) => (game.bookmakers ?? []).map((bookmaker) => bookmaker.key)),

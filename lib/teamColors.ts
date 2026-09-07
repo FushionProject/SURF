@@ -70,6 +70,7 @@ const MLB_TEAM_PRIMARY_RGB: Readonly<Record<string, string>> = {
 };
 
 const FALLBACK_RGB: Record<SurfLeague, string> = {
+  CFB: "0,229,255",
   NFL: "0,229,255",
   MLB: "232,24,40",
   NBA: "0,229,255",
@@ -78,5 +79,5 @@ const FALLBACK_RGB: Record<SurfLeague, string> = {
 export function getTeamPrimaryRgb(teamName: string, league: SurfLeague): string {
   if (league === "NFL") return NFL_TEAM_PRIMARY_RGB[teamName] ?? FALLBACK_RGB.NFL;
   if (league === "MLB") return MLB_TEAM_PRIMARY_RGB[teamName] ?? FALLBACK_RGB.MLB;
-  return FALLBACK_RGB.NBA;
+  return FALLBACK_RGB[league];
 }

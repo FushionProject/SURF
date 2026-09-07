@@ -70,6 +70,7 @@ const NFL_TEAM_LOGOS: Record<string, string> = {
 };
 
 export function getTeamLogo(teamName: string, league?: SurfLeague) {
+  if (league === "CFB") return null;
   if (league === "MLB") return getMlbLogo(teamName);
   if (league === "NFL") {
     const code = NFL_TEAM_LOGOS[teamName];

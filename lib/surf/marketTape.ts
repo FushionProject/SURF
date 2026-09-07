@@ -85,6 +85,7 @@ function isHalfPointed(value: number): boolean {
 }
 
 function sportMeta(sportKey: SurfSportKey): { league: SurfLeague; label: SurfSportLabel } {
+  if (sportKey === "americanfootball_ncaaf") return { league: "CFB", label: "CFB" };
   if (sportKey === "basketball_nba") return { league: "NBA", label: "NBA" };
   if (sportKey === "baseball_mlb") return { league: "MLB", label: "MLB" };
   if (sportKey === "americanfootball_nfl_preseason") return { league: "NFL", label: "NFL Preseason" };
@@ -94,6 +95,7 @@ function sportMeta(sportKey: SurfSportKey): { league: SurfLeague; label: SurfSpo
 function isPlausibleLine(sportKey: SurfSportKey, market: SurfMarketType, point: number): boolean {
   if (!Number.isFinite(point) || !isHalfPointed(point)) return false;
 
+  if (sportKey === "americanfootball_ncaaf") return market === "spreads" ? Math.abs(point) <= 80 : point >= 20 && point <= 120;
   if (sportKey === "baseball_mlb") {
     return market === "spreads" ? Math.abs(point) >= 0.5 && Math.abs(point) <= 3.5 : point >= 3 && point <= 25;
   }
@@ -320,6 +322,8 @@ export function recordMarketTapeSnapshot(
     const game = gameId ? gameById.get(gameId) : undefined;
     const market = recent.find((move) => move.marketKey === marketKey)?.market;
     if (!game || !market || current.length < MIN_BOOKS_IN_MARKET) continue;
+
+    if (sportKey === "americanfootball_ncaaf" && (!confirmed || !qualifiedMoves.some(move => Math.abs(move.delta) >= (market === "totals" ? 2 : 1)))) continue;
 
     const activeStoreKey = `${marketKey}:${direction}`;
     const priorEvent = [...store.events.values()]
