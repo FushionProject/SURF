@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AccountAccessForm } from "@/app/account/AccountAccessForm";
+import { AccountBilling } from "@/components/surf/AccountBilling";
 import { signOut } from "@/app/account/actions";
 import { SurfAppHeader } from "@/components/surf/SurfAppHeader";
 import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
@@ -8,19 +9,38 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: {
+  searchParams: Promise<{ confirmation?: string | string[] }>;
+}) {
   const supabase = await createSupabaseServerClient();
-  const { data } = supabase ? await supabase.auth.getClaims() : { data: null };
-  const claims = data?.claims;
-  const email = typeof claims?.email === "string" ? claims.email : "Surf member";
+  const confirmationFailed = (await searchParams).confirmation === "failed";
+  let member: { id: string; email?: string } | null = null;
+  let accountUnavailable = false;
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      member = error ? null : data.user;
+      accountUnavailable = Boolean(error && error.name !== "AuthSessionMissingError");
+    } catch {
+      accountUnavailable = true;
+    }
+  }
+  const email = member?.email ?? "Surf member";
 
   return (
     <div className="surf-bg min-h-full flex-1 bg-[color:var(--surf-base)]">
       <main className="surf-content mx-auto w-full max-w-md px-5 pb-28">
         <SurfAppHeader
           title="Your account"
-          subtitle="One identity for saved context, alerts, and your Surf account."
+          subtitle="Sign in to your Surf account and manage your plan."
         />
+
+        {confirmationFailed && <p role="alert" className="mb-5 border border-[color:var(--surf-line)] p-4 text-sm leading-6">
+          That confirmation link could not be verified. It may have expired or already been used. Try signing in, or request a new confirmation by starting signup again.
+        </p>}
+        {accountUnavailable && <p role="status" className="mb-5 border border-[color:var(--surf-line)] p-4 text-sm leading-6">
+          We could not verify your session right now. Try signing in again. Games and Signals are still available.
+        </p>}
 
         {!supabase ? (
           <section className="rounded-[22px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-surface)] p-5">
@@ -29,7 +49,7 @@ export default async function AccountPage() {
               Games and Signals remain available while account configuration finishes.
             </p>
           </section>
-        ) : claims ? (
+        ) : member ? (
           <section className="overflow-hidden rounded-[22px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-surface)] shadow-[var(--surf-card-shadow)]">
             <div className="border-b border-[color:var(--surf-line-06)] p-5">
               <div className="flex items-center gap-3">
@@ -48,8 +68,8 @@ export default async function AccountPage() {
               </div>
             </div>
             <div className="p-5">
-              <p className="text-xs leading-5 text-[color:var(--surf-ink-55)]">
-                Your account is ready. Saved teams, signal alerts, and subscription access can now attach to this identity.
+              <p className="text-sm leading-6 text-[color:var(--surf-ink-55)]">
+                You’re signed in. Your watchlist is currently saved on this device; cross-device syncing and alerts are not enabled yet.
               </p>
               <form action={signOut} className="mt-5">
                 <button
@@ -64,6 +84,8 @@ export default async function AccountPage() {
         ) : (
           <AccountAccessForm />
         )}
+
+        {member && <AccountBilling />}
 
         <Link
           href="/games"

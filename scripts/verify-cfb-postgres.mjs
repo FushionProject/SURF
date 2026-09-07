@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import {readFileSync,readdirSync} from 'node:fs';import assert from 'node:assert/strict';
-const db=new PGlite();await db.exec('create role anon; create role authenticated; create role service_role bypassrls;');
+const db=new PGlite();await db.exec('create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key);');
 for(const file of readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort()) await db.exec(readFileSync('supabase/migrations/'+file,'utf8'));
 await db.exec(readFileSync('supabase/migrations/20260907022743_add_cfb_market_memory.sql','utf8'));
 await db.exec('set role service_role');
