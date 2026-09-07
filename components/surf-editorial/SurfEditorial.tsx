@@ -64,6 +64,7 @@ type Snapshot = {
   games?: Games;
   signals: SignalCard[];
   signalError?: string;
+  gameError?: string;
   fetchedAt: number;
 };
 const cache = new Map<
@@ -97,13 +98,13 @@ async function snapshot(sport: SurfSportKey, force = false): Promise<Snapshot> {
           })
         : Promise.resolve(undefined),
     ]);
-    if (games.status === "rejected") throw games.reason;
-    if (games.value.sportKey !== sport)
-      throw new Error(
-        "This league’s market data is unavailable. Try refreshing in a moment.",
-      );
+    const validGames = games.status === "fulfilled" && games.value.sportKey === sport;
+    const validFeed = feed.status === "fulfilled" && feed.value.sportKey === sport;
+    if (!validGames && !validFeed)
+      throw new Error("This league’s market data is unavailable. Try refreshing in a moment.");
     const result = {
-      games: games.value,
+      games: validGames ? games.value : undefined,
+      gameError: validGames ? undefined : "Game board unavailable. Signals may still be available; try refreshing shortly.",
       feed:
         feed.status === "fulfilled" && feed.value.sportKey === sport
           ? feed.value
@@ -560,6 +561,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
             matchesGameSearch(g, search) &&
             (sport !== "americanfootball_ncaaf" ||
               !top25 ||
+              data?.rankings?.status !== "available" ||
               isTop25Game(g, data?.rankings ?? null)),
         )
         .sort((a, b) =>
@@ -777,6 +779,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 "This is a demonstration, not a live market."}
             </p>
           )}
+          {data?.gameError && <p className="bn-notice" role="status">{data.gameError}</p>}
           {error && (
             <div className="bn-notice" role="alert">
               {error}{" "}
@@ -830,7 +833,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                   <label>
                     <input
                       type="checkbox"
-                      checked={top25}
+                      checked={top25 && data?.rankings?.status === "available"}
                       onChange={(e) => setTop25(e.target.checked)}
                       disabled={data?.rankings?.status !== "available"}
                     />{" "}

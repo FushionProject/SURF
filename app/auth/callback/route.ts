@@ -3,9 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-function safeNextPath(value: string | null): string {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/account";
-}
+import { safeNextPath } from "@/lib/supabase/safeNextPath";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.clone();

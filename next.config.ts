@@ -7,6 +7,8 @@ const localNetworkOrigins = Object.values(networkInterfaces())
   .map((network) => network.address);
 
 const nextConfig: NextConfig = {
+  turbopack: { root: process.cwd() },
+  outputFileTracingRoot: process.cwd(),
   // Keep LAN-origin access explicit so the development app can be tested on a
   // phone without broadly relaxing Next.js cross-origin protections.
   allowedDevOrigins: localNetworkOrigins,
