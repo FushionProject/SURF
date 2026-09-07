@@ -278,8 +278,13 @@ export function matchKalshiWinnerMarkets(
   games: OddsApiGame[],
   markets: KalshiWinnerMarket[],
   observedAt: number,
+  options: { forActivity?: boolean } = {},
 ): MatchedWinnerMarket[] {
   const candidates = markets.flatMap((market) => {
+    if (!market || typeof market !== "object" || Array.isArray(market)
+      || typeof market.ticker !== "string" || !market.ticker.trim()
+      || typeof market.event_ticker !== "string" || !market.event_ticker.trim()
+      || (market.yes_sub_title != null && typeof market.yes_sub_title !== "string")) return [];
     const probability = marketMidpoint(market);
     if (probability == null) return [];
     if (market.event_ticker.startsWith("KXNCAAFGAME-")) {
@@ -289,7 +294,7 @@ export function matchKalshiWinnerMarkets(
     const providerCode = market.ticker.split("-").at(-1)?.toUpperCase();
     if (!providerCode) return [];
     const timestampValue = market.expected_expiration_time ?? market.close_time;
-    const timestamp = timestampValue ? new Date(timestampValue).getTime() : Number.NaN;
+    const timestamp = typeof timestampValue === "string" ? new Date(timestampValue).getTime() : Number.NaN;
     if (!Number.isFinite(timestamp)) return [];
 
     const game = closestGame(games, timestamp, (candidateGame) =>
@@ -327,7 +332,9 @@ export function matchKalshiWinnerMarkets(
     const openInterest =
       (finiteNumber(away.market.open_interest_fp) ?? 0) +
       (finiteNumber(home.market.open_interest_fp) ?? 0);
-    if (awayVolume + homeVolume < 100 && openInterest < 100) continue;
+    // Quote consensus keeps its liquidity floor. Factual trade discovery cannot
+    // treat absent/lagging volume metadata as proof that no large buy occurred.
+    if (!options.forActivity && awayVolume + homeVolume < 100 && openInterest < 100) continue;
     const volume24hUsd = awayVolume * away.probability + homeVolume * home.probability;
     matched.push({
       venue: "kalshi",
@@ -359,7 +366,7 @@ export function matchKalshiWinnerMarkets(
 }
 
 function parseJsonArray(value: string | null | undefined): string[] {
-  if (!value) return [];
+  if (typeof value !== "string" || !value) return [];
   try {
     const parsed: unknown = JSON.parse(value);
     return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
@@ -372,12 +379,19 @@ export function matchPolymarketWinnerMarkets(
   games: OddsApiGame[],
   events: PolymarketEvent[],
   observedAt: number,
+  options: { forActivity?: boolean } = {},
 ): MatchedWinnerMarket[] {
   const matched: MatchedWinnerMarket[] = [];
   for (const event of events) {
-    const timestamp = event.startTime ? new Date(event.startTime).getTime() : Number.NaN;
+    if (!event || typeof event !== "object" || Array.isArray(event)
+      || typeof event.id !== "string" || !event.id.trim() || !Array.isArray(event.markets)
+      || (event.slug != null && typeof event.slug !== "string")) continue;
+    const timestamp = typeof event.startTime === "string" ? new Date(event.startTime).getTime() : Number.NaN;
     if (!Number.isFinite(timestamp)) continue;
     for (const market of event.markets ?? []) {
+      if (!market || typeof market !== "object" || Array.isArray(market)
+        || typeof market.conditionId !== "string" || !market.conditionId.trim()
+        || (market.question != null && typeof market.question !== "string")) continue;
       if (market.sportsMarketType !== "moneyline" || market.closed || market.active === false) continue;
       const outcomes = parseJsonArray(market.outcomes);
       const prices = parseJsonArray(market.outcomePrices).map(Number);
@@ -402,7 +416,7 @@ export function matchPolymarketWinnerMarkets(
       if (!probabilities) continue;
       const volume24hUsd = finiteNumber(market.volume24hr) ?? 0;
       const liquidityUsd = finiteNumber(market.liquidity) ?? 0;
-      if (volume24hUsd < 1_000 && liquidityUsd < 1_000) continue;
+      if (!options.forActivity && volume24hUsd < 1_000 && liquidityUsd < 1_000) continue;
 
       matched.push({
         venue: "polymarket",
@@ -486,11 +500,17 @@ type BuyFill = {
   occurredAt: number;
 };
 
-function clusterBuys(fills: BuyFill[], byParticipant: boolean): BuyFill[][] {
+function anonymousBurstHolds(first: BuyFill, last: BuyFill, averagePrice: number): boolean {
+  // Anonymous flow is not a single identified buyer. Preserve the existing
+  // impact/persistence requirement for bursts, never for a real individual buy.
+  return last.price - first.price >= 0.005 || first.selection.probability >= averagePrice - 0.005;
+}
+
+function clusterBuys(fills: BuyFill[], byParticipant: boolean, thresholdUsd: number): BuyFill[][] {
   const grouped = new Map<string, BuyFill[]>();
   for (const fill of fills) {
     const participant = byParticipant ? fill.participantId ?? "unknown" : "anonymous";
-    const key = `${fill.market.marketId}:${fill.selection.team}:${participant}`;
+    const key = `${fill.venue}:${fill.market.game.id}:${fill.market.marketId}:${fill.selection.providerMarketId}:${fill.selection.team}:${participant}`;
     const group = grouped.get(key) ?? [];
     group.push(fill);
     grouped.set(key, group);
@@ -499,18 +519,65 @@ function clusterBuys(fills: BuyFill[], byParticipant: boolean): BuyFill[][] {
   const clusters: BuyFill[][] = [];
   for (const group of grouped.values()) {
     const sorted = group.slice().sort((a, b) => a.occurredAt - b.occurredAt || a.id.localeCompare(b.id));
-    let active: BuyFill[] = [];
+    // A qualifying single is evidence in its own right. A later small fill or
+    // retraced market price must not turn it into a rejected anonymous burst.
+    // Reserve its cash before grouping so direction totals cannot count it twice.
+    const small: BuyFill[] = [];
     for (const fill of sorted) {
-      const windowStart = active[0];
-      if (windowStart && fill.occurredAt - windowStart.occurredAt > WHALE_BURST_WINDOW_MS) {
-        clusters.push(active);
-        active = [];
-      }
-      active.push(fill);
+      if (fill.committedUsd >= thresholdUsd) clusters.push([fill]);
+      else small.push(fill);
     }
-    if (active.length > 0) clusters.push(active);
+
+    const cash = [0];
+    const contracts = [0];
+    for (const fill of small) {
+      cash.push(cash[cash.length - 1] + fill.committedUsd);
+      contracts.push(contracts[contracts.length - 1] + fill.contracts);
+    }
+
+    // Consider every actual rolling interval, not batches anchored to an
+    // arbitrary first fill. Weighted interval selection retains the most cash
+    // supported by disjoint qualifying windows; overlap is never double counted.
+    // Prefix sums keep each candidate O(1), with O(n) memory. Provider samples
+    // are bounded, and starts earlier than 90 seconds are never examined.
+    const bestCash = Array<number>(small.length + 1).fill(0);
+    const bestCount = Array<number>(small.length + 1).fill(0);
+    const selectedStart = Array<number>(small.length + 1).fill(-1);
+    let earliest = 0;
+    for (let end = 0; end < small.length; end += 1) {
+      const last = small[end];
+      while (last.occurredAt - small[earliest].occurredAt > WHALE_BURST_WINDOW_MS) earliest += 1;
+      bestCash[end + 1] = bestCash[end];
+      bestCount[end + 1] = bestCount[end];
+      for (let start = earliest; start < end; start += 1) {
+        const committedUsd = cash[end + 1] - cash[start];
+        if (committedUsd < thresholdUsd) continue;
+        const averagePrice = committedUsd / (contracts[end + 1] - contracts[start]);
+        if (!byParticipant && !anonymousBurstHolds(small[start], last, averagePrice)) continue;
+        const candidateCash = bestCash[start] + committedUsd;
+        const candidateCount = bestCount[start] + 1;
+        const difference = candidateCash - bestCash[end + 1];
+        // Equal evidence prefers fewer cards. Stable time/id order resolves the
+        // remaining tie without depending on provider page or arrival order.
+        if (difference > 1e-7 || (Math.abs(difference) <= 1e-7 && candidateCount < bestCount[end + 1])) {
+          bestCash[end + 1] = candidateCash;
+          bestCount[end + 1] = candidateCount;
+          selectedStart[end + 1] = start;
+        }
+      }
+    }
+
+    let end = small.length;
+    while (end > 0) {
+      const start = selectedStart[end];
+      if (start < 0) end -= 1;
+      else {
+        clusters.push(small.slice(start, end));
+        end = start;
+      }
+    }
   }
-  return clusters;
+  return clusters.sort((a, b) => a[a.length - 1].occurredAt - b[b.length - 1].occurredAt || a[0].id.localeCompare(b[0].id));
 }
 
 function shortWallet(value: string | undefined): string | undefined {
@@ -562,6 +629,8 @@ export function summarizeLargeTradeActivity(
 }
 
 function kalshiTakerOutcome(trade: KalshiTrade): "yes" | "no" | undefined {
+  if ([trade.taker_outcome_side, trade.taker_book_side, trade.taker_side]
+    .some((value) => value != null && typeof value !== "string")) return undefined;
   const outcome = trade.taker_outcome_side?.toLowerCase();
   const book = trade.taker_book_side?.toLowerCase();
   const fromBook = book === "bid" ? "yes" : book === "ask" ? "no" : undefined;
@@ -584,17 +653,11 @@ function activityFromCluster(
   if (!first || !last) return undefined;
   const committedUsd = cluster.reduce((sum, fill) => sum + fill.committedUsd, 0);
   const contracts = cluster.reduce((sum, fill) => sum + fill.contracts, 0);
-  if (committedUsd < thresholdUsd || contracts <= 0) return undefined;
+  if (!Number.isFinite(committedUsd) || !Number.isFinite(contracts) || committedUsd < thresholdUsd || contracts <= 0) return undefined;
   const averagePrice = committedUsd / contracts;
   const impact = last.price - first.price;
 
-  // Anonymous flow can represent several people. Require either visible upward
-  // impact or a current price that still holds near the aggregate execution.
-  if (isAnonymous && cluster.length > 1) {
-    const currentProbability = first.selection.probability;
-    const persisted = currentProbability >= averagePrice - 0.005;
-    if (impact < 0.005 && !persisted) return undefined;
-  }
+  if (isAnonymous && cluster.length > 1 && !anonymousBurstHolds(first, last, averagePrice)) return undefined;
 
   return {
     id: `${first.venue}:${first.market.marketId}:${canonicalTeamCode(first.selection.team) ?? first.selection.team}:${first.id}:${last.id}`,
@@ -621,6 +684,7 @@ export function aggregateKalshiWhaleBuys(
   now: number,
   thresholdUsd = DEFAULT_WHALE_THRESHOLD_USD,
 ): NormalizedWhaleActivity[] {
+  if (!Number.isFinite(now) || !Number.isFinite(thresholdUsd) || thresholdUsd <= 0) return [];
   const byTicker = new Map<string, { market: MatchedWinnerMarket; selection: MatchedWinnerSelection }>();
   for (const market of markets.filter((item) => item.venue === "kalshi")) {
     for (const selection of market.selections) {
@@ -630,9 +694,9 @@ export function aggregateKalshiWhaleBuys(
   const seen = new Set<string>();
   const fills: BuyFill[] = [];
   for (const trade of trades) {
-    if (!trade.trade_id) continue;
-    if (seen.has(trade.trade_id)) continue;
-    seen.add(trade.trade_id);
+    if (!trade || typeof trade !== "object" || Array.isArray(trade)
+      || typeof trade.trade_id !== "string" || !trade.trade_id.trim()
+      || typeof trade.ticker !== "string" || typeof trade.created_time !== "string") continue;
     // Public trades disclose taker exposure, not wallet identity or new-position intent.
     // A NO fill is not silently inverted to the other team's YES contract: tie and
     // settlement rules can differ. Only the named winner contract's YES flow qualifies.
@@ -643,8 +707,15 @@ export function aggregateKalshiWhaleBuys(
     const price = finiteNumber(trade.yes_price_dollars);
     const occurredAt = new Date(trade.created_time).getTime();
     if (contracts == null || price == null || contracts <= 0 || price <= 0 || price > 1) continue;
-    if (!Number.isFinite(occurredAt) || occurredAt < now - WHALE_LOOKBACK_MS || occurredAt > now + 60_000) continue;
-    if (occurredAt >= new Date(match.market.game.commence_time).getTime()) continue;
+    const commenceAt = new Date(match.market.game.commence_time).getTime();
+    if (!Number.isFinite(occurredAt) || occurredAt < now - WHALE_LOOKBACK_MS || occurredAt > now) continue;
+    if (!Number.isFinite(commenceAt) || occurredAt >= commenceAt) continue;
+    const committedUsd = contracts * price;
+    if (!Number.isFinite(committedUsd)) continue;
+    // Do not let an invalid row poison a later valid row with the same identity.
+    const id = `${trade.ticker}:${trade.trade_id}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
     fills.push({
       id: trade.trade_id,
       venue: "kalshi",
@@ -652,11 +723,11 @@ export function aggregateKalshiWhaleBuys(
       selection: match.selection,
       contracts,
       price,
-      committedUsd: contracts * price,
+      committedUsd,
       occurredAt,
     });
   }
-  return clusterBuys(fills, false)
+  return clusterBuys(fills, false, thresholdUsd)
     .map((cluster) => activityFromCluster(cluster, thresholdUsd, true))
     .filter((activity): activity is NormalizedWhaleActivity => Boolean(activity));
 }
@@ -667,6 +738,7 @@ export function aggregatePolymarketWhaleBuys(
   now: number,
   thresholdUsd = DEFAULT_WHALE_THRESHOLD_USD,
 ): NormalizedWhaleActivity[] {
+  if (!Number.isFinite(now) || !Number.isFinite(thresholdUsd) || thresholdUsd <= 0) return [];
   const byConditionAndAsset = new Map<string, { market: MatchedWinnerMarket; selection: MatchedWinnerSelection }>();
   for (const market of markets.filter((item) => item.venue === "polymarket")) {
     for (const selection of market.selections) {
@@ -676,12 +748,11 @@ export function aggregatePolymarketWhaleBuys(
   const seen = new Set<string>();
   const fills: BuyFill[] = [];
   for (const trade of trades) {
-    if (!trade.transactionHash || !/^0x[a-f0-9]{40}$/i.test(trade.proxyWallet ?? "")) continue;
-    // One transaction may fill the same asset for different wallets/sizes/prices.
-    // Deduplicate identical public rows without conflating distinct observed fills.
-    const id = `${trade.transactionHash}:${trade.proxyWallet}:${trade.asset}:${trade.side}:${trade.timestamp}:${trade.size}:${trade.price}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
+    if (!trade || typeof trade !== "object" || Array.isArray(trade)
+      || typeof trade.transactionHash !== "string" || !trade.transactionHash.trim()
+      || typeof trade.proxyWallet !== "string" || !/^0x[a-f0-9]{40}$/i.test(trade.proxyWallet)
+      || typeof trade.side !== "string" || typeof trade.conditionId !== "string"
+      || typeof trade.asset !== "string") continue;
     if (trade.side.toUpperCase() !== "BUY") continue;
     const match = byConditionAndAsset.get(`${trade.conditionId}:${trade.asset}`);
     if (!match) continue;
@@ -689,21 +760,29 @@ export function aggregatePolymarketWhaleBuys(
     const price = finiteNumber(trade.price);
     const occurredAt = finiteNumber(trade.timestamp) != null ? Number(trade.timestamp) * 1000 : Number.NaN;
     if (contracts == null || price == null || contracts <= 0 || price <= 0 || price > 1) continue;
-    if (!Number.isFinite(occurredAt) || occurredAt < now - WHALE_LOOKBACK_MS || occurredAt > now + 60_000) continue;
-    if (occurredAt >= new Date(match.market.game.commence_time).getTime()) continue;
+    const commenceAt = new Date(match.market.game.commence_time).getTime();
+    if (!Number.isFinite(occurredAt) || occurredAt < now - WHALE_LOOKBACK_MS || occurredAt > now) continue;
+    if (!Number.isFinite(commenceAt) || occurredAt >= commenceAt) continue;
+    // One transaction may fill the same asset for different wallets/sizes/prices.
+    // Normalize validated identity fields without conflating distinct fills.
+    const participantId = trade.proxyWallet.toLowerCase();
+    const id = `${trade.transactionHash.toLowerCase()}:${participantId}:${trade.conditionId}:${trade.asset}:BUY:${occurredAt / 1000}:${contracts}:${price}`;
+    const committedUsd = contracts * price;
+    if (!Number.isFinite(committedUsd) || seen.has(id)) continue;
+    seen.add(id);
     fills.push({
       id,
-      participantId: trade.proxyWallet,
+      participantId,
       venue: "polymarket",
       market: match.market,
       selection: match.selection,
       contracts,
       price,
-      committedUsd: contracts * price,
+      committedUsd,
       occurredAt,
     });
   }
-  return clusterBuys(fills, true)
+  return clusterBuys(fills, true, thresholdUsd)
     .map((cluster) => activityFromCluster(cluster, thresholdUsd, false))
     .filter((activity): activity is NormalizedWhaleActivity => Boolean(activity));
 }

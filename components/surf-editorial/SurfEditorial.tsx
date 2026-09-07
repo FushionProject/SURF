@@ -1,6 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import {
+  GameDataPanels,
+  SignalEvidence,
+  type FullGameData,
+} from "./DataPanels";
+import { WhaleTrackingStatus } from "@/components/surf/WhaleTrackingStatus";
+import { OvernightMoves } from "@/components/surf/OvernightMoves";
+import { filterSignalFeed, type SignalFeedFilter } from "@/lib/surf/signalFeed";
+import {
+  cfbRankForTeam,
+  isTop25Game,
+  matchesGameSearch,
+  type CfbRankings,
+} from "@/lib/surf/cfbRankings";
+import {
+  nextRefreshDelayMs,
+  refreshScheduleLabel,
+} from "@/lib/surf/feedSchedule";
+import type { PredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
+import type { OvernightMarketSummary } from "@/lib/surf/types";
 import { ThemeControl } from "./ThemeControl";
 import { useEffect, useMemo, useState } from "react";
 import { useSurfSport } from "@/components/surf/useSurfSport";
@@ -22,14 +42,25 @@ import { getTeamLogo } from "@/lib/teamLogos";
 
 type View = "markets" | "signals" | "saved";
 type Market = "spreads" | "h2h" | "totals";
-type Games = {
+type Games = FullGameData & {
   sportKey: SurfSportKey;
   games: OddsApiGame[];
   predictionMarketConsensus?: Record<string, GamePredictionMarketConsensus>;
   dataSource?: string;
   dataNotice?: string;
 };
+type FeedData = {
+  sportKey: string;
+  signals: SignalCard[];
+  overnight?: OvernightMarketSummary;
+  activityCoverage?: PredictionMarketSnapshot["activityCoverage"];
+  nextGameAt?: number;
+  dataSource?: string;
+  dataNotice?: string;
+};
 type Snapshot = {
+  feed?: FeedData;
+  rankings?: CfbRankings;
   games?: Games;
   signals: SignalCard[];
   signalError?: string;
@@ -45,16 +76,26 @@ async function snapshot(sport: SurfSportKey, force = false): Promise<Snapshot> {
   if (!force && entry?.value && Date.now() - entry.value.fetchedAt < 60_000)
     return entry.value;
   const pending = (async () => {
-    const [games, feed] = await Promise.allSettled([
-      fetch(`/api/surf-games?sport=${sport}`).then(async (r) => {
-        if (!r.ok)
-          throw new Error("The game board is temporarily unavailable.");
-        return r.json() as Promise<Games>;
-      }),
-      fetch(`/api/surf-feed?sport=${sport}`).then(async (r) => {
-        if (!r.ok) throw new Error("Signals are temporarily unavailable.");
-        return r.json() as Promise<{ sportKey: string; signals: SignalCard[] }>;
-      }),
+    const [games, feed, rankings] = await Promise.allSettled([
+      fetch(`/api/surf-games?sport=${sport}&refreshMode=dynamic`).then(
+        async (r) => {
+          if (!r.ok)
+            throw new Error("The game board is temporarily unavailable.");
+          return r.json() as Promise<Games>;
+        },
+      ),
+      fetch(`/api/surf-feed?sport=${sport}&refreshMode=dynamic`).then(
+        async (r) => {
+          if (!r.ok) throw new Error("Signals are temporarily unavailable.");
+          return r.json() as Promise<FeedData>;
+        },
+      ),
+      sport === "americanfootball_ncaaf"
+        ? fetch("/api/cfb-rankings").then(async (r) => {
+            if (!r.ok) throw new Error("Rankings unavailable");
+            return r.json() as Promise<CfbRankings>;
+          })
+        : Promise.resolve(undefined),
     ]);
     if (games.status === "rejected") throw games.reason;
     if (games.value.sportKey !== sport)
@@ -63,6 +104,11 @@ async function snapshot(sport: SurfSportKey, force = false): Promise<Snapshot> {
       );
     const result = {
       games: games.value,
+      feed:
+        feed.status === "fulfilled" && feed.value.sportKey === sport
+          ? feed.value
+          : undefined,
+      rankings: rankings.status === "fulfilled" ? rankings.value : undefined,
       signals:
         feed.status === "fulfilled" && feed.value.sportKey === sport
           ? feed.value.signals
@@ -205,6 +251,8 @@ function GameCard({
   onSave,
   observedAt,
   consensus,
+  fullData,
+  rankings,
 }: {
   game: OddsApiGame;
   sport: SurfSportKey;
@@ -213,6 +261,8 @@ function GameCard({
   onSave: () => void;
   observedAt: number;
   consensus?: GamePredictionMarketConsensus;
+  fullData: Games;
+  rankings?: CfbRankings;
 }) {
   const [open, setOpen] = useState(false);
   const board = useMemo(
@@ -249,7 +299,13 @@ function GameCard({
             <TeamLogo name={name} sport={sport} />
             <div className="bn-team-name">
               <small>{i ? "HOME" : "AWAY"}</small>
-              <h3>{name}</h3>
+              <h3>
+                {sport === "americanfootball_ncaaf" &&
+                cfbRankForTeam(name, rankings ?? null) != null
+                  ? `#${cfbRankForTeam(name, rankings ?? null)} `
+                  : ""}
+                {name}
+              </h3>
             </div>
             <Offer offer={offers[i]} market={market} side={i} />
           </div>
@@ -312,6 +368,13 @@ function GameCard({
               </tbody>
             </table>
           </div>
+          <GameDataPanels
+            game={game}
+            sport={sport}
+            data={fullData}
+            consensus={consensus}
+            observedAt={observedAt}
+          />
           <p className="bn-fine">
             {consensus
               ? `${consensus.sources.length} prediction ${consensus.sources.length === 1 ? "venue" : "venues"} matched to this game.`
@@ -334,7 +397,24 @@ function Signal({ signal, index }: { signal: SignalCard; index: number }) {
         <span className="bn-tag">{signal.signalType}</span>
       </div>
       <h3>{signal.title}</h3>
+      {signal.isTopSignal && (
+        <span className="bn-tag">{signal.topBadge ?? "Top signal"}</span>
+      )}
+      <p className="bn-signal-matchup">
+        {signal.game.awayTeam} vs {signal.game.homeTeam} ·{" "}
+        {kickoff(signal.commenceTime)}
+      </p>
       <p>{signal.insight || signal.detail}</p>
+      {signal.whaleActivity && (
+        <p className="bn-whale-amount">
+          {signal.whaleActivity.committedUsd.toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 0,
+          })}{" "}
+          committed · {signal.whaleActivity.venueLabel}
+        </p>
+      )}
       <div
         className="bn-strength"
         title="Market relevance and magnitude, not pick confidence"
@@ -363,6 +443,7 @@ function Signal({ signal, index }: { signal: SignalCard; index: number }) {
       {open && (
         <div className="bn-signal-evidence">
           <p>{signal.detail}</p>
+          <SignalEvidence signal={signal} />
           <p>
             {signal.game.awayTeam} vs {signal.game.homeTeam} ·{" "}
             {kickoff(signal.commenceTime)}
@@ -392,6 +473,17 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
   const [market, setMarket] = useState<Market>("spreads");
   const [saved, setSaved] = useState<string[]>([]);
   const [sort, setSort] = useState("time");
+  const [feedFilter, setFeedFilter] = useState<SignalFeedFilter>("all");
+  const [top25, setTop25] = useState(false);
+  const [topSignals, setTopSignals] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get("type") === "whales")
+        setFeedFilter("whales");
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -413,7 +505,9 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
       if (active) {
         setLoading(true);
         setError("");
-        setData(undefined);
+        setData((current) =>
+          current?.games?.sportKey === sport ? current : undefined,
+        );
       }
     });
     snapshot(sport, refresh > 0)
@@ -431,6 +525,21 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
       active = false;
     };
   }, [sport, sportSynced, refresh]);
+  useEffect(() => {
+    if (!data || !autoRefresh || loading) return;
+    const future =
+      data.games?.games
+        .map((g) => Date.parse(g.commence_time))
+        .filter((t) => t > Date.now()) ?? [];
+    const nextGame =
+      data.feed?.nextGameAt ??
+      (future.length ? Math.min(...future) : undefined);
+    const timer = setTimeout(
+      () => setRefresh((v) => v + 1),
+      nextRefreshDelayMs(Date.now(), nextGame),
+    );
+    return () => clearTimeout(timer);
+  }, [data, autoRefresh, loading]);
   function toggleSave(id: string) {
     setSaved((current) => {
       const next = current.includes(id)
@@ -448,22 +557,25 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
         .filter(
           (g) =>
             (view !== "saved" || saved.includes(`${sport}:${g.id}`)) &&
-            `${g.away_team} ${g.home_team}`
-              .toLowerCase()
-              .includes(search.toLowerCase()),
+            matchesGameSearch(g, search) &&
+            (sport !== "americanfootball_ncaaf" ||
+              !top25 ||
+              isTop25Game(g, data?.rankings ?? null)),
         )
         .sort((a, b) =>
           sort === "books"
             ? (b.bookmakers?.length ?? 0) - (a.bookmakers?.length ?? 0)
             : Date.parse(a.commence_time) - Date.parse(b.commence_time),
         ),
-    [data, search, view, saved, sport, sort],
+    [data, search, view, saved, sport, sort, top25],
   );
-  const signals = (data?.signals ?? []).filter((s) =>
-    `${s.title} ${s.game.awayTeam} ${s.game.homeTeam}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
+  const signals = filterSignalFeed(data?.signals ?? [], feedFilter)
+    .filter((s) => !topSignals || s.isTopSignal)
+    .filter((s) =>
+      `${s.title} ${s.game.awayTeam} ${s.game.homeTeam}`
+        .toLowerCase()
+        .includes(search.toLowerCase()),
+    );
   const books = new Set(
     data?.games?.games.flatMap((g) => g.bookmakers?.map((b) => b.key) ?? []),
   );
@@ -607,6 +719,14 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                     ? `Checked ${new Date(data.fetchedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
                     : "Waiting for data"}
               </span>
+              <label className="bn-auto-refresh">
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                />{" "}
+                Auto refresh
+              </label>
               <button
                 onClick={() => setRefresh((v) => v + 1)}
                 disabled={loading}
@@ -616,10 +736,44 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
               </button>
             </div>
           </section>
-          {data?.games?.dataSource && (
+          <div className="bn-data-status">
+            <span>
+              {autoRefresh
+                ? !data
+                  ? "Automatic refresh when data is ready"
+                  : refreshScheduleLabel(
+                      data?.fetchedAt ?? 0,
+                      data?.feed?.nextGameAt ??
+                        data?.games?.games.reduce<number | undefined>(
+                          (earliest, g) => {
+                            const t = Date.parse(g.commence_time);
+                            return t > (data?.fetchedAt ?? 0) &&
+                              (earliest == null || t < earliest)
+                              ? t
+                              : earliest;
+                          },
+                          undefined,
+                        ),
+                    )
+                : "Manual refresh"}
+            </span>
+            <Link href="/how-to-use">How to read Surf ↗</Link>
+          </div>
+          {view === "signals" && (
+            <div className="bn-data-section bn-feed-context">
+              <OvernightMoves
+                summary={data?.feed?.overnight}
+                sportKey={sport}
+              />
+              <WhaleTrackingStatus coverage={data?.feed?.activityCoverage} />
+            </div>
+          )}
+          {(data?.games?.dataSource ||
+            (view === "signals" && data?.feed?.dataSource)) && (
             <p className="bn-notice">
               Sample data ·{" "}
-              {data.games.dataNotice ??
+              {(view === "signals" ? data?.feed?.dataNotice : undefined) ??
+                data?.games?.dataNotice ??
                 "This is a demonstration, not a live market."}
             </p>
           )}
@@ -671,6 +825,56 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                   />
                 </label>
               </div>
+              {sport === "americanfootball_ncaaf" && view !== "signals" && (
+                <div className="bn-cfb-filter">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={top25}
+                      onChange={(e) => setTop25(e.target.checked)}
+                      disabled={data?.rankings?.status !== "available"}
+                    />{" "}
+                    AP Top 25 only
+                  </label>
+                  <span>
+                    {data?.rankings?.status === "available"
+                      ? (data.rankings.edition ?? "Current AP poll")
+                      : "Rankings unavailable"}
+                  </span>
+                </div>
+              )}
+              {view === "signals" && (
+                <div className="bn-feed-filters" aria-label="Signal category">
+                  {(
+                    [
+                      ["all", "All signals"],
+                      ["whales", "Whale activity"],
+                      ["opportunities", "Market opportunities"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      aria-pressed={feedFilter === key}
+                      onClick={() => setFeedFilter(key)}
+                    >
+                      {label}
+                      <span>
+                        {filterSignalFeed(data?.signals ?? [], key).length}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {view === "signals" && (
+                <label className="bn-top-signals">
+                  <input
+                    type="checkbox"
+                    checked={topSignals}
+                    onChange={(e) => setTopSignals(e.target.checked)}
+                  />{" "}
+                  Top signals only
+                </label>
+              )}
               {view !== "signals" && (
                 <div className="bn-market-controls">
                   <div className="bn-market-tabs" aria-label="Market type">
@@ -703,7 +907,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                   </label>
                 </div>
               )}
-              {loading ? (
+              {loading && !data ? (
                 <div className="bn-loading" role="status">
                   <span className="bn-loading-flower">↗</span>
                   <h3>Building your market view.</h3>
@@ -736,6 +940,8 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                       saved={saved.includes(`${sport}:${game.id}`)}
                       onSave={() => toggleSave(`${sport}:${game.id}`)}
                       observedAt={data?.fetchedAt ?? 0}
+                      fullData={data!.games!}
+                      rankings={data?.rankings}
                       consensus={
                         data?.games?.predictionMarketConsensus?.[game.id]
                       }

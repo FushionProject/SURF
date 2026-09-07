@@ -1454,3 +1454,307 @@ body {
     transform: translateX(-35%);
   }
 }
+/* Full Surf data uses the same neutral panels and cyan accents. */
+.bn-data-panels,
+.bn-feed-context {
+  --surf-primary: var(--ed-blue-ink);
+  --surf-primary-rgb: 0, 229, 255;
+  --surf-positive: var(--ed-blue-ink);
+}
+.bn-data-panels {
+  margin: 24px -1px 18px;
+  display: grid;
+  gap: 16px;
+}
+.bn-data-section {
+  padding: 20px;
+  border: 1px solid var(--ed-line);
+  background: var(--ed-card);
+  min-width: 0;
+}
+.bn-data-section h4 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin-bottom: 15px;
+}
+.bn-data-section h5 {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.bn-data-section p,
+.bn-data-muted {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--ed-muted);
+  margin: 7px 0;
+}
+.bn-data-section a {
+  font-size: 11px;
+  color: var(--ed-blue-ink);
+  text-decoration: underline;
+}
+.bn-data-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+.bn-data-tabs {
+  display: flex;
+  border: 1px solid var(--ed-line);
+}
+.bn-data-tabs button {
+  padding: 6px 10px;
+  font-size: 10px;
+  color: var(--ed-muted);
+}
+.bn-data-tabs button[aria-pressed="true"] {
+  background: var(--ed-art);
+  color: var(--ed-blue-ink);
+}
+.bn-team-reports {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.bn-team-reports > div {
+  min-width: 0;
+}
+.bn-injury {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 11px;
+  background: var(--ed-soft);
+  font-size: 10px;
+}
+.bn-injury strong {
+  font-weight: 600;
+}
+.bn-injury span {
+  color: var(--ed-blue-ink);
+}
+.bn-injury p {
+  width: 100%;
+  margin: 0;
+}
+.bn-whale-summary {
+  padding: 12px 0;
+  border-top: 1px solid var(--ed-line);
+  font-size: 12px;
+}
+.bn-evidence-data {
+  margin: 18px 0;
+}
+.bn-evidence-data > p {
+  margin: 9px 0;
+}
+.bn-evidence-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 15px;
+}
+.bn-evidence-facts > div {
+  padding: 12px;
+  background: var(--ed-soft);
+}
+.bn-evidence-facts small {
+  display: block;
+  font-size: 9px;
+  color: var(--ed-muted);
+  margin-bottom: 8px;
+}
+.bn-evidence-facts strong {
+  font-size: 19px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.bn-evidence-quotes {
+  margin: 15px 0;
+  border: 1px solid var(--ed-line);
+}
+.bn-evidence-quotes > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 12px;
+  font-size: 11px;
+}
+.bn-evidence-quotes > div + div {
+  border-top: 1px solid var(--ed-line);
+}
+.bn-evidence-quotes span {
+  color: var(--ed-muted);
+}
+.bn-evidence-quotes strong {
+  text-align: right;
+  font-weight: 500;
+}
+.bn-signal .bn-whale-amount {
+  font-size: 16px;
+  color: var(--ed-blue-ink);
+  margin-top: 12px;
+}
+.bn-signal .bn-signal-matchup {
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+.bn-feed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 4px;
+}
+.bn-feed-filters button {
+  font-size: 11px;
+  padding: 10px 12px;
+  border: 1px solid var(--ed-line);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--ed-muted);
+}
+.bn-feed-filters button[aria-pressed="true"] {
+  background: var(--ed-art);
+  border-color: var(--ed-blue-ink);
+  color: var(--ed-blue-ink);
+}
+.bn-feed-filters button span {
+  font-family: monospace;
+  font-size: 10px;
+}
+.bn-data-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin: -24px 0 30px;
+  font-size: 10px;
+  color: var(--ed-muted);
+}
+.bn-data-status a {
+  text-decoration: underline;
+}
+.bn-feed-context {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.bn-feed-context:empty {
+  display: none;
+}
+.bn-auto-refresh {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 9px;
+  color: var(--ed-stats-muted);
+}
+.bn-auto-refresh input,
+.bn-cfb-filter input {
+  accent-color: var(--ed-blue-ink);
+}
+.bn-cfb-filter {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--ed-muted);
+  padding: 15px 0 0;
+}
+.bn-cfb-filter label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 600px) {
+  .bn-data-section {
+    padding: 15px;
+  }
+  .bn-team-reports {
+    grid-template-columns: 1fr;
+  }
+  .bn-evidence-facts {
+    gap: 5px;
+  }
+  .bn-evidence-facts > div {
+    padding: 9px;
+  }
+  .bn-evidence-facts strong {
+    font-size: 16px;
+  }
+  .bn-stats .bn-stats-refresh {
+    flex-wrap: wrap;
+  }
+  .bn-data-status {
+    font-size: 9px;
+    margin-top: -14px;
+    gap: 12px;
+  }
+  .bn-feed-filters button {
+    padding: 9px;
+    font-size: 10px;
+  }
+  .bn-data-panels {
+    margin: 20px -5px;
+  }
+  .bn-data-heading {
+    flex-wrap: wrap;
+  }
+  .bn-data-section h4 {
+    margin-bottom: 12px;
+  }
+}
+.bn-top-signals {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 16px;
+  font-size: 10px;
+  color: var(--ed-muted);
+}
+.bn-top-signals input {
+  accent-color: var(--ed-blue-ink);
+}
+.bn-data-panels,
+.bn-feed-context {
+  --surf-ink-25: var(--ed-muted);
+  --surf-ink-30: var(--ed-muted);
+  --surf-ink-35: var(--ed-muted);
+  --surf-ink-40: var(--ed-muted);
+  --surf-ink-45: var(--ed-muted);
+  --surf-ink-50: var(--ed-muted);
+  --surf-ink-55: var(--ed-muted);
+  --surf-ink-60: var(--ed-muted);
+}
+.bn-report-disclosure > summary {
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.bn-report-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.bn-report-disclosure > summary:after {
+  content: "+";
+  color: var(--ed-blue-ink);
+}
+.bn-report-disclosure[open] > summary {
+  margin-bottom: 18px;
+}
+.bn-report-disclosure[open] > summary:after {
+  content: "−";
+}
+.bn-data-panels .text-amber-300 {
+  color: var(--ed-blue-ink);
+}

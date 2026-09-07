@@ -1008,6 +1008,7 @@ async function getLiveSurfFeed(request: Request) {
       nextGameAt: nextGameAt(filteredGames, now),
       overnight,
       predictionMarkets: predictionMarketSnapshot.providers,
+      activityCoverage: predictionMarketSnapshot.activityCoverage,
       debug,
       coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
     });
@@ -1067,6 +1068,7 @@ async function getLiveSurfFeed(request: Request) {
     nextGameAt: nextGameAt(filteredGames, now),
     overnight,
     predictionMarkets: predictionMarketSnapshot.providers,
+    activityCoverage: predictionMarketSnapshot.activityCoverage,
     signals: taggedSignals.slice().sort((a, b) => {
       const as = typeof a.strengthScore === "number" && Number.isFinite(a.strengthScore) ? a.strengthScore : 0;
       const bs = typeof b.strengthScore === "number" && Number.isFinite(b.strengthScore) ? b.strengthScore : 0;

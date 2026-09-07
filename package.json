@@ -22,7 +22,8 @@
     "test:feed-schedule": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-feed-schedule.mjs",
     "test:sport-gating": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-sport-gating.mjs",
     "test:cfb": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-cfb.mjs",
-    "test:cfb-postgres": "node scripts/verify-cfb-postgres.mjs"
+    "test:cfb-postgres": "node scripts/verify-cfb-postgres.mjs",
+    "test:signal-feed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-signal-feed.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",
