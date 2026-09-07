@@ -9,7 +9,6 @@ import type { SignalCard } from "@/lib/surf/types";
 type Props = {
   card: SignalCard;
   now: number;
-  historical?: boolean;
 };
 
 function eventTime(card: SignalCard): number | undefined {
@@ -182,7 +181,7 @@ function BestCurrentNumbers({ options }: { options: NonNullable<SignalCard["valu
   );
 }
 
-export function MarketEventCard({ card, now, historical = false }: Props) {
+export function MarketEventCard({ card, now }: Props) {
   const away = getTeamAbbrev(card.game.awayTeam) ?? card.game.awayTeam;
   const home = getTeamAbbrev(card.game.homeTeam) ?? card.game.homeTeam;
   const tracked = card.trackedMarket;
@@ -198,7 +197,7 @@ export function MarketEventCard({ card, now, historical = false }: Props) {
         <span className="sports-signal-time">{timingLabel(card, now)}</span>
         <div className="sports-signal-status flex items-center gap-1.5">
           <span className={`h-1.5 w-1.5 rounded-full ${verified ? "bg-[color:var(--surf-positive)]" : "bg-[color:var(--surf-neutral)]"}`} />
-          {historical ? "Game started · Trade record" : whale ? (whale.venue === "polymarket" ? "On-chain" : "Public trade") : opportunity ? "Live quote" : verified ? "Verified" : "Snapshot"}
+          {whale ? (whale.venue === "polymarket" ? "On-chain" : "Public trade") : opportunity ? "Live quote" : verified ? "Verified" : "Snapshot"}
         </div>
       </div>
 
@@ -246,7 +245,7 @@ export function MarketEventCard({ card, now, historical = false }: Props) {
             ) : null}
           </div>
           <div className="mt-3 flex items-center justify-between gap-3 border-t border-[color:var(--surf-line-06)] pt-3">
-            <span className="text-[9px] text-[color:var(--surf-ink-35)]">{historical ? "Recorded before game start. Not a current offer." : "Large activity, not a prediction."}</span>
+            <span className="text-[9px] text-[color:var(--surf-ink-35)]">Large activity, not a prediction.</span>
             <a
               href={whale.sourceUrl}
               target="_blank"

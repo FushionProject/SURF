@@ -14,7 +14,6 @@ import { useSurfSport } from "@/components/surf/useSurfSport";
 import { isOvernight, nextRefreshDelayMs, refreshScheduleLabel } from "@/lib/surf/feedSchedule";
 import { filterSignalFeed, type SignalFeedFilter } from "@/lib/surf/signalFeed";
 import type { PredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
-import type { getRecentWhaleActivity } from "@/lib/surf/recentWhaleActivity";
 import { getSurfSportConfig, type SurfSportKey, type SurfSportLabel } from "@/lib/surf/sports";
 import type { OvernightMarketSummary, SignalCard } from "@/lib/surf/types";
 
@@ -31,7 +30,6 @@ type SurfFeedResponse = {
   dataSource?: "demo" | "fallback";
   dataNotice?: string;
   activityCoverage?: PredictionMarketSnapshot["activityCoverage"];
-  recentWhaleActivity?: Awaited<ReturnType<typeof getRecentWhaleActivity>>;
 };
 
 async function fetchSurfFeed(sport: SurfSportKey): Promise<SurfFeedResponse> {
@@ -135,11 +133,8 @@ export default function Home() {
     return filterSignalFeed(data?.signals ?? [], filter);
   }, [data, filter]);
   const whaleCount = (data?.signals ?? []).filter((signal) => signal.whaleActivity).length;
-  const recentWhales = data?.recentWhaleActivity?.signals ?? [];
-  const showRecentWhales = filter !== "opportunities" && recentWhales.length > 0;
   const whaleSources = data?.activityCoverage ? Object.values(data.activityCoverage.providers) : [];
-  const whaleScanLimited = whaleSources.some((source) => source.coverage !== "sampled")
-    || data?.recentWhaleActivity?.coverage === "partial" || data?.recentWhaleActivity?.coverage === "unavailable";
+  const whaleScanLimited = whaleSources.some((source) => source.coverage !== "sampled");
 
   const selectFilter = (value: SignalFeedFilter) => {
     setFilter(value);
@@ -197,19 +192,19 @@ export default function Home() {
           <OvernightMoves summary={data?.overnight} sportKey={sport} />
 
           <div role="group" aria-label="Signal type" className="mb-4 grid grid-cols-3 gap-2">
-            {([ ["all", "All", (data?.signals.length ?? 0) + recentWhales.length], ["whales", "Whales", whaleCount + recentWhales.length], ["opportunities", "Markets", (data?.signals.length ?? 0) - whaleCount] ] as const).map(([value, label, count]) => (
+            {([ ["all", "All", data?.signals.length ?? 0], ["whales", "Whales", whaleCount], ["opportunities", "Markets", (data?.signals.length ?? 0) - whaleCount] ] as const).map(([value, label, count]) => (
               <button key={value} type="button" aria-pressed={filter === value} onClick={() => selectFilter(value)}
                 className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold ${filter === value ? "border-[color:var(--surf-primary)] bg-[rgba(var(--surf-primary-rgb),0.06)] text-[color:var(--surf-primary)]" : "border-[color:var(--surf-line-08)] bg-[color:var(--surf-sunken)] text-[color:var(--surf-ink-55)]"}`}>
                 {label} <span className="ml-1 opacity-70">{count}</span>
               </button>
             ))}
           </div>
-          {filter === "whales" && !isLoading && !error ? <WhaleTrackingStatus coverage={data?.activityCoverage} recent={data?.recentWhaleActivity} /> : null}
+          {filter === "whales" && !isLoading && !error ? <WhaleTrackingStatus coverage={data?.activityCoverage} /> : null}
 
           <div className="mb-3 flex items-center justify-between px-1">
             <div>
               <div className="text-xs font-semibold text-[color:var(--surf-ink-75)]">
-                {visibleSignals.length} current {visibleSignals.length === 1 ? "signal" : "signals"}{showRecentWhales ? ` · ${recentWhales.length} recent whale records` : ""}
+                {visibleSignals.length} current {visibleSignals.length === 1 ? "signal" : "signals"}
               </div>
               <div className="mt-0.5 text-[10px] text-[color:var(--surf-ink-35)]">
                 Strictly qualified across sportsbooks and prediction markets
@@ -231,7 +226,7 @@ export default function Home() {
               <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">Market signals unavailable</div>
               <p className="mt-1 text-xs leading-5 text-[color:var(--surf-ink-45)]">{error}</p>
             </div>
-          ) : visibleSignals.length === 0 && !showRecentWhales ? (
+          ) : visibleSignals.length === 0 ? (
             <div className="rounded-[22px] border border-[color:var(--surf-line-08)] bg-[color:var(--surf-fill-02)] p-6 text-center">
               <div className="text-sm font-semibold text-[color:var(--surf-ink-80)]">{filter === "whales" ? (whaleScanLimited ? "No whale activity found in the available sample" : "No qualifying whale activity found") : "Nothing worth flagging right now"}</div>
               <p className="mx-auto mt-2 max-w-xs text-xs leading-5 text-[color:var(--surf-ink-45)]">
@@ -250,17 +245,6 @@ export default function Home() {
               ))}
             </main>
           )}
-          {!isLoading && !error && showRecentWhales ? (
-            <section aria-label="Recent whale activity" className="mt-5">
-              <div className="mb-4 border-t border-[color:var(--surf-line-08)] pt-5">
-                <h2 className="text-lg font-bold text-[color:var(--surf-ink-solid)]">Recent whale activity</h2>
-                <p className="mt-1 text-sm leading-6 text-[color:var(--surf-ink-45)]">Real pregame buys from the past 24 hours. These games have started; the cards are trade records, not available bets.</p>
-              </div>
-              <div className="flex flex-col gap-3">
-                {recentWhales.map((card) => <MarketEventCard key={card.id} card={card} now={now} historical />)}
-              </div>
-            </section>
-          ) : null}
         </div>
 
         <SurfFooter updatedAt={updatedAt} isSimulated={Boolean(data?.dataSource)} />

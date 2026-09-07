@@ -1,9 +1,7 @@
 import type { PredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
-import type { getRecentWhaleActivity } from "@/lib/surf/recentWhaleActivity";
 
-export function WhaleTrackingStatus({ coverage, recent }: {
+export function WhaleTrackingStatus({ coverage }: {
   coverage?: PredictionMarketSnapshot["activityCoverage"];
-  recent?: Awaited<ReturnType<typeof getRecentWhaleActivity>>;
 }) {
   if (!coverage) return null;
   return (
@@ -24,7 +22,6 @@ export function WhaleTrackingStatus({ coverage, recent }: {
           return <div key={venue} className="leading-5"><div className="font-semibold text-[color:var(--surf-ink-75)]">{label}</div><div className="text-[color:var(--surf-ink-45)]">{status}</div></div>;
         })}
       </div>
-      {recent ? <p className="mt-3 text-xs leading-5 text-[color:var(--surf-ink-45)]">Recent games · Polymarket individual buys: {recent.coverage === "unavailable" ? "source unavailable" : recent.coverage === "disabled" ? "not enabled" : `${recent.signals.length} records${recent.coverage === "partial" ? " · Partial scan" : ""}`}</p> : null}
       <p className="mt-3 text-xs leading-5 text-[color:var(--surf-ink-40)]">Individual buys, same-wallet buys, and anonymous buying bursts. Refreshes with the market schedule; not a complete trade history.</p>
     </details>
   );
