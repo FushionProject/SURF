@@ -6,6 +6,8 @@ import {
   type FullGameData,
 } from "./DataPanels";
 import { EditorialSignal } from "./EditorialSignal";
+import { SportsbookGameLink } from "./SportsbookGameLink";
+import { SportsbookLinkPreferences, SportsbookStateSelect } from "./SportsbookLinkPreferences";
 import { upcomingGames, upcomingSignals, matchesEditorialGame, matchesEditorialSignal, countNewSignals, nextEditorialRefreshDelay } from "@/lib/surf/editorialBoard";
 import { OvernightMoves } from "@/components/surf/OvernightMoves";
 import { filterSignalFeed } from "@/lib/surf/signalFeed";
@@ -221,11 +223,13 @@ function TeamLogo({ name, sport, providerLogo }: { name: string; sport: SurfSpor
 }
 function Offer({
   offer,
+  game,
   market,
   side,
   opportunity,
 }: {
   offer?: BestMarketOffer;
+  game: OddsApiGame;
   market: Market;
   side: number;
   opportunity?: MarketOpportunity;
@@ -243,7 +247,7 @@ function Offer({
         {market !== "h2h" && offer?.price != null
           ? `${price(offer.price)} · `
           : ""}
-        {offer?.bookTitle ?? "No quote"}
+        {offer?.bookTitle ? <SportsbookGameLink game={game} book={offer.bookTitle} /> : "No quote"}
       </small>
       {offer && <small className="bn-offer-midpoint">
         {market === "h2h" ? `Median ${price(offer.consensusPrice)}` : `Midpoint ${market === "spreads" ? price(offer.consensusPoint) : offer.consensusPoint ?? "—"}`} · {offer.booksCompared} books
@@ -322,7 +326,7 @@ function GameCard({
               </h3>
               {sport === "americanfootball_ncaaf" && <span className="bn-team-record">{fullData.cfbContext?.teams[name]?.record ?? "Record unavailable"}</span>}
             </div>
-            <Offer offer={offers[i]} market={market} side={i}
+            <Offer offer={offers[i]} game={game} market={market} side={i}
               opportunity={board.opportunities.find((o) => o.slot === offers[i]?.slot)} />
           </div>
         ))}
@@ -361,7 +365,7 @@ function GameCard({
                   if (!outcomes?.length) return null;
                   return (
                     <tr key={book.key}>
-                      <td>{book.title}</td>
+                      <td><SportsbookGameLink game={game} book={book.title} /></td>
                       {[
                         market === "totals" ? "Over" : game.away_team,
                         market === "totals" ? "Under" : game.home_team,
@@ -392,6 +396,10 @@ function GameCard({
 }
 
 export default function SurfEditorial({ view = "markets" }: { view?: View }) {
+  return <SportsbookLinkPreferences><SurfEditorialContent view={view} /></SportsbookLinkPreferences>;
+}
+
+function SurfEditorialContent({ view = "markets" }: { view?: View }) {
   const { sport, sportSynced, selectSport } = useSurfSport();
   const [snapshotData, setData] = useState<Snapshot>();
   const data = (snapshotData?.games?.sportKey ?? snapshotData?.feed?.sportKey) === sport ? snapshotData : undefined;
@@ -804,6 +812,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                   />
                 </label>
               </div>
+              <SportsbookStateSelect />
               {sport === "americanfootball_ncaaf" && view !== "signals" && (
                 <div className="bn-cfb-filter">
                   <label>
@@ -886,7 +895,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
               ) : view === "signals" ? (
                 <div className="bn-signal-grid">
                   {signals.map((s, i) => (
-                    <EditorialSignal key={s.id} signal={s} index={i} now={now} sport={sport} />
+                    <EditorialSignal key={s.id} signal={s} index={i} now={now} sport={sport} game={currentGames.find((game) => game.id === s.game.id)} />
                   ))}
                   {signals.length === 0 && (
                     <div className="bn-empty">

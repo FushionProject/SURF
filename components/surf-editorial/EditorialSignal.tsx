@@ -3,11 +3,12 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { getTeamLogo } from "@/lib/teamLogos";
-import type { SignalCard } from "@/lib/surf/types";
+import type { OddsApiGame, SignalCard } from "@/lib/surf/types";
 import { signalAdditionalQuotes, signalKindLabel, signalQuoteRows, signalStrength, signalRatingNote, signalTimestamp, signalTimingLabel, type SignalQuoteRow } from "@/lib/surf/signalPresentation";
 import { signalMeaning } from "@/lib/surf/signalMeaning";
 import { signalAnchorId, signalHref } from "@/lib/surf/signalLinks";
 import { SignalShareLink } from "./SignalShareLink";
+import { SportsbookGameLink } from "./SportsbookGameLink";
 import "./signal-card.css";
 
 const subscribe = () => () => {};
@@ -27,17 +28,17 @@ function TeamLogo({ team, league }: { team: string; league: SignalCard["game"]["
   </span>;
 }
 
-function QuoteRows({ rows, label }: { rows: SignalQuoteRow[]; label: string }) {
+function QuoteRows({ rows, label, game }: { rows: SignalQuoteRow[]; label: string; game?: OddsApiGame }) {
   if (rows.length === 0) return null;
   return <dl className="bn-card-quotes" aria-label={label}>
     {rows.map((row, index) => <div key={`${row.label}:${row.book}:${index}`}>
-      <dt><span>{row.label}</span>{row.book && <small>{row.book}</small>}</dt>
+      <dt><span>{row.label}</span>{row.book && <small><SportsbookGameLink game={game} book={row.book} /></small>}</dt>
       <dd>{row.value}</dd>
     </div>)}
   </dl>;
 }
 
-export function EditorialSignal({ signal, index, now, sport }: { signal: SignalCard; index: number; now: number; sport: string }) {
+export function EditorialSignal({ signal, index, now, sport, game }: { signal: SignalCard; index: number; now: number; sport: string; game?: OddsApiGame }) {
   const titleId = useId();
   // Initial server/client markup agrees even when their time zones differ.
   const localReady = useSyncExternalStore(subscribe, clientSnapshot, serverSnapshot);
@@ -56,6 +57,7 @@ export function EditorialSignal({ signal, index, now, sport }: { signal: SignalC
     ? `Books are ${signal.gap} ${signal.gap === 1 ? "point" : "points"} apart on the ${signal.market === "totals" ? "total" : "spread"}`
     : signal.title;
   const meaning = signalMeaning(signal);
+  const matchingGame = game?.id === signal.game.id && game?.sport_key === signal.game.sportKey ? game : undefined;
   const status = whale ? whale.venueLabel : opportunity ? "Current quotes" : movement ? "Observed movement" : "Current snapshot";
 
   return <article id={signalAnchorId(signal.id)} tabIndex={-1} aria-labelledby={titleId} className="bn-signal bn-signal-card" data-strength={strength?.label.toLowerCase()} data-kind={whale ? whale.activityKind : opportunity?.isMiddle ? "middle" : opportunity?.kind ?? "movement"}>
@@ -100,13 +102,13 @@ export function EditorialSignal({ signal, index, now, sport }: { signal: SignalC
         <span>{whale.isAnonymous
           ? whale.activityKind === "buying_burst" ? "Anonymous buying burst · may include multiple traders" : "Anonymous public trade · trader identity unavailable"
           : `Wallet ${whale.participantLabel ?? "tracked"}`}</span>
-        {whale.sourceUrl && <a href={whale.sourceUrl} target="_blank" rel="noreferrer">View market ↗</a>}
+        {whale.venue !== "kalshi" && whale.sourceUrl && <a href={whale.sourceUrl} target="_blank" rel="noopener noreferrer">View market ↗</a>}
       </div>
     </> : <>
       <div className="bn-card-quote-label">{opportunity?.isMiddle || opportunity?.arbitrage ? "Both sides of the opportunity" : status}</div>
-      <QuoteRows rows={rows} label={opportunity?.isMiddle || opportunity?.arbitrage ? "Both quoted legs" : status} />
+      <QuoteRows rows={rows} label={opportunity?.isMiddle || opportunity?.arbitrage ? "Both quoted legs" : status} game={matchingGame} />
       {rows.length === 0 && signal.detail && <p className="bn-card-detail">{movement ? signal.detail : signal.detail.replace(/\s*→\s*/g, " vs ")}</p>}
-      {extraRows.length > 0 && <><div className="bn-card-quote-label">Other current numbers</div><QuoteRows rows={extraRows} label="Other current numbers" /></>}
+      {extraRows.length > 0 && <><div className="bn-card-quote-label">Other current numbers</div><QuoteRows rows={extraRows} label="Other current numbers" game={matchingGame} /></>}
       {!movement && <p className="bn-card-context">{opportunity?.arbitrage ? "Theoretical return only. Prices, limits and settlement rules can change the outcome."
         : opportunity?.isMiddle ? "Both bets win only inside the middle. Outside it, the prices determine the cost."
         : "A current price comparison, not evidence a book just moved."}</p>}

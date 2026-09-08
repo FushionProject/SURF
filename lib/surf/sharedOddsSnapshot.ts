@@ -121,6 +121,9 @@ function oddsUrl(sportKey: SurfSportKey, apiKey: string): string {
   url.searchParams.set("markets", (sportKey === "baseball_mlb" || sportKey === "americanfootball_ncaaf") ? "h2h,spreads,totals" : "spreads,totals");
   url.searchParams.set("oddsFormat", "american");
   url.searchParams.set("dateFormat", "iso");
+  // Event links arrive with this same shared snapshot; no extra request or
+  // betslip lookup is needed when a customer opens a sportsbook's game page.
+  url.searchParams.set("includeLinks", "true");
   return url.toString();
 }
 
