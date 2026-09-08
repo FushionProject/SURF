@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useId, useState, useSyncExternalStore } from "react";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 import { getTeamLogo } from "@/lib/teamLogos";
 import type { SignalCard } from "@/lib/surf/types";
 import { signalAdditionalQuotes, signalKindLabel, signalQuoteRows, signalStrength, signalRatingNote, signalTimestamp, signalTimingLabel, type SignalQuoteRow } from "@/lib/surf/signalPresentation";
+import { signalMeaning } from "@/lib/surf/signalMeaning";
+import { signalAnchorId, signalHref } from "@/lib/surf/signalLinks";
+import { SignalShareLink } from "./SignalShareLink";
 import "./signal-card.css";
 
 const subscribe = () => () => {};
@@ -34,7 +37,8 @@ function QuoteRows({ rows, label }: { rows: SignalQuoteRow[]; label: string }) {
   </dl>;
 }
 
-export function EditorialSignal({ signal, index, now }: { signal: SignalCard; index: number; now: number }) {
+export function EditorialSignal({ signal, index, now, sport }: { signal: SignalCard; index: number; now: number; sport: string }) {
+  const titleId = useId();
   // Initial server/client markup agrees even when their time zones differ.
   const localReady = useSyncExternalStore(subscribe, clientSnapshot, serverSnapshot);
   const whale = signal.whaleActivity;
@@ -51,10 +55,18 @@ export function EditorialSignal({ signal, index, now }: { signal: SignalCard; in
   const headline = !opportunity && !whale && !movement && signal.signalType === "Book Disagreement" && signal.gap != null
     ? `Books are ${signal.gap} ${signal.gap === 1 ? "point" : "points"} apart on the ${signal.market === "totals" ? "total" : "spread"}`
     : signal.title;
-  const why = opportunity?.reason || signal.insight;
+  const meaning = signalMeaning(signal);
   const status = whale ? whale.venueLabel : opportunity ? "Current quotes" : movement ? "Observed movement" : "Current snapshot";
 
-  return <article className="bn-signal bn-signal-card" data-kind={whale ? whale.activityKind : opportunity?.isMiddle ? "middle" : opportunity?.kind ?? "movement"}>
+  return <article id={signalAnchorId(signal.id)} tabIndex={-1} aria-labelledby={titleId} className="bn-signal bn-signal-card" data-strength={strength?.label.toLowerCase()} data-kind={whale ? whale.activityKind : opportunity?.isMiddle ? "middle" : opportunity?.kind ?? "movement"}>
+    {strength && <div className="bn-card-priority">
+      <div className="bn-card-strength" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={strength.score} aria-valuetext={`${strength.label} signal. Market relevance, not chance of winning.`} aria-label="Signal strength">
+        <strong>{strength.label} signal</strong>
+        <div className="bn-card-strength-track" aria-hidden="true"><i style={{ width: `${strength.score}%` }} /></div>
+      </div>
+      <span className="bn-card-strength-caption">Market relevance · not a prediction</span>
+      {ratingNote && <p className="bn-card-rating-note">{ratingNote}</p>}
+    </div>}
     <header className="bn-card-meta">
       <span className="bn-signal-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
       <span className="bn-tag bn-card-kind">{signalKindLabel(signal)}</span>
@@ -73,12 +85,15 @@ export function EditorialSignal({ signal, index, now }: { signal: SignalCard; in
       <span className="bn-card-kickoff">{kickoffLabel}</span>
     </div>
 
-    <h3>{headline}</h3>
-    {why && <p className="bn-card-why">{why}</p>}
+    <h3 id={titleId}>{headline}</h3>
+    <div className="bn-card-meaning">
+      <h4>What this means</h4>
+      <p>{meaning}</p>
+    </div>
 
     {whale ? <>
       <div className="bn-card-execution">
-        <div className="bn-card-execution-main"><span>Executed buys · {whale.venueLabel}</span><strong>{money(whale.committedUsd)}</strong><small>{whale.outcomeTeam} to win</small></div>
+        <div className="bn-card-execution-main"><span>Amount bought · {whale.venueLabel}</span><strong>{money(whale.committedUsd)}</strong><small>{whale.outcomeTeam} to win</small></div>
         <dl><div><dt>Average entry</dt><dd>{Math.round(whale.averagePrice * 100)}¢</dd></div><div><dt>Executed fills</dt><dd>{whale.tradeCount}</dd></div></dl>
       </div>
       <div className="bn-card-flow-note">
@@ -97,9 +112,6 @@ export function EditorialSignal({ signal, index, now }: { signal: SignalCard; in
         : "A current price comparison, not evidence a book just moved."}</p>}
     </>}
 
-    {strength && <div className="bn-card-strength" aria-label={`${strength.measure}: ${strength.label}, ${strength.score} out of 100. Not pick confidence.`}>
-      <span>{strength.measure}</span><div aria-hidden="true"><i style={{ width: `${strength.score}%` }} /></div><strong>{strength.label}</strong>
-    </div>}
-    {strength && ratingNote && <p className="bn-card-rating-note">{ratingNote}</p>}
+    <SignalShareLink href={signalHref(signal.id, sport)} />
   </article>;
 }
