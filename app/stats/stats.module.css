@@ -1,0 +1,38 @@
+.page { min-height: 100vh; background: var(--surf-base); color: var(--surf-ink-solid); }
+.shell { width: min(100% - 40px, 960px); margin: 0 auto; padding-bottom: 64px; }
+.intro, .cardHeading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.intro { margin: 24px 0; font-size: 14px; }
+.intro a, .eyebrow { color: var(--surf-primary); }
+.eyebrow { font-weight: 650; letter-spacing: .05em; text-transform: uppercase; font-size: 12px; }
+.status, .card { border: 1px solid color-mix(in srgb, var(--surf-primary) 48%, transparent); background: var(--surf-surface); padding: 26px; }
+.status h2, .card h2, .next h2 { font-size: 23px; font-weight: 650; letter-spacing: -.025em; line-height: 1.25; margin-bottom: 10px; }
+.status p, .card p, .next p, .next li { color: var(--surf-ink-55); font-size: 16px; line-height: 1.65; }
+.status p + p { margin-top: 10px; }
+.next { padding: 34px 0; max-width: 720px; }
+.next ul { padding-left: 20px; list-style: disc; margin: 18px 0; }
+.next li { margin-bottom: 10px; }
+.footer, .scope { color: var(--surf-ink-55); font-size: 14px; line-height: 1.7; }
+.footer { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--surf-line); }
+.controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 28px 0 12px; font-size: 16px; }
+.controls select, .controls button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--surf-line-strong); background: var(--surf-surface); color: var(--surf-ink-solid); }
+.controls button { background: var(--surf-primary); color: #000; border-color: var(--surf-primary); font-weight: 650; }
+.controls select:focus-visible, .controls button:focus-visible, .audit summary:focus-visible, .intro a:focus-visible { outline: 2px solid var(--surf-primary); outline-offset: 4px; }
+.cards { display: grid; gap: 20px; margin-top: 24px; }
+.badge { font-size: 13px; color: var(--surf-primary); }
+.numbers { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 26px 0; }
+.numbers dt { font-size: 14px; color: var(--surf-ink-55); }
+.numbers dd { margin: 5px 0; font-size: 36px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
+.numbers small { font-size: 12px; color: var(--surf-ink-55); }
+.card .caution { font-size: 14px; }
+.card .source { font-size: 12px; margin-top: 10px; }
+.audit { border-top: 1px solid var(--surf-line); margin-top: 20px; padding-top: 6px; }
+.audit summary { display: flex; align-items: center; justify-content: space-between; min-height: 48px; cursor: pointer; font-size: 14px; color: var(--surf-primary); }
+.gameList { list-style: none; }
+.gameList li { border-top: 1px solid var(--surf-line); padding: 14px 0; font-size: 14px; }
+.gameTitle, .gameResult { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.gameTitle strong { font-weight: 600; }
+.gameList p { font-size: 13px; margin: 5px 0; }
+.gameResult { margin: 8px 0; font-size: 14px; }
+.gameResult strong { color: var(--surf-primary); font-weight: 600; }
+.gameList small { color: var(--surf-ink-55); font-size: 12px; }
+@media (max-width: 480px) { .shell { width: calc(100% - 32px); } .status, .card { padding: 20px; } .numbers dd { font-size: 28px; } .controls label { width: 100%; } }
