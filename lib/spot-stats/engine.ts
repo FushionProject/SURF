@@ -1,4 +1,4 @@
-import type { SpotGame } from "./types.ts";
+import type { SpotGame, SpotSource } from "./types.ts";
 
 // Provider codes are intentional: historical relocations are not silently merged.
 export const SPOT_TEAM_CODES = [
@@ -71,6 +71,8 @@ export interface SpotAuditRow {
 /** Counts are input records, not necessarily distinct games. */
 export interface SpotExclusions {
   trialRecords: number;
+  researchRecords: number;
+  licensedRecords: number;
   invalidRecords: number;
   duplicateRecords: number;
   conflictingIdRecords: number;
@@ -103,7 +105,7 @@ export interface SpotQueryResult {
   ats: OutcomeSample & { wins: number; losses: number; pushes: number; missingSpread: number };
   totals: (OutcomeSample & { overs: number; unders: number; pushes: number; missingTotal: number }) | null;
   exclusions: SpotExclusions;
-  lineBasis: "game-start";
+  lineBasis: "game-start" | "historical-reference";
   closingVerified: false;
 }
 
@@ -115,6 +117,10 @@ const QUERY_KEYS = new Set([
 const MAX_INPUT_RECORDS = 100_000;
 const METHODOLOGY =
   "Retrospective description of imported completed games only. The cutoff excludes starts at or after the specified instant; completion time and historical data availability are not verified. Imported final revisions may be newer than the cutoff. Lines are provider game-start lines, not verified closing lines. Results describe the specified sample and do not establish predictive value.";
+const RESEARCH_METHODOLOGY =
+  "Private research only; downstream publication rights are not confirmed. Retrospective description of imported completed games only. The cutoff excludes starts at or after the specified instant; completion time and historical data availability are not verified. Imported final revisions may be newer than the cutoff. Lines are nflverse historical reference lines, not verified closing lines or prices at a specific sportsbook. Results describe the specified sample and do not establish predictive value.";
+type QueryAccess = "licensed" | "research";
+const NFLVERSE_RESEARCH_ENDPOINT = "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -193,7 +199,17 @@ function isLine(value: unknown, lower: number, upper: number): value is number |
   return value === null || (typeof value === "number" && Number.isFinite(value) && value >= lower && value <= upper);
 }
 
-function isSpotGame(value: unknown): value is SpotGame {
+function isSource(value: Record<string, unknown>, access: QueryAccess): boolean {
+  if (value.closingVerified !== false || !isUtcTimestamp(value.retrievedAt) ||
+    typeof value.endpoint !== "string" || value.endpoint.trim().length === 0 || value.endpoint.length > 1000) return false;
+  if (access === "research") {
+    return value.provider === "nflverse" && value.access === "research" &&
+      value.lineBasis === "historical-reference" && value.endpoint === NFLVERSE_RESEARCH_ENDPOINT;
+  }
+  return value.provider === "sportsdataio" && value.access === "licensed" && value.lineBasis === "game-start";
+}
+
+function isSpotGame(value: unknown, access: QueryAccess): value is SpotGame {
   if (!isRecord(value) || !isRecord(value.source)) return false;
   const source = value.source;
   return isId(value.id) && isIntegerBetween(value.season, 1920, 2100) &&
@@ -202,9 +218,8 @@ function isSpotGame(value: unknown): value is SpotGame {
     value.homeTeam !== value.awayTeam && isIntegerBetween(value.homeScore, 0, 200) &&
     isIntegerBetween(value.awayScore, 0, 200) && isLine(value.homeSpread, -200, 200) &&
     isLine(value.total, 0, 400) && (value.neutralVenue === null || typeof value.neutralVenue === "boolean") &&
-    source.provider === "sportsdataio" && source.access === "licensed" && source.lineBasis === "game-start" &&
-    source.closingVerified === false && isUtcTimestamp(source.retrievedAt) &&
-    typeof source.endpoint === "string" && source.endpoint.trim().length > 0 && source.endpoint.length <= 1000;
+    isSource(source, access) &&
+    (access !== "research" || Date.parse(value.kickoffAt) < Date.parse(source.retrievedAt as string));
 }
 
 /** Retrieval time and endpoint differences do not make identical game facts conflict. */
@@ -224,11 +239,19 @@ function compareCopies(left: SpotGame, right: SpotGame): number {
     compareText(left.source.endpoint, right.source.endpoint) || compareText(left.kickoffAt, right.kickoffAt);
 }
 
-function uniqueGames(input: readonly SpotGame[], excluded: SpotExclusions): SpotGame[] {
+function uniqueGames(input: readonly SpotGame[], excluded: SpotExclusions, access: QueryAccess): SpotGame[] {
   const ids = new Map<string, unknown[]>();
   for (const value of input as readonly unknown[]) {
     if (isRecord(value) && isRecord(value.source) && value.source.access === "trial") {
       excluded.trialRecords += 1;
+      continue;
+    }
+    if (isRecord(value) && isRecord(value.source) && access === "licensed" && value.source.access === "research") {
+      excluded.researchRecords += 1;
+      continue;
+    }
+    if (isRecord(value) && isRecord(value.source) && access === "research" && value.source.access === "licensed") {
+      excluded.licensedRecords += 1;
       continue;
     }
     if (!isRecord(value) || !isId(value.id)) {
@@ -241,7 +264,7 @@ function uniqueGames(input: readonly SpotGame[], excluded: SpotExclusions): Spot
   }
   const byId: SpotGame[] = [];
   for (const group of ids.values()) {
-    if (!group.every(isSpotGame)) {
+    if (!group.every((value): value is SpotGame => isSpotGame(value, access))) {
       // A bad version of an ID invalidates the group; never select its good-looking version.
       excluded.invalidRecords += group.length;
       continue;
@@ -276,6 +299,18 @@ function uniqueGames(input: readonly SpotGame[], excluded: SpotExclusions): Spot
   return unique;
 }
 
+/** Keep only the source contract, not arbitrary imported metadata. */
+function auditSource(source: SpotSource): SpotSource {
+  const common = {
+    endpoint: source.endpoint,
+    retrievedAt: new Date(source.retrievedAt).toISOString(),
+    closingVerified: false as const,
+  };
+  return source.provider === "nflverse"
+    ? { ...common, provider: "nflverse", access: "research", lineBasis: "historical-reference" }
+    : { ...common, provider: "sportsdataio", access: source.access, lineBasis: "game-start" };
+}
+
 function perspective(game: SpotGame, team: string, includeTotals: boolean): SpotAuditRow {
   const home = game.homeTeam === team;
   const teamScore = home ? game.homeScore : game.awayScore;
@@ -305,14 +340,7 @@ function perspective(game: SpotGame, team: string, includeTotals: boolean): Spot
     totalLine: game.total,
     totalScore,
     totalOutcome: !includeTotals ? null : game.total === null ? "missing" : totalScore > game.total ? "over" : totalScore < game.total ? "under" : "push",
-    source: {
-      provider: game.source.provider,
-      endpoint: game.source.endpoint,
-      retrievedAt: new Date(game.source.retrievedAt).toISOString(),
-      access: game.source.access,
-      lineBasis: game.source.lineBasis,
-      closingVerified: game.source.closingVerified,
-    },
+    source: auditSource(game.source),
   };
 }
 
@@ -322,19 +350,32 @@ function perspective(game: SpotGame, team: string, includeTotals: boolean): Spot
  * No network, model, outcome-directed query generation, or best-angle ranking.
  */
 export function runSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery): SpotQueryResult {
+  return calculateSpotQuery(games, rawQuery, "licensed");
+}
+
+/**
+ * Explicit private research entry point for the local report CLI, never the live
+ * site. Does not upgrade data to licensed access or accept scrambled trial rows.
+ */
+export function runResearchSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery): SpotQueryResult {
+  if (typeof window !== "undefined") throw new Error("Private spot research must run locally on the server.");
+  return calculateSpotQuery(games, rawQuery, "research");
+}
+
+function calculateSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery, access: QueryAccess): SpotQueryResult {
   const query = validateSpotQuery(rawQuery);
   if (!Array.isArray(games) || games.length > MAX_INPUT_RECORDS) {
     throw new SpotQueryError([{ field: "games", message: `Use an array of at most ${MAX_INPUT_RECORDS} imported completed games.` }]);
   }
   const exclusions: SpotExclusions = {
-    trialRecords: 0, invalidRecords: 0, duplicateRecords: 0, conflictingIdRecords: 0,
+    trialRecords: 0, researchRecords: 0, licensedRecords: 0, invalidRecords: 0, duplicateRecords: 0, conflictingIdRecords: 0,
     duplicateFixtureRecords: 0, conflictingFixtureRecords: 0, atOrAfterCutoffRecords: 0,
     otherTeamRecords: 0, outsideSeasonRecords: 0, seasonTypeRecords: 0,
     venueRecords: 0, weekRecords: 0, roleRecords: 0,
   };
   const rows: SpotAuditRow[] = [];
   const cutoff = Date.parse(query.cutoffAt);
-  for (const game of uniqueGames(games, exclusions)) {
+  for (const game of uniqueGames(games, exclusions, access)) {
     let reason: keyof SpotExclusions | null = null;
     if (Date.parse(game.kickoffAt) >= cutoff) reason = "atOrAfterCutoffRecords";
     else if (game.homeTeam !== query.team && game.awayTeam !== query.team) reason = "otherTeamRecords";
@@ -394,7 +435,7 @@ export function runSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery): S
     note: insufficient.length
       ? `Insufficient sample: ${insufficient.join(", ")} has fewer than ${query.minimumSample} graded games. Descriptive counts only.`
       : "Descriptive counts only; meeting the minimum sample does not establish predictive value.",
-    methodology: METHODOLOGY,
-    su, ats, totals, exclusions, lineBasis: "game-start", closingVerified: false,
+    methodology: access === "research" ? RESEARCH_METHODOLOGY : METHODOLOGY,
+    su, ats, totals, exclusions, lineBasis: access === "research" ? "historical-reference" : "game-start", closingVerified: false,
   };
 }

@@ -3,6 +3,72 @@
 Branch: `codex/surf-spot-stats`, based on `codex/surf-signal-readability` at `253fb6e`.
 Main, live Signals, bookmaker quotes, whales, and existing collection schedules are unchanged.
 
+## Free NFL history: private nflverse research
+
+We now support the official [nflverse schedules release](https://github.com/nflverse/nflverse-data/releases/tag/schedules)
+directly. No API key, SportsDataIO subscription, or full GitHub repository clone is
+needed. This is **data ingestion**, not copying their application or claiming ownership
+of their dataset. Our adapter and calculations are Surf code; the source retains its credit.
+
+```sh
+# Help makes no network calls. --fetch downloads games.csv and its repository license once.
+npm run stats:import:nflverse -- --fetch
+# Descriptive, pre-specified sample; regular season by default.
+npm run stats:research -- --team PIT --from 2020 --to 2025 --week 1
+# Include every matching game and calculation in the local report:
+npm run stats:research -- --team PIT --from 2020 --to 2025 --week 1 --rows
+# Other optional filters: --venue home|away|neutral, --role favorite|underdog|pickem, --postseason
+```
+
+The importer retains the **unchanged raw CSV and full license text** together in
+ignored `.surf-data/spot-stats/nflverse-research/` JSON snapshots, with SHA-256 source
+and full-archive fingerprints, source URL, retrieval time, credits, and transformation notices. A local
+pointer selects the latest successful import. Malformed/empty imports cannot replace
+the selected archive; reads verify fingerprints and re-normalize the original CSV.
+Old source fingerprints remain available for reproducibility. No data is committed,
+placed in `public/`, or sent to a database. Downloads have size limits and a deadline;
+there are no retries, timers, or automatic requests on page views.
+
+These files have a separate `research` provenance and cannot be promoted by setting
+the SportsDataIO licensed flag. `runSpotQuery` excludes them; the explicit local-only
+`runResearchSpotQuery` processes them. **`/stats` and live Signals do not consume this
+research archive.** No public route or navigation was enabled by the download.
+
+The [repository license](https://github.com/nflverse/nflverse-data/blob/main/LICENSE.md)
+is CC-BY-4.0, while [project terms](https://nflverse.nflverse.com/#terms-of-use) also
+refer to upstream owners' conditions. We preserve attribution and mark public-use
+permissions unconfirmed until that scope is resolved. This is not a legal clearance
+or a claim of exclusive ownership. Retain supplied license notices and credit if a
+permitted public integration is later enabled.
+
+Important source conventions:
+
+- `spread_line` is **positive when the home team is favored**. It is reversed for
+  Surf's signed team-spread calculations. Missing values stay unknown; zero is pick'em.
+- `total_line` is the market reference total; `total` is the actual combined score.
+- `gameday` and `gametime` are Eastern time. Explicit timezone conversion handles
+  historical daylight-saving rules and UTC date rollover, independent of the Mac timezone.
+- REG is regular season; WC/DIV/CON/SB are postseason. Historical team locations are
+  not silently merged into current franchises. January games retain their NFL season.
+- The file has no authoritative live-final status. Rows require both scores and a
+  kickoff at least 24 hours before retrieval as a conservative exclusion for recent
+  games; this buffer is **not independent proof of finality**. This is historical
+  research, not live score tracking. Upcoming/incomplete rows are excluded and counted.
+- Lines are **historical reference lines**, not verified specific-book closing odds.
+  Imported final revisions cannot establish point-in-time betting availability.
+- Coaches, rest, venue, and other original fields remain in the raw archive. This
+  first adapter does not yet calculate coach-tenure, international, weather, or
+  postseason-to-next-season situations; those require explicit joins and tests.
+
+Run `npm run test:spot-stats:nflverse` and `npm run test:spot-stats` for offline
+normalization, timezone, grading, privacy-boundary, and archive regressions.
+
+Initial download on September 8, 2026: 7,548 source rows; **7,017 usable games from
+2000–2025**, 272 upcoming/unfinished 2026 games excluded, and all 259 games from 1999
+excluded because `gametime` is absent. The raw archive preserves every row. No
+kickoff times were invented to fill the 1999 gap. These counts describe this snapshot,
+not a guarantee of future release coverage.
+
 ## What is built
 
 - A bounded, server-side SportsDataIO NFL season adapter with header authentication.

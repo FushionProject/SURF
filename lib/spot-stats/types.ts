@@ -6,6 +6,27 @@ export type SpotSeason = {
   seasonType: 1 | 3;
 };
 
+export type SportsDataIOSpotSource = {
+  provider: "sportsdataio";
+  endpoint: string;
+  retrievedAt: string;
+  access: SpotAccess;
+  lineBasis: "game-start";
+  closingVerified: false;
+};
+
+/** Research access does not attest that downstream publication rights are cleared. */
+export type NflverseSpotSource = {
+  provider: "nflverse";
+  endpoint: string;
+  retrievedAt: string;
+  access: "research";
+  lineBasis: "historical-reference";
+  closingVerified: false;
+};
+
+export type SpotSource = SportsDataIOSpotSource | NflverseSpotSource;
+
 export type SpotGame = SpotSeason & {
   id: string;
   week: number;
@@ -17,19 +38,12 @@ export type SpotGame = SpotSeason & {
   homeSpread: number | null;
   total: number | null;
   neutralVenue: boolean | null;
-  source: {
-    provider: "sportsdataio";
-    endpoint: string;
-    retrievedAt: string;
-    access: SpotAccess;
-    lineBasis: "game-start";
-    closingVerified: false;
-  };
+  source: SpotSource;
 };
 
 /** Private import snapshot. Never include credentials or an entire HTTP response. */
 export type SportsDataIOSeasonEnvelope = SpotSeason & {
-  source: SpotGame["source"];
+  source: SportsDataIOSpotSource;
   records: unknown[];
 };
 
