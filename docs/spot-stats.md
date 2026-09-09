@@ -3,6 +3,15 @@
 Branch: `codex/surf-spot-stats`, based on `codex/surf-signal-readability` at `253fb6e`.
 Main, live Signals, bookmaker quotes, whales, and existing collection schedules are unchanged.
 
+## Current provider addition: existing API-Sports access
+
+The separate [API-Sports results integration](./spot-stats-api-sports.md) now uses
+Surf's existing subscription. Sixteen season responses (2010–2025) are stored locally.
+This does **not** establish complete usable spot-stat coverage back to 2010: the
+provider omits stage/week fields for 2010–2020, and those seasons remain raw-only.
+The results-only query currently accepts 1,421 classified games from 2021–2025.
+It does not borrow NFLverse lines, invent coaches, or publish research data.
+
 ## Free NFL history: private nflverse research
 
 We now support the official [nflverse schedules release](https://github.com/nflverse/nflverse-data/releases/tag/schedules)

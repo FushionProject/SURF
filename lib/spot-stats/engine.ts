@@ -105,8 +105,15 @@ export interface SpotQueryResult {
   ats: OutcomeSample & { wins: number; losses: number; pushes: number; missingSpread: number };
   totals: (OutcomeSample & { overs: number; unders: number; pushes: number; missingTotal: number }) | null;
   exclusions: SpotExclusions;
-  lineBasis: "game-start" | "historical-reference";
+  lineBasis: "game-start" | "historical-reference" | "unavailable";
   closingVerified: false;
+}
+
+export interface ApiSportsResearchQueryResult extends Omit<SpotQueryResult, "ats" | "totals" | "lineBasis"> {
+  primaryOutcome: "straight-up";
+  ats: { status: "unavailable"; reason: string; missingSpread: number };
+  totals: { status: "unavailable"; reason: string; missingTotal: number };
+  lineBasis: "unavailable";
 }
 
 const TEAM_CODES = new Set<string>(SPOT_TEAM_CODES);
@@ -119,7 +126,9 @@ const METHODOLOGY =
   "Retrospective description of imported completed games only. The cutoff excludes starts at or after the specified instant; completion time and historical data availability are not verified. Imported final revisions may be newer than the cutoff. Lines are provider game-start lines, not verified closing lines. Results describe the specified sample and do not establish predictive value.";
 const RESEARCH_METHODOLOGY =
   "Private research only; downstream publication rights are not confirmed. Retrospective description of imported completed games only. The cutoff excludes starts at or after the specified instant; completion time and historical data availability are not verified. Imported final revisions may be newer than the cutoff. Lines are nflverse historical reference lines, not verified closing lines or prices at a specific sportsbook. Results describe the specified sample and do not establish predictive value.";
-type QueryAccess = "licensed" | "research";
+const API_SPORTS_RESEARCH_METHODOLOGY =
+  "Private research only; downstream publication rights are not confirmed. Retrospective straight-up results from API-Sports final-game imports only. The cutoff excludes starts at or after the specified instant; completion time and historical data availability are not verified. Imported final revisions may be newer than the cutoff. This source has no historical sportsbook lines, so ATS, totals, favorite and underdog results are unavailable. Home/away labels are not proof of a non-neutral venue; venue classification stays unknown. No historical coach tenure is inferred. Results describe the specified sample and do not establish predictive value.";
+type QueryAccess = "licensed" | "research" | "api-sports-research";
 const NFLVERSE_RESEARCH_ENDPOINT = "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -199,12 +208,16 @@ function isLine(value: unknown, lower: number, upper: number): value is number |
   return value === null || (typeof value === "number" && Number.isFinite(value) && value >= lower && value <= upper);
 }
 
-function isSource(value: Record<string, unknown>, access: QueryAccess): boolean {
+function isSource(value: Record<string, unknown>, access: QueryAccess, season: number): boolean {
   if (value.closingVerified !== false || !isUtcTimestamp(value.retrievedAt) ||
     typeof value.endpoint !== "string" || value.endpoint.trim().length === 0 || value.endpoint.length > 1000) return false;
   if (access === "research") {
     return value.provider === "nflverse" && value.access === "research" &&
       value.lineBasis === "historical-reference" && value.endpoint === NFLVERSE_RESEARCH_ENDPOINT;
+  }
+  if (access === "api-sports-research") {
+    return value.provider === "api-sports" && value.access === "research" && value.lineBasis === "unavailable" &&
+      value.endpoint === `https://v1.american-football.api-sports.io/games?league=1&season=${season}`;
   }
   return value.provider === "sportsdataio" && value.access === "licensed" && value.lineBasis === "game-start";
 }
@@ -218,8 +231,10 @@ function isSpotGame(value: unknown, access: QueryAccess): value is SpotGame {
     value.homeTeam !== value.awayTeam && isIntegerBetween(value.homeScore, 0, 200) &&
     isIntegerBetween(value.awayScore, 0, 200) && isLine(value.homeSpread, -200, 200) &&
     isLine(value.total, 0, 400) && (value.neutralVenue === null || typeof value.neutralVenue === "boolean") &&
-    isSource(source, access) &&
-    (access !== "research" || Date.parse(value.kickoffAt) < Date.parse(source.retrievedAt as string));
+    isSource(source, access, value.season) &&
+    (access === "licensed" || Date.parse(value.kickoffAt) < Date.parse(source.retrievedAt as string)) &&
+    (access !== "api-sports-research" || (value.homeSpread === null && value.total === null && value.neutralVenue === null &&
+      value.kickoffAt >= `${value.season}-07-01T00:00:00.000Z` && value.kickoffAt < `${value.season + 1}-07-01T00:00:00.000Z`));
 }
 
 /** Retrieval time and endpoint differences do not make identical game facts conflict. */
@@ -250,7 +265,7 @@ function uniqueGames(input: readonly SpotGame[], excluded: SpotExclusions, acces
       excluded.researchRecords += 1;
       continue;
     }
-    if (isRecord(value) && isRecord(value.source) && access === "research" && value.source.access === "licensed") {
+    if (isRecord(value) && isRecord(value.source) && access !== "licensed" && value.source.access === "licensed") {
       excluded.licensedRecords += 1;
       continue;
     }
@@ -306,9 +321,9 @@ function auditSource(source: SpotSource): SpotSource {
     retrievedAt: new Date(source.retrievedAt).toISOString(),
     closingVerified: false as const,
   };
-  return source.provider === "nflverse"
-    ? { ...common, provider: "nflverse", access: "research", lineBasis: "historical-reference" }
-    : { ...common, provider: "sportsdataio", access: source.access, lineBasis: "game-start" };
+  if (source.provider === "nflverse") return { ...common, provider: "nflverse", access: "research", lineBasis: "historical-reference" };
+  if (source.provider === "api-sports") return { ...common, provider: "api-sports", access: "research", lineBasis: "unavailable" };
+  return { ...common, provider: "sportsdataio", access: source.access, lineBasis: "game-start" };
 }
 
 function perspective(game: SpotGame, team: string, includeTotals: boolean): SpotAuditRow {
@@ -360,6 +375,19 @@ export function runSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery): S
 export function runResearchSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery): SpotQueryResult {
   if (typeof window !== "undefined") throw new Error("Private spot research must run locally on the server.");
   return calculateSpotQuery(games, rawQuery, "research");
+}
+
+/** Results-only local research; unavailable betting outcomes are never represented as 0-0. */
+export function runApiSportsResearchQuery(games: readonly SpotGame[], rawQuery: SpotQuery): ApiSportsResearchQueryResult {
+  if (typeof window !== "undefined") throw new Error("Private spot research must run locally on the server.");
+  const result = calculateSpotQuery(games, rawQuery, "api-sports-research");
+  return {
+    ...result,
+    primaryOutcome: "straight-up",
+    ats: { status: "unavailable", reason: "No historical spread lines in this API-Sports results import.", missingSpread: result.sampleSize },
+    totals: { status: "unavailable", reason: "No historical total lines in this API-Sports results import.", missingTotal: result.sampleSize },
+    lineBasis: "unavailable",
+  };
 }
 
 function calculateSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery, access: QueryAccess): SpotQueryResult {
@@ -427,15 +455,17 @@ function calculateSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery, acc
   if (totals) totals.sampleStatus = status(totals.sampleSize);
   const insufficient = [
     ...(su.sampleStatus === "insufficient" ? ["straight-up"] : []),
-    ...(ats.sampleStatus === "insufficient" ? ["ATS"] : []),
-    ...(totals?.sampleStatus === "insufficient" ? ["totals"] : []),
+    ...(access !== "api-sports-research" && ats.sampleStatus === "insufficient" ? ["ATS"] : []),
+    ...(access !== "api-sports-research" && totals?.sampleStatus === "insufficient" ? ["totals"] : []),
   ];
   return {
     query, rows, sampleSize: rows.length, sampleStatus: insufficient.length ? "insufficient" : "available",
     note: insufficient.length
       ? `Insufficient sample: ${insufficient.join(", ")} has fewer than ${query.minimumSample} graded games. Descriptive counts only.`
       : "Descriptive counts only; meeting the minimum sample does not establish predictive value.",
-    methodology: access === "research" ? RESEARCH_METHODOLOGY : METHODOLOGY,
-    su, ats, totals, exclusions, lineBasis: access === "research" ? "historical-reference" : "game-start", closingVerified: false,
+    methodology: access === "research" ? RESEARCH_METHODOLOGY : access === "api-sports-research" ? API_SPORTS_RESEARCH_METHODOLOGY : METHODOLOGY,
+    su, ats, totals, exclusions,
+    lineBasis: access === "research" ? "historical-reference" : access === "api-sports-research" ? "unavailable" : "game-start",
+    closingVerified: false,
   };
 }

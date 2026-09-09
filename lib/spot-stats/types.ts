@@ -25,7 +25,17 @@ export type NflverseSpotSource = {
   closingVerified: false;
 };
 
-export type SpotSource = SportsDataIOSpotSource | NflverseSpotSource;
+/** Results-only research import: never supplies or verifies historical betting lines. */
+export type ApiSportsSpotSource = {
+  provider: "api-sports";
+  endpoint: string;
+  retrievedAt: string;
+  access: "research";
+  lineBasis: "unavailable";
+  closingVerified: false;
+};
+
+export type SpotSource = SportsDataIOSpotSource | NflverseSpotSource | ApiSportsSpotSource;
 
 export type SpotGame = SpotSeason & {
   id: string;
