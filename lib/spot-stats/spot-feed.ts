@@ -29,6 +29,10 @@ export const FEED_TEAMS = Object.keys(TEAMS);
 const integer = (value: string, min: number, max: number) => /^\d+$/.test(value) && Number(value) >= min && Number(value) <= max ? Number(value) : null;
 const coachName = (value: string | undefined) => value && /^[A-Za-z][A-Za-z .'-]{2,70}$/.test(value) ? value : null;
 const missing = (value: string | undefined) => value === "" || value === "NA" || value === undefined;
+const qbIdentity = (row: CsvRow, side: "home" | "away") => {
+  const id = row[`${side}_qb_id`], name = coachName(row[`${side}_qb_name`]);
+  return id && /^00-\d{7}$/.test(id) && name ? { id, name } : null;
+};
 
 export type UpcomingSpotGame = {
   id: string; season: number; week: number; kickoffAt: string;
@@ -36,7 +40,7 @@ export type UpcomingSpotGame = {
   homeRest: number | null; awayRest: number | null; division: boolean | null;
   international: InternationalFixture | null;
 };
-type HistoryRow = { row: SpotAuditRow; coach: string | null; rest: number | null; division: boolean | null; international: boolean };
+type HistoryRow = { row: SpotAuditRow; coach: string | null; qb: { id: string; name: string } | null; rest: number | null; division: boolean | null; international: boolean };
 /** Editorial thresholds, not statistical significance or a probability forecast. Symmetric for good/bad records. */
 export function notableRecord(wins: number, losses: number): "Standout history" | "Early pattern" | null {
   const n = wins + losses, extreme = Math.max(wins, losses);
@@ -129,6 +133,7 @@ export function buildSpotFeed(input: {
     for (const side of ["home", "away"] as const) history.push({
       row: spotGamePerspective(game, side === "home" ? game.homeTeam : game.awayTeam, true),
       coach: coachName(row[`${side}_coach`]), rest: game.week > 1 ? integer(row[`${side}_rest`], 1, 30) : null,
+      qb: qbIdentity(row, side),
       division: row.div_game === "1" ? true : row.div_game === "0" ? false : null,
       international: international.has(game.id),
     });
@@ -193,6 +198,27 @@ export function buildSpotFeed(input: {
       "after a loss by 14+ points", `The ${name} lost their previous regular-season game by at least 14 points. This is history in that situation, not a guaranteed bounce-back.`,
       coached.filter(item => afterHeavyLoss(feedTeam(item.row.team), item.row.season, item.row.week, item.row.kickoffAt)), 2, coachScope);
     const currentRaw = raw.get(game.id)!;
+    const qb = qbIdentity(currentRaw, side);
+    if (qb) {
+      const starts = history.filter(item => item.qb?.id === qb.id);
+      // Never turn a populated future schedule field into a confirmed starter claim.
+      const subject = `Teams with ${qb.name} starting`;
+      const qbScope = `${scope} · All teams with ${qb.name} starting`;
+      const projection = `${qb.name} is the projected QB in the saved schedule for the ${name}; this spot applies only if he starts. These are team results, not individual passing statistics.`;
+      if (game.week === 1) add(game, team, "qb-week-one", "QB · Week 1", subject, "in Week 1 games", projection,
+        starts.filter(item => item.row.week === 1), 1, qbScope);
+      if (game.division) add(game, team, "qb-division", "QB · Division matchup", subject, "against division opponents", projection,
+        starts.filter(item => item.division === true), 3, qbScope);
+      const qbRest = game[`${side}Rest`];
+      if (game.week > 1 && qbRest !== null && qbRest <= 6) add(game, team, "qb-short-rest", "QB · Short rest", subject,
+        "on six or fewer days between games", projection, starts.filter(item => item.rest !== null && item.rest <= 6), 2, qbScope);
+      const qbLine = !missing(currentRaw.spread_line) && Number.isFinite(Number(currentRaw.spread_line)) ? Number(currentRaw.spread_line) : null;
+      const qbHandicap = qbLine === null ? null : side === "home" ? -qbLine : qbLine;
+      if (currentRaw.location === "Home" && qbHandicap !== null && qbHandicap > 0 && qbHandicap <= 100) add(game, team,
+        "qb-underdog", `QB · ${side === "home" ? "Home" : "Road"} underdog`, subject,
+        `as a ${side === "home" ? "home" : "road"} underdog`, `${projection} Underdog status uses the saved reference line, not a live quote.`,
+        starts.filter(item => item.row.venue === side && item.row.role === "underdog"), 3, qbScope);
+    }
     const line = !missing(currentRaw.spread_line) && Number.isFinite(Number(currentRaw.spread_line)) ? Number(currentRaw.spread_line) : null;
     // nflverse spread_line is positive when the home team is favored.
     const handicap = line === null ? null : side === "home" ? -line : line;
@@ -238,5 +264,22 @@ export function buildSpotFeed(input: {
   }
   const tier = (card: SpotCard) => card.prominence === "Standout history" ? 0 : card.prominence === "Early pattern" ? 1 : 2;
   result.cards.sort((a, b) => tier(a) - tier(b) || a.order - b.order || a.game.kickoffAt.localeCompare(b.game.kickoffAt) || a.team.localeCompare(b.team) || a.id.localeCompare(b.id));
+  // Same matchup/side and exact supporting game set: show once, retaining both contexts.
+  // Totals remain separate from SU/ATS. Similar percentages alone are not duplicates.
+  const unique = new Map<string, SpotCard>();
+  for (const card of result.cards) {
+    const situation = /(?:opener|qb-week-one)$/.test(card.id) ? "week-one"
+      : card.id.endsWith("division") ? "division" : card.id.endsWith("underdog") ? "underdog"
+        : card.id.endsWith("short-rest") ? "short-rest" : card.id;
+    const key = JSON.stringify([card.game.id, card.team, situation, !!card.totalSummary,
+      card.rows.map(row => `${row.gameId}:${feedTeam(row.team)}`).sort()]);
+    const prior = unique.get(key);
+    if (!prior) unique.set(key, card);
+    else if (card.category.startsWith("QB ·") !== prior.category.startsWith("QB ·")) {
+      prior.why += ` Also applies: ${card.category}. ${card.why}`;
+      prior.scope += ` · Also: ${card.scope}`;
+    } else unique.set(`${key}:${card.id}`, card);
+  }
+  result.cards = [...unique.values()];
   return result;
 }

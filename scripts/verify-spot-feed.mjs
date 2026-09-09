@@ -102,4 +102,25 @@ const lossRows = [2017,2018,2019].flatMap(year => [record(year,1,{gameday:`${yea
 assert.ok(card(build([...lossRows,prior,shortCurrent]),"heavy-loss"));
 assert.equal(card(build([...lossRows,{...prior,home_score:"",away_score:""},shortCurrent]),"heavy-loss"),undefined);
 assert.ok(card(baseline,"division-totals").totalSummary);
-console.log("Spot feed tests passed, including prominence, ATS headlines, missing-line suppression, underdogs, neutral venues, bye weeks, heavy losses, totals, and local guards.");
+// QB identities are fixtures, not roster assumptions. Include QB columns in the CSV helper.
+const qbInput = (rows) => {
+  const header = [...new Set(rows.flatMap(Object.keys))];
+  const csv = [header.join(","), ...rows.map(row => header.map(key => row[key] ?? "").join(","))].join("\n");
+  return buildSpotFeed({ ...input(), games: normalizeNflverseCsv(csv, now).games, records: parseNflverseRecords(csv) });
+};
+const qbCurrent = {...current,home_qb_id:"00-0036442",home_qb_name:"Joe Burrow"};
+const qbHistory = atsOnly.map(r=>({...r,home_qb_id:"00-0036442",home_qb_name:"Joe Burrow"}));
+const merged = qbInput([...qbHistory,qbCurrent]);
+assert.ok(card(merged,"coach-opener").why.includes("Joe Burrow"));
+assert.ok(card(merged,"coach-opener").why.includes("projected"));
+assert.equal(card(merged,"qb-week-one"),undefined,"exact duplicate is combined");
+const distinct = qbInput([...qbHistory.map((r,i)=>i===0?{...r,home_qb_id:"00-0000001"}:r),qbCurrent]);
+assert.equal(card(distinct,"qb-week-one").sampleSize,4,"same name is not same identity");
+assert.ok(card(distinct,"coach-opener"),"different membership remains separate");
+assert.equal(card(qbInput([...qbHistory,{...qbCurrent,home_qb_id:""}]),"qb-week-one"),undefined);
+assert.equal(card(qbInput([...qbHistory.slice(0,2),qbCurrent]),"qb-week-one"),undefined);
+const renamed=qbInput([...qbHistory.map(r=>({...r,home_qb_name:"Joseph Burrow"})),qbCurrent]);
+assert.equal(card(renamed,"coach-opener").sampleSize,5);
+assert.ok(card(renamed,"coach-opener").why.includes("Joe Burrow"));
+assert.deepEqual(qbInput([...qbHistory,qbCurrent].reverse()).cards,merged.cards,"deterministic deduplication");
+console.log("Spot feed tests passed, including QB ID matching, projection labels, minimum samples, exact-set deduplication, prominence and local guards.");

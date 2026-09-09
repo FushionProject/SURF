@@ -13,3 +13,11 @@ This is a review branch, not a deployment. Development/loopback gates remain in 
 Licensing context: user supplied maintainer FAQ and usage clarification stating CC BY permits commercial/noncommercial use with nflverse and applicable upstream attribution. The schedules repository's published CC BY 4.0 license is retained with the archive. This is not an exclusive ownership claim or a legal guarantee. Production enablement still needs appropriate notices and verification of data accuracy; do not change research provenance to a paid-provider license.
 
 Review before final merge: confirm theme/layout in the preview; decide production data storage/update job; retain attribution and source links; complete production enablement separately. Historical spreads are reference lines, not verified bookmaker closing quotes.
+
+## QB-start expansion
+
+QB records match valid GSIS player IDs from schedule columns, never names alone. They describe team results with the QB starting across franchises, not passing performance. Supported fixed situations: Week 1, division games, short rest, and home/road underdogs. Future schedule identities are explicitly projected and conditional on starting. Missing IDs/names suppress the category; no roster inference is used.
+
+Coach/QB duplicates combine only for the same upcoming team, situation, metric family, and exact historical game/team membership. Both contexts remain in the explanation. Different samples and totals remain distinct. Existing symmetric editorial prominence and small-sample rules are unchanged. No arbitrary recent-window search or predictive score is added.
+
+Verified preview example: teams with Joe Burrow starting are 1–5 ATS in Week 1 across the saved 2020–2025 reference-line sample. No new provider downloads or paid calls were required.
