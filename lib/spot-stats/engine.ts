@@ -1,0 +1,471 @@
+import type { SpotGame, SpotSource } from "./types.ts";
+
+// Provider codes are intentional: historical relocations are not silently merged.
+export const SPOT_TEAM_CODES = [
+  "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN",
+  "DET", "GB", "HOU", "IND", "JAX", "KC", "LAC", "LAR", "LV", "MIA",
+  "MIN", "NE", "NO", "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB",
+  "TEN", "WAS", "SD", "LA", "STL", "OAK",
+] as const;
+
+export type SpotTeamCode = (typeof SPOT_TEAM_CODES)[number];
+export type SpotSampleStatus = "insufficient" | "available";
+
+export interface SpotQuery {
+  team: SpotTeamCode;
+  /** UTC ISO timestamp; selects game starts strictly before this instant. */
+  cutoffAt: string;
+  seasonTypes: readonly (1 | 3)[];
+  seasonFrom: number;
+  seasonTo: number;
+  venue?: "home" | "away" | "neutral";
+  week?: number;
+  role?: "favorite" | "underdog" | "pickem";
+  includeTotals?: boolean;
+  minimumSample?: number;
+}
+
+export interface ValidatedSpotQuery extends SpotQuery {
+  includeTotals: boolean;
+  minimumSample: number;
+}
+
+export interface SpotQueryIssue {
+  field: string;
+  message: string;
+}
+
+export class SpotQueryError extends Error {
+  readonly issues: readonly SpotQueryIssue[];
+
+  constructor(issues: SpotQueryIssue[]) {
+    super(issues.map((issue) => `${issue.field}: ${issue.message}`).join("; "));
+    this.name = "SpotQueryError";
+    this.issues = issues;
+  }
+}
+
+export interface SpotAuditRow {
+  gameId: string;
+  season: number;
+  seasonType: 1 | 3;
+  week: number;
+  kickoffAt: string;
+  team: string;
+  opponent: string;
+  venue: "home" | "away" | "neutral" | "unknown";
+  teamScore: number;
+  opponentScore: number;
+  margin: number;
+  teamSpread: number | null;
+  role: "favorite" | "underdog" | "pickem" | "unknown";
+  atsMargin: number | null;
+  su: "win" | "loss" | "tie";
+  ats: "win" | "loss" | "push" | "missing";
+  totalLine: number | null;
+  totalScore: number;
+  totalOutcome: "over" | "under" | "push" | "missing" | null;
+  source: SpotGame["source"];
+}
+
+/** Counts are input records, not necessarily distinct games. */
+export interface SpotExclusions {
+  trialRecords: number;
+  researchRecords: number;
+  licensedRecords: number;
+  invalidRecords: number;
+  duplicateRecords: number;
+  conflictingIdRecords: number;
+  duplicateFixtureRecords: number;
+  conflictingFixtureRecords: number;
+  atOrAfterCutoffRecords: number;
+  otherTeamRecords: number;
+  outsideSeasonRecords: number;
+  seasonTypeRecords: number;
+  venueRecords: number;
+  weekRecords: number;
+  roleRecords: number;
+}
+
+interface OutcomeSample {
+  /** Includes pushes/ties; missing lines are never graded. */
+  sampleSize: number;
+  sampleStatus: SpotSampleStatus;
+}
+
+export interface SpotQueryResult {
+  query: ValidatedSpotQuery;
+  rows: SpotAuditRow[];
+  sampleSize: number;
+  /** Insufficient if any requested outcome has too few graded games. */
+  sampleStatus: SpotSampleStatus;
+  note: string;
+  methodology: string;
+  su: OutcomeSample & { wins: number; losses: number; ties: number };
+  ats: OutcomeSample & { wins: number; losses: number; pushes: number; missingSpread: number };
+  totals: (OutcomeSample & { overs: number; unders: number; pushes: number; missingTotal: number }) | null;
+  exclusions: SpotExclusions;
+  lineBasis: "game-start" | "historical-reference" | "unavailable";
+  closingVerified: false;
+}
+
+export interface ApiSportsResearchQueryResult extends Omit<SpotQueryResult, "ats" | "totals" | "lineBasis"> {
+  primaryOutcome: "straight-up";
+  ats: { status: "unavailable"; reason: string; missingSpread: number };
+  totals: { status: "unavailable"; reason: string; missingTotal: number };
+  lineBasis: "unavailable";
+}
+
+const TEAM_CODES = new Set<string>(SPOT_TEAM_CODES);
+const QUERY_KEYS = new Set([
+  "team", "cutoffAt", "seasonTypes", "seasonFrom", "seasonTo", "venue", "week",
+  "role", "includeTotals", "minimumSample",
+]);
+const MAX_INPUT_RECORDS = 100_000;
+const METHODOLOGY =
+  "Retrospective description of imported completed games only. The cutoff excludes starts at or after the specified instant; completion time and historical data availability are not verified. Imported final revisions may be newer than the cutoff. Lines are provider game-start lines, not verified closing lines. Results describe the specified sample and do not establish predictive value.";
+const RESEARCH_METHODOLOGY =
+  "Private research only; downstream publication rights are not confirmed. Retrospective description of imported completed games only. The cutoff excludes starts at or after the specified instant; completion time and historical data availability are not verified. Imported final revisions may be newer than the cutoff. Lines are nflverse historical reference lines, not verified closing lines or prices at a specific sportsbook. Results describe the specified sample and do not establish predictive value.";
+const API_SPORTS_RESEARCH_METHODOLOGY =
+  "Private research only; downstream publication rights are not confirmed. Retrospective straight-up results from API-Sports final-game imports only. The cutoff excludes starts at or after the specified instant; completion time and historical data availability are not verified. Imported final revisions may be newer than the cutoff. This source has no historical sportsbook lines, so ATS, totals, favorite and underdog results are unavailable. Home/away labels are not proof of a non-neutral venue; venue classification stays unknown. No historical coach tenure is inferred. Results describe the specified sample and do not establish predictive value.";
+type QueryAccess = "licensed" | "research" | "api-sports-research";
+const NFLVERSE_RESEARCH_ENDPOINT = "https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isIntegerBetween(value: unknown, lower: number, upper: number): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= lower && value <= upper;
+}
+
+function isUtcTimestamp(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) {
+    return false;
+  }
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return false;
+  // Date.parse normalizes impossible dates such as February 30; reject them.
+  return new Date(time).toISOString().slice(0, 19) === value.slice(0, 19);
+}
+
+function isTeam(value: unknown): value is SpotTeamCode {
+  return typeof value === "string" && TEAM_CODES.has(value);
+}
+
+/** Only this fixed filter vocabulary is accepted. No outcomes or search objectives. */
+export function validateSpotQuery(value: unknown): ValidatedSpotQuery {
+  if (!isRecord(value)) throw new SpotQueryError([{ field: "query", message: "Must be an object." }]);
+  const issues: SpotQueryIssue[] = [];
+  const issue = (field: string, message: string) => issues.push({ field, message });
+  for (const key of Object.keys(value)) {
+    if (!QUERY_KEYS.has(key)) issue(key, "Unknown filter.");
+  }
+  if (!isTeam(value.team)) issue("team", "Use an exact supported NFL provider team code.");
+  if (!isUtcTimestamp(value.cutoffAt)) issue("cutoffAt", "Use a valid UTC ISO timestamp with seconds and Z.");
+  if (
+    !Array.isArray(value.seasonTypes) || value.seasonTypes.length < 1 || value.seasonTypes.length > 2 ||
+    Array.from(value.seasonTypes).some((type) => type !== 1 && type !== 3) ||
+    new Set(value.seasonTypes).size !== value.seasonTypes.length
+  ) issue("seasonTypes", "Choose regular season (1), postseason (3), or both once each.");
+  if (!isIntegerBetween(value.seasonFrom, 1920, 2100)) issue("seasonFrom", "Must be a season year from 1920 through 2100.");
+  if (!isIntegerBetween(value.seasonTo, 1920, 2100)) issue("seasonTo", "Must be a season year from 1920 through 2100.");
+  if (typeof value.seasonFrom === "number" && typeof value.seasonTo === "number" && value.seasonFrom > value.seasonTo) {
+    issue("seasonTo", "Must be on or after seasonFrom.");
+  }
+  if (value.venue !== undefined && (typeof value.venue !== "string" || !["home", "away", "neutral"].includes(value.venue))) {
+    issue("venue", "Choose home, away, or neutral; omit for all venues.");
+  }
+  if (value.week !== undefined && !isIntegerBetween(value.week, 1, 22)) issue("week", "Must be a whole number from 1 through 22.");
+  if (value.role !== undefined && (typeof value.role !== "string" || !["favorite", "underdog", "pickem"].includes(value.role))) {
+    issue("role", "Choose favorite, underdog, or pickem; omit for all roles.");
+  }
+  if (value.includeTotals !== undefined && typeof value.includeTotals !== "boolean") issue("includeTotals", "Must be a boolean.");
+  if (value.minimumSample !== undefined && !isIntegerBetween(value.minimumSample, 1, 1000)) {
+    issue("minimumSample", "Must be a whole number from 1 through 1000.");
+  }
+  if (issues.length) throw new SpotQueryError(issues);
+  const query = value as unknown as SpotQuery;
+  return {
+    team: query.team,
+    cutoffAt: new Date(query.cutoffAt).toISOString(),
+    seasonTypes: [...query.seasonTypes].sort(),
+    seasonFrom: query.seasonFrom,
+    seasonTo: query.seasonTo,
+    ...(query.venue === undefined ? {} : { venue: query.venue }),
+    ...(query.week === undefined ? {} : { week: query.week }),
+    ...(query.role === undefined ? {} : { role: query.role }),
+    includeTotals: query.includeTotals ?? false,
+    minimumSample: query.minimumSample ?? 10,
+  };
+}
+
+function isId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 200 && value.trim() === value;
+}
+
+function isLine(value: unknown, lower: number, upper: number): value is number | null {
+  return value === null || (typeof value === "number" && Number.isFinite(value) && value >= lower && value <= upper);
+}
+
+function isSource(value: Record<string, unknown>, access: QueryAccess, season: number): boolean {
+  if (value.closingVerified !== false || !isUtcTimestamp(value.retrievedAt) ||
+    typeof value.endpoint !== "string" || value.endpoint.trim().length === 0 || value.endpoint.length > 1000) return false;
+  if (access === "research") {
+    return value.provider === "nflverse" && value.access === "research" &&
+      value.lineBasis === "historical-reference" && value.endpoint === NFLVERSE_RESEARCH_ENDPOINT;
+  }
+  if (access === "api-sports-research") {
+    return value.provider === "api-sports" && value.access === "research" && value.lineBasis === "unavailable" &&
+      value.endpoint === `https://v1.american-football.api-sports.io/games?league=1&season=${season}`;
+  }
+  return value.provider === "sportsdataio" && value.access === "licensed" && value.lineBasis === "game-start";
+}
+
+function isSpotGame(value: unknown, access: QueryAccess): value is SpotGame {
+  if (!isRecord(value) || !isRecord(value.source)) return false;
+  const source = value.source;
+  return isId(value.id) && isIntegerBetween(value.season, 1920, 2100) &&
+    (value.seasonType === 1 || value.seasonType === 3) && isIntegerBetween(value.week, 1, 22) &&
+    isUtcTimestamp(value.kickoffAt) && isTeam(value.homeTeam) && isTeam(value.awayTeam) &&
+    value.homeTeam !== value.awayTeam && isIntegerBetween(value.homeScore, 0, 200) &&
+    isIntegerBetween(value.awayScore, 0, 200) && isLine(value.homeSpread, -200, 200) &&
+    isLine(value.total, 0, 400) && (value.neutralVenue === null || typeof value.neutralVenue === "boolean") &&
+    isSource(source, access, value.season) &&
+    (access === "licensed" || Date.parse(value.kickoffAt) < Date.parse(source.retrievedAt as string)) &&
+    (access !== "api-sports-research" || (value.homeSpread === null && value.total === null && value.neutralVenue === null &&
+      value.kickoffAt >= `${value.season}-07-01T00:00:00.000Z` && value.kickoffAt < `${value.season + 1}-07-01T00:00:00.000Z`));
+}
+
+/** Retrieval time and endpoint differences do not make identical game facts conflict. */
+function facts(game: SpotGame): string {
+  return JSON.stringify([
+    game.season, game.seasonType, game.week, Date.parse(game.kickoffAt), game.homeTeam, game.awayTeam,
+    game.homeScore, game.awayScore, game.homeSpread, game.total, game.neutralVenue,
+  ]);
+}
+
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function compareCopies(left: SpotGame, right: SpotGame): number {
+  return compareText(left.id, right.id) || Date.parse(left.source.retrievedAt) - Date.parse(right.source.retrievedAt) ||
+    compareText(left.source.endpoint, right.source.endpoint) || compareText(left.kickoffAt, right.kickoffAt);
+}
+
+function uniqueGames(input: readonly SpotGame[], excluded: SpotExclusions, access: QueryAccess): SpotGame[] {
+  const ids = new Map<string, unknown[]>();
+  for (const value of input as readonly unknown[]) {
+    if (isRecord(value) && isRecord(value.source) && value.source.access === "trial") {
+      excluded.trialRecords += 1;
+      continue;
+    }
+    if (isRecord(value) && isRecord(value.source) && access === "licensed" && value.source.access === "research") {
+      excluded.researchRecords += 1;
+      continue;
+    }
+    if (isRecord(value) && isRecord(value.source) && access !== "licensed" && value.source.access === "licensed") {
+      excluded.licensedRecords += 1;
+      continue;
+    }
+    if (!isRecord(value) || !isId(value.id)) {
+      excluded.invalidRecords += 1;
+      continue;
+    }
+    const group = ids.get(value.id) ?? [];
+    group.push(value);
+    ids.set(value.id, group);
+  }
+  const byId: SpotGame[] = [];
+  for (const group of ids.values()) {
+    if (!group.every((value): value is SpotGame => isSpotGame(value, access))) {
+      // A bad version of an ID invalidates the group; never select its good-looking version.
+      excluded.invalidRecords += group.length;
+      continue;
+    }
+    if (new Set(group.map(facts)).size !== 1) {
+      excluded.conflictingIdRecords += group.length;
+      continue;
+    }
+    excluded.duplicateRecords += group.length - 1;
+    byId.push([...group].sort(compareCopies)[0]);
+  }
+  const fixtures = new Map<string, SpotGame[]>();
+  for (const game of byId) {
+    // An unordered pair also catches inputs that reverse the two perspectives.
+    const key = JSON.stringify([
+      game.season, game.seasonType, game.week, Date.parse(game.kickoffAt),
+      [game.homeTeam, game.awayTeam].sort(),
+    ]);
+    const group = fixtures.get(key) ?? [];
+    group.push(game);
+    fixtures.set(key, group);
+  }
+  const unique: SpotGame[] = [];
+  for (const group of fixtures.values()) {
+    if (new Set(group.map(facts)).size !== 1) {
+      excluded.conflictingFixtureRecords += group.length;
+      continue;
+    }
+    excluded.duplicateFixtureRecords += group.length - 1;
+    unique.push([...group].sort(compareCopies)[0]);
+  }
+  return unique;
+}
+
+/** Keep only the source contract, not arbitrary imported metadata. */
+function auditSource(source: SpotSource): SpotSource {
+  const common = {
+    endpoint: source.endpoint,
+    retrievedAt: new Date(source.retrievedAt).toISOString(),
+    closingVerified: false as const,
+  };
+  if (source.provider === "nflverse") return { ...common, provider: "nflverse", access: "research", lineBasis: "historical-reference" };
+  if (source.provider === "api-sports") return { ...common, provider: "api-sports", access: "research", lineBasis: "unavailable" };
+  return { ...common, provider: "sportsdataio", access: source.access, lineBasis: "game-start" };
+}
+
+export function spotGamePerspective(game: SpotGame, team: string, includeTotals: boolean): SpotAuditRow {
+  const home = game.homeTeam === team;
+  const teamScore = home ? game.homeScore : game.awayScore;
+  const opponentScore = home ? game.awayScore : game.homeScore;
+  const margin = teamScore - opponentScore;
+  const spread = game.homeSpread === null ? null : (home ? game.homeSpread : -game.homeSpread);
+  const teamSpread = spread === 0 ? 0 : spread;
+  const atsMargin = teamSpread === null ? null : margin + teamSpread;
+  const totalScore = teamScore + opponentScore;
+  return {
+    gameId: game.id,
+    season: game.season,
+    seasonType: game.seasonType,
+    week: game.week,
+    kickoffAt: new Date(game.kickoffAt).toISOString(),
+    team,
+    opponent: home ? game.awayTeam : game.homeTeam,
+    venue: game.neutralVenue === null ? "unknown" : game.neutralVenue ? "neutral" : home ? "home" : "away",
+    teamScore,
+    opponentScore,
+    margin,
+    teamSpread,
+    role: teamSpread === null ? "unknown" : teamSpread < 0 ? "favorite" : teamSpread > 0 ? "underdog" : "pickem",
+    atsMargin,
+    su: margin > 0 ? "win" : margin < 0 ? "loss" : "tie",
+    ats: atsMargin === null ? "missing" : atsMargin > 0 ? "win" : atsMargin < 0 ? "loss" : "push",
+    totalLine: game.total,
+    totalScore,
+    totalOutcome: !includeTotals ? null : game.total === null ? "missing" : totalScore > game.total ? "over" : totalScore < game.total ? "under" : "push",
+    source: auditSource(game.source),
+  };
+}
+
+/**
+ * Run one pre-specified descriptive query. Accept only completed-game imports from
+ * the adapter: this minimal normalized contract has no independent status field.
+ * No network, model, outcome-directed query generation, or best-angle ranking.
+ */
+export function runSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery): SpotQueryResult {
+  return calculateSpotQuery(games, rawQuery, "licensed");
+}
+
+/**
+ * Explicit private research entry point for the local report CLI, never the live
+ * site. Does not upgrade data to licensed access or accept scrambled trial rows.
+ */
+export function runResearchSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery): SpotQueryResult {
+  if (typeof window !== "undefined") throw new Error("Private spot research must run locally on the server.");
+  return calculateSpotQuery(games, rawQuery, "research");
+}
+
+/** Results-only local research; unavailable betting outcomes are never represented as 0-0. */
+export function runApiSportsResearchQuery(games: readonly SpotGame[], rawQuery: SpotQuery): ApiSportsResearchQueryResult {
+  if (typeof window !== "undefined") throw new Error("Private spot research must run locally on the server.");
+  const result = calculateSpotQuery(games, rawQuery, "api-sports-research");
+  return {
+    ...result,
+    primaryOutcome: "straight-up",
+    ats: { status: "unavailable", reason: "No historical spread lines in this API-Sports results import.", missingSpread: result.sampleSize },
+    totals: { status: "unavailable", reason: "No historical total lines in this API-Sports results import.", missingTotal: result.sampleSize },
+    lineBasis: "unavailable",
+  };
+}
+
+function calculateSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery, access: QueryAccess): SpotQueryResult {
+  const query = validateSpotQuery(rawQuery);
+  if (!Array.isArray(games) || games.length > MAX_INPUT_RECORDS) {
+    throw new SpotQueryError([{ field: "games", message: `Use an array of at most ${MAX_INPUT_RECORDS} imported completed games.` }]);
+  }
+  const exclusions: SpotExclusions = {
+    trialRecords: 0, researchRecords: 0, licensedRecords: 0, invalidRecords: 0, duplicateRecords: 0, conflictingIdRecords: 0,
+    duplicateFixtureRecords: 0, conflictingFixtureRecords: 0, atOrAfterCutoffRecords: 0,
+    otherTeamRecords: 0, outsideSeasonRecords: 0, seasonTypeRecords: 0,
+    venueRecords: 0, weekRecords: 0, roleRecords: 0,
+  };
+  const rows: SpotAuditRow[] = [];
+  const cutoff = Date.parse(query.cutoffAt);
+  for (const game of uniqueGames(games, exclusions, access)) {
+    let reason: keyof SpotExclusions | null = null;
+    if (Date.parse(game.kickoffAt) >= cutoff) reason = "atOrAfterCutoffRecords";
+    else if (game.homeTeam !== query.team && game.awayTeam !== query.team) reason = "otherTeamRecords";
+    else if (game.season < query.seasonFrom || game.season > query.seasonTo) reason = "outsideSeasonRecords";
+    else if (!query.seasonTypes.includes(game.seasonType)) reason = "seasonTypeRecords";
+    else if (query.week !== undefined && query.week !== game.week) reason = "weekRecords";
+    if (reason) {
+      exclusions[reason] += 1;
+      continue;
+    }
+    const row = spotGamePerspective(game, query.team, query.includeTotals);
+    if (query.venue !== undefined && query.venue !== row.venue) {
+      exclusions.venueRecords += 1;
+      continue;
+    }
+    if (query.role !== undefined && query.role !== row.role) {
+      exclusions.roleRecords += 1;
+      continue;
+    }
+    rows.push(row);
+  }
+  rows.sort((left, right) => Date.parse(left.kickoffAt) - Date.parse(right.kickoffAt) || compareText(left.gameId, right.gameId));
+  const status = (count: number): SpotSampleStatus => count < query.minimumSample ? "insufficient" : "available";
+  const su = { wins: 0, losses: 0, ties: 0, sampleSize: rows.length, sampleStatus: status(rows.length) };
+  const ats = { wins: 0, losses: 0, pushes: 0, missingSpread: 0, sampleSize: 0, sampleStatus: status(0) };
+  const totals = query.includeTotals ? { overs: 0, unders: 0, pushes: 0, missingTotal: 0, sampleSize: 0, sampleStatus: status(0) } : null;
+  for (const row of rows) {
+    if (row.su === "win") su.wins += 1;
+    else if (row.su === "loss") su.losses += 1;
+    else su.ties += 1;
+    if (row.ats === "missing") ats.missingSpread += 1;
+    else {
+      ats.sampleSize += 1;
+      if (row.ats === "win") ats.wins += 1;
+      else if (row.ats === "loss") ats.losses += 1;
+      else ats.pushes += 1;
+    }
+    if (totals) {
+      if (row.totalOutcome === "missing") totals.missingTotal += 1;
+      else {
+        totals.sampleSize += 1;
+        if (row.totalOutcome === "over") totals.overs += 1;
+        else if (row.totalOutcome === "under") totals.unders += 1;
+        else totals.pushes += 1;
+      }
+    }
+  }
+  ats.sampleStatus = status(ats.sampleSize);
+  if (totals) totals.sampleStatus = status(totals.sampleSize);
+  const insufficient = [
+    ...(su.sampleStatus === "insufficient" ? ["straight-up"] : []),
+    ...(access !== "api-sports-research" && ats.sampleStatus === "insufficient" ? ["ATS"] : []),
+    ...(access !== "api-sports-research" && totals?.sampleStatus === "insufficient" ? ["totals"] : []),
+  ];
+  return {
+    query, rows, sampleSize: rows.length, sampleStatus: insufficient.length ? "insufficient" : "available",
+    note: insufficient.length
+      ? `Insufficient sample: ${insufficient.join(", ")} has fewer than ${query.minimumSample} graded games. Descriptive counts only.`
+      : "Descriptive counts only; meeting the minimum sample does not establish predictive value.",
+    methodology: access === "research" ? RESEARCH_METHODOLOGY : access === "api-sports-research" ? API_SPORTS_RESEARCH_METHODOLOGY : METHODOLOGY,
+    su, ats, totals, exclusions,
+    lineBasis: access === "research" ? "historical-reference" : access === "api-sports-research" ? "unavailable" : "game-start",
+    closingVerified: false,
+  };
+}

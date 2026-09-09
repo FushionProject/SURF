@@ -552,6 +552,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
               </Link>
             ))}
             <Link href="/how-to-use">How to use Surf</Link>
+            {process.env.NODE_ENV === "development" && <Link href="/stats/research" prefetch={false}>Spot Stats</Link>}
           </nav>
           <ThemeControl />
           <Link href="/account" className="bn-account-link">
@@ -958,6 +959,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
         </main>
       </div>
       <nav className="bn-mobile-nav" aria-label="Mobile navigation">
+        {process.env.NODE_ENV === "development" && <Link href="/stats/research" prefetch={false}><Icon name="grid" size={19} /><span>Stats</span></Link>}
         {nav.map((item) => (
           <Link
             key={item.id}
