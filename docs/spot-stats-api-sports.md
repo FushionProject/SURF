@@ -2,6 +2,11 @@
 
 Branch: `codex/surf-spot-stats`. Main and public Games/Signals are unchanged.
 
+The [local NFL preview and 2010s audit](./spot-stats-local-preview.md) now provide
+an explicitly development-only view of 2021–2025 and a reproducible source review.
+The private preview is separate from the licensed `/stats` workspace; older rows
+remain excluded and no publication-rights flag has been enabled.
+
 ## Access and cost checked September 8, 2026
 
 The existing server-only `API_SPORTS_KEY` successfully accessed the American Football
