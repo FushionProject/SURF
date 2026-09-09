@@ -53,3 +53,9 @@ The findings above describe the initial read-only pass. Subsequent authorized ch
 Stripe connector returns reauthentication required. Reconnect and identify the Surf account; confirm proposed monthly prices. Configure server-only least-privilege Stripe/Supabase credentials privately, apply/verify remote billing migrations, canonical HTTPS domain, webhook and portal setup. Complete real sandbox checkout/renewal/failure/cancel/replay tests and durable read/write/restart tests. Review Stripe Tax registrations before live charging. Do not claim tax collection is configured. Complete portable Spot Stats production data storage and refresh before enabling its paid tier.
 
 Hourly local follow-ups are scheduled until 9 AM America/Chicago, temporarily sharing this thread's AP-poll automation; restore its original weekly Sunday 13:30 schedule at handoff. Mac/Codex must remain running. No automatic public deployment or live charging is authorized by this follow-up.
+
+## Repeatable release gates
+
+`npm run test:release` now runs all 25 offline suites with per-suite timeouts and stops on failure. The full run passes locally. `npm run test:production-access` starts a separate temporary loopback production server with provider and billing credentials blanked, checks anonymous paid routes and billing failures, verifies the local-preview flag cannot expose research in production, then stops its own server. It passes against the production build. It does not replace authenticated sandbox checkout or durable storage verification.
+
+The `ROPE release regressions` GitHub workflow installs from the lockfile, runs lint and all offline suites, builds with webpack, and runs the production HTTP gate. Actions are pinned to resolved commits and permissions are read-only; no deployment or secrets are supplied. GitHub execution must be verified separately from the local pass.
