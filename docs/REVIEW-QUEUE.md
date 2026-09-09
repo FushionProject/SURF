@@ -34,7 +34,7 @@ Adds one bounded GitHub Actions job for reviewed fixture suites, lint and a webp
 
 ## Validation and limits
 
-The independent CI branch and the combined completed source stack both pass the selected offline fixture suites, lint (existing warnings) and production build locally. The combined stack includes billing, layout, ratings and link regressions. This is not a browser typography test, production migration, provider validation or billing sandbox certification. GitHub-hosted execution remains unverified until a workflow run completes.
+The independent CI branch and the combined completed source stack both pass the selected offline fixture suites, lint (existing warnings) and production build locally. The combined stack includes billing, layout, ratings and link regressions. This is not a browser typography test, production migration, provider validation or billing sandbox certification. [GitHub-hosted CI passed](https://github.com/FushionProject/SURF/actions/runs/34304379802) on `b89c64f`: dependency installation, offline tests, lint and production build all succeeded. This independent CI branch uses the original GitHub main source; completed feature and stats stacks were separately validated locally as described here.
 
 Ancestry/path and token scans found no private archive/cache paths or credential-token matches in the inventoried history; a second assignment/entropy screen found no candidate hardcoded secrets in the publication ancestry. Source review included changed configuration templates, auth/billing boundaries, ratings, links and documentation. No private runtime or research files were uploaded.
 
