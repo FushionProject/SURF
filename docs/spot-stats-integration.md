@@ -1,10 +1,10 @@
 # Spot Stats integration preview
 
-Branch: `codex/spot-stats-integration`, created from main `2b777b7`.
+Integrated into local main at `50f14c0`; originally developed on `codex/spot-stats-integration` from main `2b777b7`.
 
-Stats sources and tests were selectively imported from `codex/surf-spot-stats`, including its working-tree prominence improvements. No signal-readability, sportsbook-link, or other unrelated branch changes were imported. Main is unchanged.
+Stats sources and tests were selectively imported from `codex/surf-spot-stats`, including its working-tree prominence improvements. No signal-readability, sportsbook-link, or other unrelated branch changes were imported in that integration.
 
-Preview: `npm run stats:preview`, http://127.0.0.1:3164/stats/research. Development navigation exposes Spot Stats from the board and signals, and the stats page reuses Surf's Brand, ThemeControl, masthead/mobile navigation classes, Manrope, and existing light/dark tokens. Cards use a two-column desktop feed and one column below 1000px. No additional fonts or theme palette were introduced.
+Preview: `node scripts/preview-spot-stats.mjs`, http://127.0.0.1:3164/stats/research (reuse the existing server if already running). Development navigation exposes Spot Stats from the board and signals, and the stats page reuses Surf's Brand, ThemeControl, masthead/mobile navigation classes, Manrope, and existing light/dark tokens. Cards use a two-column desktop feed and one column below 1000px. No additional fonts or theme palette were introduced.
 
 The archive is a local symlink to the existing validated nflverse research archive, excluded from Git and production tracing. No provider keys were copied, and no new data downloads are required for this preview. Games and Signals keep main's data behavior; this isolated checkout has no copied provider configuration. Their live API setup must be supplied separately if full live-board testing is wanted.
 

@@ -395,7 +395,16 @@ function signalChecks(signals: SignalCard[], games: OddsApiGame[], auditedAt: nu
   for (const signal of signals) {
     if (seenIds.has(signal.id)) duplicateProblems.push(`Duplicate signal id: ${signal.id}`);
     seenIds.add(signal.id);
-    const semanticKey = `${signal.game.id}:${signal.market ?? "none"}:${signal.signalType}:${signal.title}`;
+    // Whale headlines round dollar amounts, so separate executions can have
+    // identical copy. activityFromCluster supplies venue/market/outcome and
+    // first/last provider execution identities in the canonical card id.
+    // Keep the conservative title fallback when that identity is unavailable.
+    const canonicalWhale = signal.signalType === "Whale Activity" && signal.whaleActivity &&
+      signal.id.startsWith(`whale:${signal.whaleActivity.venue}:`) &&
+      signal.id.split(":").length >= 6 && signal.id.split(":").every(part => part.trim().length > 0);
+    const semanticKey = canonicalWhale
+      ? signal.id
+      : `${signal.game.id}:${signal.market ?? "none"}:${signal.signalType}:${signal.title}`;
     if (seenSemanticKeys.has(semanticKey)) duplicateProblems.push(`Duplicate signal meaning: ${semanticKey}`);
     seenSemanticKeys.add(semanticKey);
 

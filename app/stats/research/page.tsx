@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getLocalSpotFeed } from "@/lib/spot-stats/spot-feed-server";
 import { localPreviewAllowed, type PreviewParams } from "@/lib/spot-stats/local-preview";
 import { feedTeamName, type SpotCard } from "@/lib/spot-stats/spot-feed";
+import { selectSpotFeedGame } from "@/lib/spot-stats/feed-query";
 import styles from "./feed.module.css";
 import { SpotStatsHeader, SpotStatsMobileNav } from "@/components/surf-editorial/SpotStatsNavigation";
 
@@ -41,8 +42,9 @@ export default async function SpotFeedPage({ searchParams }: { searchParams: Pro
   let feed: Awaited<ReturnType<typeof getLocalSpotFeed>> | undefined;
   let issue: string | undefined;
   try { feed = await getLocalSpotFeed(host); } catch { issue = "The saved research archive could not be validated. No stats are shown until it is available."; }
-  const selected = typeof params.game === "string" ? params.game : "all";
-  if (Object.keys(params).some(key => key !== "game") || Array.isArray(params.game) || (selected !== "all" && !feed?.games.some(game => game.id === selected))) issue = "Choose a current matchup. The old archive filters are available in Research tools.";
+  const selection = selectSpotFeedGame(params, feed?.games ?? []);
+  const selected = selection ?? "all";
+  if (selection === null) issue = "Choose a current matchup. The old archive filters are available in Research tools.";
   const cards = issue ? [] : feed?.cards.filter(card => selected === "all" ? card.prominence !== null : card.game.id === selected) ?? [];
   return <div className={`bn-app ${styles.page}`}><SpotStatsHeader /><main className={styles.shell}>
     <div className={styles.intro}><p className={styles.eyebrow}>{feed?.week ? `NFL ${feed.season} · Week ${feed.week}` : "NFL"}</p><h1>Spot Stats</h1><p>Standout history for this week’s matchups.</p><p>Strong and weak records both count. Early patterns have only 3–4 games—not enough to call an edge. Choose a matchup to see the ordinary records too.</p></div>

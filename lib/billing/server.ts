@@ -3,7 +3,7 @@ import "server-only";
 import Stripe from "stripe";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSurfSupabaseClient } from "@/lib/surf/supabasePersistence";
-import { BILLING_UNAVAILABLE, isBillingSameOrigin, readBillingConfig } from "./config";
+import { BILLING_UNAVAILABLE, isBillingSameOrigin, isPaidPlanId, readBillingConfig } from "./config";
 import { BillingError, createBillingService, type BillingCustomer, type BillingStore } from "./service";
 
 const jsonHeaders = { "Cache-Control": "private, no-store", "Vary": "Cookie, Origin", "X-Content-Type-Options": "nosniff" };
@@ -105,9 +105,16 @@ export async function billingMutation(request: Request, action: "checkout" | "po
     if (!isBillingSameOrigin(request, runtime.config.origin)) throw new BillingError("Please open billing from the Surf account page.", 403);
     if (request.headers.get("content-type")?.split(";")[0] !== "application/json") throw new BillingError("Invalid billing request.", 400);
     const text = await readBillingBody(request, 256);
-    if (text.trim() !== "{}") throw new BillingError("Invalid billing request.", 400);
+    let body: unknown;
+    try { body = JSON.parse(text); } catch { throw new BillingError("Invalid billing request.", 400); }
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new BillingError("Invalid billing request.", 400);
+    const fields = Object.keys(body);
+    const planId = (body as { planId?: unknown }).planId;
+    if (action === "checkout" ? fields.length !== 1 || fields[0] !== "planId" || !isPaidPlanId(planId) : fields.length !== 0) {
+      throw new BillingError("Invalid billing request.", 400);
+    }
     const user = await billingUser();
-    const url = await runtime.service[action](user.id);
+    const url = action === "checkout" && isPaidPlanId(planId) ? await runtime.service.checkout(user.id, planId) : await runtime.service.portal(user.id);
     return billingJson({ url });
   } catch (error) { return billingError(error); }
 }

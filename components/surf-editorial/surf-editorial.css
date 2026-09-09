@@ -1431,6 +1431,22 @@ body {
 }
 
 /* Two identical wave periods keep the horizontal loop seamless. */
+.bn-logo-frame { display: inline-block; position: relative; width: 44px; height: 44px; flex: 0 0 44px; overflow: hidden; }
+.bn-logo-mark {
+  position: absolute;
+  width: 176%;
+  height: 176%;
+  left: -38%;
+  top: -35%;
+  background: #00e5ff;
+  /* Stack the same luminance mask to restore solid cyan without a black box. */
+  mask-image: url("/brand/surf-logo.png"), url("/brand/surf-logo.png"), url("/brand/surf-logo.png");
+  mask-mode: luminance, luminance, luminance;
+  mask-composite: add, add;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
 .bn-waves {
   position: absolute;
   inset: 20% 0 15%;
@@ -1445,24 +1461,46 @@ body {
   left: 0;
   top: 0;
   color: var(--ed-blue-ink);
-  animation: bn-wave-roll 14s linear infinite;
+  animation: bn-wave-roll 22s linear infinite;
+}
+.bn-wave path {
+  animation: bn-wave-bob 8s ease-in-out infinite;
+}
+.bn-wave-0 path { animation-duration: 10s; animation-delay: -3s; }
+.bn-wave-1 path { animation-duration: 9s; animation-delay: -5s; }
+.bn-wave-3 path { animation-duration: 11s; animation-delay: -2s; }
+@keyframes bn-wave-bob {
+  0%, 100% {
+    transform: translateY(-5px);
+    d: path("M0 120 C100 96 200 96 300 120 S500 144 600 120 S800 96 900 120 S1100 144 1200 120");
+  }
+  50% {
+    transform: translateY(5px);
+    d: path("M0 120 C100 65 200 65 300 120 S500 175 600 120 S800 65 900 120 S1100 175 1200 120");
+  }
 }
 .bn-wave-0 {
   opacity: 0.25;
   top: -14%;
-  animation-duration: 22s;
+  animation-duration: 29s;
   animation-delay: -7s;
 }
 .bn-wave-1 {
   opacity: 0.45;
   top: 10%;
-  animation-direction: reverse;
-  animation-duration: 18s;
+  animation-duration: 25s;
   animation-delay: -11s;
 }
 .bn-wave-2 {
   color: var(--ed-blue);
   animation-delay: -4s;
+}
+.bn-wave-3 {
+  color: var(--ed-blue);
+  opacity: 0.55;
+  top: 18%;
+  animation-duration: 27s;
+  animation-delay: -9s;
 }
 @keyframes bn-wave-roll {
   from {
@@ -1473,6 +1511,7 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .bn-wave path { animation: none; }
   .bn-wave {
     animation: none;
   }

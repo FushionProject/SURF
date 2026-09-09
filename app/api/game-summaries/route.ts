@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 
 import type { GamePredictionMarketConsensus, OddsApiGame, SignalCard, SurfSignalDetection } from "@/lib/surf/types";
 import { detectSurfSignals } from "@/lib/surf/signals";
+import { paidAccessRequired } from "@/lib/billing/access-policy";
 import { getNbaOddsSnapshot } from "@/lib/surf/nbaOddsScheduler";
 import type { NbaRefreshMode } from "@/lib/surf/nbaOddsScheduler";
 import type { GameMarketContext } from "@/lib/surf/marketContext";
@@ -696,7 +697,8 @@ async function getLiveGameSummaries(request: Request) {
     coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
     injuries,
     predictionMarketConsensus: predictionMarketSnapshot.consensusByGame,
-    predictionMarketWhaleSignals: predictionMarketSnapshot.whaleSignals,
+    // The free board keeps probabilities/quotes, never full paid whale cards.
+    predictionMarketWhaleSignals: paidAccessRequired() ? [] : predictionMarketSnapshot.whaleSignals,
   };
 
   if (isDebug) {

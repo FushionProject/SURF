@@ -1,4 +1,5 @@
 import { pricePressureTitle } from "@/lib/surf/marketHorizonCopy";
+import { paidFeatureDenial } from "@/lib/billing/access";
 import { getCfbContext, cachedCfbFinals } from "@/lib/surf/cfbContext";
 import { cfbMarketEligible } from "@/lib/surf/cfbContextCore";
 import { surfPersistenceStatus } from "@/lib/surf/supabasePersistence";
@@ -863,6 +864,8 @@ async function getLiveSurfFeed(request: Request) {
 }
 
 export async function GET(request: Request) {
+  const denial = await paidFeatureDenial("signals");
+  if (denial) return denial;
   if (isSurfDemoMode() && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
     return NextResponse.json(getDemoSurfFeed("demo"));
   }
@@ -872,6 +875,8 @@ export async function GET(request: Request) {
     if (response.status >= 500 && process.env.NODE_ENV === "development" && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
       return NextResponse.json(getDemoSurfFeed("fallback"));
     }
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Vary", "Cookie");
     return response;
   } catch (error) {
     if (process.env.NODE_ENV === "development" && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {

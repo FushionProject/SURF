@@ -177,20 +177,10 @@ export function Icon({
 export function Brand() {
   return (
     <Link href="/games" className="bn-brand" aria-label="Surf home">
-      <svg
-        className="bn-surf-mark"
-        width="38"
-        height="30"
-        viewBox="0 0 38 30"
-        aria-hidden="true"
-      >
-        <path
-          d="M2 11c6-10 11 10 17 0s11 10 17 0M2 21c6-10 11 10 17 0s11 10 17 0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-        />
-      </svg>
+      <span className="bn-logo-frame" aria-hidden="true">
+        {/* A luminance mask removes black without redrawing the supplied mark. */}
+        <span className="bn-logo-mark" />
+      </span>
       SURF
     </Link>
   );
@@ -531,6 +521,9 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
   const nav = [
     { id: "markets", href: "/games", label: "Market board", icon: "grid" },
     { id: "signals", href: "/feed", label: "The signals", icon: "pulse" },
+    ...(process.env.NODE_ENV === "development"
+      ? [{ id: "stats", href: "/stats/research", label: "Spot Stats", icon: "grid" } as const]
+      : []),
     { id: "saved", href: "/top", label: "My watchlist", icon: "save" },
   ] as const;
   return (
@@ -543,6 +536,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
               <Link
                 key={item.id}
                 href={`${item.href}?sport=${sport}`}
+                prefetch={item.id === "stats" ? false : undefined}
                 aria-current={view === item.id ? "page" : undefined}
               >
                 {item.label}
@@ -552,7 +546,6 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
               </Link>
             ))}
             <Link href="/how-to-use">How to use Surf</Link>
-            {process.env.NODE_ENV === "development" && <Link href="/stats/research" prefetch={false}>Spot Stats</Link>}
           </nav>
           <ThemeControl />
           <Link href="/account" className="bn-account-link">
@@ -606,7 +599,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 <span>01—03</span>
               </div>
               <div className="bn-waves">
-                {[0, 1, 2].map((layer) => (
+                {[0, 1, 2, 3].map((layer) => (
                   <svg
                     key={layer}
                     className={`bn-wave bn-wave-${layer}`}
@@ -615,16 +608,11 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                     focusable="false"
                   >
                     <path
-                      d="M0 120 C100 40 200 40 300 120 S500 200 600 120 S800 40 900 120 S1100 200 1200 120"
+                      d="M0 120 C100 90 200 90 300 120 S500 150 600 120 S800 90 900 120 S1100 150 1200 120"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
                       vectorEffect="non-scaling-stroke"
-                    />
-                    <path
-                      d="M0 120 C100 40 200 40 300 120 S500 200 600 120 S800 40 900 120 S1100 200 1200 120 V240 H0 Z"
-                      fill="currentColor"
-                      opacity="0.06"
                     />
                   </svg>
                 ))}
@@ -959,7 +947,6 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
         </main>
       </div>
       <nav className="bn-mobile-nav" aria-label="Mobile navigation">
-        {process.env.NODE_ENV === "development" && <Link href="/stats/research" prefetch={false}><Icon name="grid" size={19} /><span>Stats</span></Link>}
         {nav.map((item) => (
           <Link
             key={item.id}

@@ -2,6 +2,23 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { normalizeNflverseCsv, parseNflverseRecords } from "../lib/spot-stats/nflverse.ts";
 import { buildSpotFeed, notableRecord } from "../lib/spot-stats/spot-feed.ts";
+import { selectSpotFeedGame } from "../lib/spot-stats/feed-query.ts";
+
+const queryGames = [{ id: "2026_01_SF_LA" }];
+for (const sport of [undefined, "americanfootball_nfl"]) {
+  assert.equal(selectSpotFeedGame({ sport }, queryGames), "all");
+  assert.equal(selectSpotFeedGame({ sport, game: "all" }, queryGames), "all");
+  assert.equal(selectSpotFeedGame({ sport, game: queryGames[0].id }, queryGames), queryGames[0].id);
+  for (const params of [
+    { game: "bad" }, { game: "2025_01_SF_LA" }, { game: "" }, { game: ["all", "all"] },
+    { team: "PIT" }, { from: "2021" }, { week: "1" }, { minimumSample: "1" },
+  ]) assert.equal(selectSpotFeedGame({ sport, ...params }, queryGames), null);
+}
+for (const sport of ["", "basketball_nba", "americanfootball_ncaaf", ["americanfootball_nfl"], ["americanfootball_nfl", "americanfootball_nfl"]]) {
+  assert.equal(selectSpotFeedGame({ sport }, queryGames), null);
+}
+assert.equal(selectSpotFeedGame({ sport: "americanfootball_nfl" }, []), "all");
+assert.equal(selectSpotFeedGame({ game: queryGames[0].id }, []), null);
 
 const now = "2026-09-09T03:00:00.000Z";
 const sourceUrl = "https://www.therams.com/team/coaches-roster/sean-mcvay";

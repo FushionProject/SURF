@@ -25,8 +25,8 @@ export async function updateSupabaseSession(request: NextRequest) {
     },
   });
 
-  // getClaims validates the access token and refreshes it when necessary. Surf
-  // does not gate Games or Signals yet; this Proxy exists only for session care.
+  // getClaims refreshes session cookies; paid routes separately verify the
+  // user and subscription. This Proxy is session care, not authorization.
   try {
     await supabase.auth.getClaims();
   } catch {

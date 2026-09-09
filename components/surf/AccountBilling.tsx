@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BILLING_UNAVAILABLE, displayPrice, isStripeRedirect } from "@/lib/billing/config";
+import { BILLING_UNAVAILABLE, displayPrice, isStripeRedirect, isPaidPlanId, type PaidPlanId } from "@/lib/billing/config";
 import type { BillingStatus } from "@/lib/billing/service";
 
 export function AccountBilling() {
@@ -20,11 +20,11 @@ export function AccountBilling() {
     return () => controller.abort();
   }, []);
 
-  async function open(action: "checkout" | "portal") {
+  async function open(action: "checkout" | "portal", planId?: PaidPlanId) {
     setPending(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/billing/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const response = await fetch(`/api/billing/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action === "checkout" ? { planId } : {}) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message ?? "Billing could not be opened.");
       if (!isStripeRedirect(body.url, action === "checkout" ? "checkout" : "portal")) throw new Error("Billing could not be opened safely.");
@@ -48,7 +48,10 @@ export function AccountBilling() {
           {status.testMode ? <p className="mt-2 text-sm text-[color:var(--surf-primary)]">Test mode · no real payment</p> : null}
           {status.subscription ? <p className="mt-3 text-sm">Subscription: {status.subscription.status.replaceAll("_", " ")}{status.subscription.cancelAt ? " · cancellation scheduled" : ""}</p> : null}
           <div className="mt-4 flex flex-wrap gap-3">
-            {status.canSubscribe ? <button type="button" disabled={pending} onClick={() => void open("checkout")} className="bg-[color:var(--surf-primary)] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{pending ? "Opening…" : "Review subscription"}</button> : null}
+            {status.canSubscribe ? status.catalog?.filter((entry) => isPaidPlanId(entry.id)).map((entry) => {
+              const available = isPaidPlanId(entry.id) && status.purchasablePlans?.includes(entry.id);
+              return <button key={entry.id} type="button" disabled={pending || !available} onClick={() => { if (isPaidPlanId(entry.id)) void open("checkout", entry.id); }} className="bg-[color:var(--surf-primary)] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{!available ? `${entry.name} · coming soon` : pending ? "Opening…" : `Review ${entry.name} · ${displayPrice(entry.amount, entry.currency)}/month`}</button>;
+            }) : null}
             {status.canManage ? <button type="button" disabled={pending} onClick={() => void open("portal")} className="border border-[color:var(--surf-line-08)] px-4 py-3 text-sm font-semibold disabled:opacity-50">Manage billing</button> : null}
           </div>
           <p className="mt-3 text-sm leading-6 text-[color:var(--surf-ink-55)]">Stripe shows the full recurring charge before you confirm. Returning from checkout does not by itself confirm payment.</p>

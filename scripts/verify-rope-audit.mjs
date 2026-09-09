@@ -136,6 +136,34 @@ const quiet = buildRopeReport({
 });
 assert.equal(quiet.status, "PASS", "a legitimately quiet feed must pass ROPE");
 
+function duplicateCheck(signals) {
+  return buildRopeReport({ sportKey: game.sport_key, auditedAt: now, games: [game], signals,
+    predictionProviders: { kalshi: "available", polymarket: "available" }, oddsTelemetry: telemetry, runtime,
+  }).checks.find(entry => entry.id === "signals.duplicates");
+}
+const whale = {
+  ...signal, id: "whale:polymarket:condition:BUF:execution-a:execution-a", opportunity: undefined,
+  signalType: "Whale Activity", market: "h2h", title: "$10.0K bought BUF to win",
+  whaleActivity: { venue: "polymarket", venueLabel: "Polymarket", activityKind: "wallet_buy",
+    outcomeTeam: game.away_team, committedUsd: 10001, contracts: 20002, averagePrice: 0.5,
+    tradeCount: 1, occurredAt: now, isAnonymous: false, sourceUrl: "https://polymarket.com/event/fixture" },
+};
+const otherExecution = { ...whale, id: "whale:polymarket:condition:BUF:execution-b:execution-b" };
+assert.equal(duplicateCheck([whale, otherExecution]).status, "pass",
+  "separate provider executions may have the same rounded headline, timestamp, amount, and price");
+assert.equal(duplicateCheck([whale, { ...whale, title: "$10,001 bought BUF to win" }]).status, "fail",
+  "the same canonical execution remains a duplicate even when its display copy changes");
+assert.equal(duplicateCheck([whale, whale]).status, "fail", "repeated whale cards remain duplicates");
+assert.equal(duplicateCheck([signal, { ...signal, id: "another-card-id" }]).status, "fail",
+  "non-whale duplicate meaning still fails despite different ids");
+for (const id of ["unknown-whale", "whale:polymarket:", "whale:kalshi:condition:BUF:a:a"]) {
+  assert.equal(duplicateCheck([{ ...whale, id }, { ...whale, id: `${id}other` }]).status, "fail",
+    "missing, malformed, or mismatched venue identities retain conservative copy duplicate detection");
+}
+assert.equal(duplicateCheck([whale, { ...otherExecution, id: "whale:kalshi:market:BUF:execution-a:execution-a",
+  whaleActivity: { ...whale.whaleActivity, venue: "kalshi", venueLabel: "Kalshi" } }]).status, "pass",
+  "provider execution identities are venue scoped");
+
 const unverifiedPersistence = buildRopeReport({
   sportKey: "americanfootball_nfl",
   auditedAt: now,

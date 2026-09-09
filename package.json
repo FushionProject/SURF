@@ -28,6 +28,7 @@
     "test:cfb-postgres": "node scripts/verify-cfb-postgres.mjs",
     "test:auth-redirect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-auth-redirect.mjs",
     "test:billing": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-billing.mjs && node scripts/verify-billing-postgres.mjs",
+    "test:paid-access": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-paid-access.mjs",
     "test:spot-stats:preview": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-local-preview.mjs",
     "test:spot-stats:preview:http": "node scripts/verify-spot-stats-preview-http.mjs",
     "test:spot-stats:feed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-feed.mjs",

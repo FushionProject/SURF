@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import type { BillingConfig } from "./config";
-import { isStripeRedirect } from "./config";
+import { BILLING_PLANS, isPaidPlanId, isStripeRedirect, type PaidPlanId, type PlanId } from "./config";
 
 export type BillingCustomer = {
   user_id: string;
@@ -39,7 +39,10 @@ export class BillingError extends Error {
 export type BillingStatus = {
   available: boolean;
   testMode?: boolean;
-  plan?: { name: string; amount: number; currency: string; interval: string; intervalCount: number };
+  plan?: (typeof BILLING_PLANS)[PlanId];
+  catalog?: (typeof BILLING_PLANS)[PlanId][];
+  purchasablePlans?: PaidPlanId[];
+  entitlements?: BillingEntitlements;
   subscription?: { status: string; periodEnd: number | null; cancelAt: number | null };
   canSubscribe?: boolean;
   canManage?: boolean;
@@ -48,13 +51,28 @@ export type BillingStatus = {
 
 const blockingStatuses = new Set(["active", "trialing", "past_due", "unpaid", "incomplete", "paused"]);
 
+export type BillingEntitlements = { planId: PlanId; signals: boolean; spotStats: boolean };
+/** Only authoritative, single-item active subscriptions grant paid features. */
+export function resolveBillingEntitlements(subscriptions: Stripe.Subscription[], config: BillingConfig, now = Date.now() / 1000): BillingEntitlements {
+  const free: BillingEntitlements = { planId: "free", signals: false, spotStats: false };
+  const blocking = subscriptions.filter((sub) => blockingStatuses.has(sub.status));
+  if (blocking.length !== 1) return free;
+  const subscription = blocking[0];
+  const item = subscription.items.data[0];
+  if (subscription.status !== "active" || subscription.livemode !== config.livemode || subscription.items.has_more
+    || subscription.items.data.length !== 1 || item?.quantity !== 1 || !Number.isFinite(item.current_period_end)
+    || item.current_period_end <= now || (subscription.cancel_at != null && subscription.cancel_at <= now)) return free;
+  const planId = (Object.keys(config.priceIds) as PaidPlanId[]).find((id) => config.priceIds[id] === item.price.id);
+  return planId ? { planId, signals: true, spotStats: planId === "signals_spot_stats" && config.spotStatsReleaseReady } : free;
+}
+
 export function subscriptionSnapshot(subscription: Stripe.Subscription): BillingSubscription {
   const customer = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
   const item = subscription.items.data[0];
   return {
     id: subscription.id,
     customerId: customer,
-    priceId: item?.price.id ?? null,
+    priceId: subscription.items.data.length === 1 && !subscription.items.has_more && item?.quantity === 1 ? item.price.id : null,
     status: subscription.status,
     periodEnd: item?.current_period_end ?? null,
     cancelAt: subscription.cancel_at ?? (subscription.cancel_at_period_end ? item?.current_period_end ?? null : null),
@@ -63,16 +81,32 @@ export function subscriptionSnapshot(subscription: Stripe.Subscription): Billing
 
 /** Injectable Stripe/store boundaries let billing be tested without a charge. */
 export function createBillingService(stripe: Stripe, store: BillingStore, config: BillingConfig) {
-  async function configuredPrice() {
-    const price = await stripe.prices.retrieve(config.priceId, { expand: ["product"] });
+  async function configuredPrice(planId: PaidPlanId) {
+    const plan = BILLING_PLANS[planId];
+    const price = await stripe.prices.retrieve(config.priceIds[planId], { expand: ["product"] });
     if (!price.active || price.livemode !== config.livemode || price.type !== "recurring"
       || !price.recurring || price.recurring.usage_type !== "licensed" || price.billing_scheme !== "per_unit"
-      || price.unit_amount == null || price.unit_amount <= 0) {
+      || price.id !== config.priceIds[planId] || price.unit_amount !== plan.amount || price.currency !== plan.currency
+      || price.recurring.interval !== "month" || price.recurring.interval_count !== 1 || price.transform_quantity) {
       throw new BillingError("The Surf subscription is not configured for checkout yet.");
     }
     const product = price.product;
-    if (typeof product === "string" || product.deleted || !product.active) throw new BillingError("The Surf subscription is unavailable.");
+    if (typeof product === "string" || product.deleted || !product.active || product.livemode !== config.livemode) throw new BillingError("The Surf subscription is unavailable.");
     return { price, product };
+  }
+
+  async function configuredCatalog() {
+    const [signals, spotStats] = await Promise.all([configuredPrice("signals"), configuredPrice("signals_spot_stats")]);
+    if (signals.product.id === spotStats.product.id) throw new BillingError("Each Surf plan needs its own product.");
+    return [BILLING_PLANS.free, BILLING_PLANS.signals, BILLING_PLANS.signals_spot_stats];
+  }
+
+  async function entitlements(userId: string): Promise<BillingEntitlements> {
+    const customer = await store.getCustomer(userId, config.livemode);
+    if (!customer) return resolveBillingEntitlements([], config);
+    await checkedCustomer(customer);
+    await configuredCatalog();
+    return resolveBillingEntitlements(await subscriptions(customer.stripe_customer_id), config);
   }
 
   async function subscriptions(customerId: string) {
@@ -94,34 +128,40 @@ export function createBillingService(stripe: Stripe, store: BillingStore, config
   async function status(userId: string): Promise<BillingStatus> {
     const customer = await store.getCustomer(userId, config.livemode);
     if (customer) await checkedCustomer(customer);
+    let listed: Stripe.Subscription[] = [];
     let active: Stripe.Subscription | undefined;
     let subscriptionReadFailed = false;
     if (customer) {
-      try { active = (await subscriptions(customer.stripe_customer_id)).find((sub) => blockingStatuses.has(sub.status)); }
+      try { listed = await subscriptions(customer.stripe_customer_id); active = listed.find((sub) => blockingStatuses.has(sub.status)); }
       catch { subscriptionReadFailed = true; }
     }
-    let catalog: Awaited<ReturnType<typeof configuredPrice>> | undefined;
-    try { catalog = await configuredPrice(); }
+    let catalog: Awaited<ReturnType<typeof configuredCatalog>> | undefined;
+    try { catalog = await configuredCatalog(); }
     catch { /* An archived product must not hide cancellation/payment management. */ }
     const snapshot = active ? subscriptionSnapshot(active) : undefined;
-    const plan = catalog ? {
-      name: catalog.product.name, amount: catalog.price.unit_amount!, currency: catalog.price.currency,
-      interval: catalog.price.recurring!.interval, intervalCount: catalog.price.recurring!.interval_count,
-    } : undefined;
+    const access = resolveBillingEntitlements(catalog && !subscriptionReadFailed ? listed : [], config);
+    const selected = snapshot && (Object.keys(config.priceIds) as PaidPlanId[]).find((id) => config.priceIds[id] === snapshot.priceId);
+    const plan = selected ? BILLING_PLANS[selected] : !active && !subscriptionReadFailed ? BILLING_PLANS.free : undefined;
     return {
-      available: !!plan || !!customer,
+      available: !!catalog || !!customer,
       testMode: !config.livemode,
       plan,
+      catalog,
+      purchasablePlans: catalog ? config.spotStatsReleaseReady ? ["signals", "signals_spot_stats"] : ["signals"] : [],
+      entitlements: access,
       subscription: snapshot ? { status: snapshot.status, periodEnd: snapshot.periodEnd, cancelAt: snapshot.cancelAt } : undefined,
-      canSubscribe: !!plan && !active && !subscriptionReadFailed,
+      canSubscribe: !!catalog && !active && !subscriptionReadFailed,
       canManage: !!customer,
       message: subscriptionReadFailed ? "Subscription status is temporarily unavailable. You can still manage billing in Stripe."
-        : !plan ? (customer ? "New subscriptions are unavailable. You can still manage your existing billing account." : "Subscriptions are not available yet.") : undefined,
+        : !catalog ? (customer ? "New subscriptions are unavailable. You can still manage your existing billing account." : "Subscriptions are not available yet.") : undefined,
     };
   }
 
-  async function checkout(userId: string) {
-    await configuredPrice();
+  async function checkout(userId: string, planId: PaidPlanId) {
+    if (!isPaidPlanId(planId)) throw new BillingError("Choose a valid paid plan.", 400);
+    if (planId === "signals_spot_stats" && !config.spotStatsReleaseReady) throw new BillingError("Spot Stats is coming soon. This plan is not available for purchase yet.", 409);
+    await configuredCatalog();
+    const priceId = config.priceIds[planId];
     let customer = await store.getCustomer(userId, config.livemode);
     if (!customer) {
       // Stable parameters + durable mapping. No browser-supplied customer, email,
@@ -140,7 +180,7 @@ export function createBillingService(stripe: Stripe, store: BillingStore, config
       const existing = await stripe.checkout.sessions.retrieve(attempt.checkout_session_id, { expand: ["line_items"] });
       if (existing.customer !== customer.stripe_customer_id || existing.livemode !== config.livemode) throw new BillingError("Checkout could not be verified.");
       if (existing.status === "open") {
-        if (existing.line_items?.data.length !== 1 || existing.line_items.data[0].price?.id !== config.priceId) {
+        if (existing.line_items?.has_more || existing.line_items?.data.length !== 1 || existing.line_items.data[0].price?.id !== priceId || existing.line_items.data[0].quantity !== 1) {
           throw new BillingError("An earlier checkout has different pricing. Please contact Surf before continuing.", 409);
         }
         if (isStripeRedirect(existing.url, "checkout")) return existing.url;
@@ -160,7 +200,7 @@ export function createBillingService(stripe: Stripe, store: BillingStore, config
       mode: "subscription",
       customer: customer.stripe_customer_id,
       client_reference_id: userId,
-      line_items: [{ price: config.priceId, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${config.origin}/account?billing=returned`,
       cancel_url: `${config.origin}/account?billing=canceled`,
       metadata: { surf_user_id: userId },
@@ -208,5 +248,5 @@ export function createBillingService(stripe: Stripe, store: BillingStore, config
     await store.recordEvent(event.id, event.livemode, event.type, event.created, snapshot, observedAt);
   }
 
-  return { status, checkout, portal, webhook };
+  return { status, checkout, portal, webhook, entitlements };
 }

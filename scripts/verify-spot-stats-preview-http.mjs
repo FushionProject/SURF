@@ -44,16 +44,22 @@ assert.equal(feed.status, 200);
 assert.match(feed.body, /Standout history for this week/);
 assert.match(feed.body, /Historical-reference spread results/);
 assert.doesNotMatch(feed.body, /name="from"|name="week"/);
+const nflFeed = await request("/stats/research?sport=americanfootball_nfl");
+assert.equal(nflFeed.status, 200);
+assert.doesNotMatch(nflFeed.body, /Stats paused/);
+assert.match(nflFeed.body, /Standout history for this week/);
 const firstGame = /<option value="(\d{4}_\d{2}_[A-Z]+_[A-Z]+)"/.exec(feed.body)?.[1];
 if (firstGame) {
   assert.match(feed.body, /data-spot-card=/);
-  const selected = await request(`/stats/research?game=${firstGame}`);
+  const selected = await request(`/stats/research?sport=americanfootball_nfl&game=${firstGame}`);
   assert.equal(selected.status, 200);
   const cardIds = [...selected.body.matchAll(/<article[^>]*id="(spot-[^"]+)"/g)].map(match => match[1]);
   assert.ok(cardIds.length > 0);
   assert.ok(cardIds.every(id => id.startsWith(`spot-${firstGame}-`)));
 } else assert.match(feed.body, /No matching spots yet/);
-for (const query of ["game=bad", "game=all&game=all", "team=PIT", "minimumSample=1"]) {
+for (const query of ["game=bad", "game=all&game=all", "team=PIT", "minimumSample=1",
+  "sport=basketball_nba", "sport=", "sport=americanfootball_nfl&sport=americanfootball_nfl",
+  "sport=americanfootball_nfl&team=PIT", "sport=americanfootball_nfl&game=bad"]) {
   const bad = await request(`/stats/research?${query}`);
   assert.match(bad.body, /Stats paused/);
   assert.doesNotMatch(bad.body, /data-spot-card=/);
