@@ -1,5 +1,7 @@
 # Surf
 
+Development: [branch inventory, review order, and offline CI](docs/DEVELOPMENT.md).
+
 Surf is a fast, NFL-first market companion. It translates spreads, totals, book
 differences, and line movement into short matchup reads; it is not a picks product.
 

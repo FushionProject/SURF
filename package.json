@@ -24,7 +24,8 @@
     "test:sport-gating": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-sport-gating.mjs",
     "test:cfb": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-cfb.mjs",
     "test:cfb-postgres": "node scripts/verify-cfb-postgres.mjs",
-    "test:auth-redirect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-auth-redirect.mjs"
+    "test:auth-redirect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-auth-redirect.mjs",
+    "ci:offline": "node scripts/ci/offline.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",

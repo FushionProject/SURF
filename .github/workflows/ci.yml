@@ -1,0 +1,30 @@
+name: Offline checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: offline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+      - name: Install locked dependencies (registry access only)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test, lint, and build without network access
+        # Dependencies are installed first. The namespace has no external interfaces.
+        run: sudo env "PATH=$PATH" unshare --net -- bash -c 'ip link set lo up; npm run ci:offline'
