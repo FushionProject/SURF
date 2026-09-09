@@ -13,7 +13,7 @@ See [ready-to-open PR descriptions](REVIEW-QUEUE.md).
 3. `codex/surf-polish-billing` ← `codex/surf-ratings-and-movement` (`2b777b7`).
 4. `codex/surf-ratings-and-movement` ← `codex/surf-signal-readability` (`253fb6e`).
 
-`codex/github-project-ci` is independent and targets GitHub main. Review the stack in order; retarget later PRs to main as their predecessors land. Do not merge the private stats prototype with this stack. Existing rollback stays available.
+`codex/github-project-ci` is independent and targets GitHub main. Review the stack in order; retarget later PRs to main as their predecessors land. The separately reviewed stats source checkpoint follows readability as a prototype-only review; it is not authorized for merge or deployment. Existing rollback stays available.
 
 ## Local branch inventory
 
@@ -57,7 +57,7 @@ See [ready-to-open PR descriptions](REVIEW-QUEUE.md).
 | `codex/surf-release-candidate` | `954c8fa` | Contained in local main; no separate PR needed |
 | `codex/surf-signal-readability` | `253fb6e` | Completed; published for review (2 commits after local main) |
 | `codex/surf-sports-redesign` | `216a136` | Contained in local main; no separate PR needed |
-| `codex/surf-spot-stats` | `c6ebcc3` | ACTIVE private prototype; excluded from publication; do not edit/reset |
+| `codex/surf-spot-stats` | `b93ce47` | Completed source checkpoint; published for prototype review only; private archives excluded |
 | `codex/surf-whale-reliability` | `6af58ad` | Contained in local main; no separate PR needed |
 | `codex/ui-refresh-editorial` | `d7592d8` | Contained in local main; no separate PR needed |
 | `codex/usefulness-horizon` | `0f5c766` | Contained in local main; no separate PR needed |
@@ -102,7 +102,7 @@ Worktree names below are relative identifiers, with no machine-specific home pat
 
 Only reviewed source, synthetic tests, migrations, and documentation are published. The existing `.env.example` is a blank configuration template, not a credential file. Historical token/path scans covered 733 unique blobs across all original refs; a second assignment/entropy screen covered 574 blobs in the publication ancestry and found no candidate hardcoded secrets. These checks reduce risk but are not a formal security audit.
 
-Private environment files, provider archives, NFL/API-Sports/nflverse research, raw responses, caches, customer data, build outputs, screenshots and temporary reports are excluded. The active stats branch remains local even though its source exists in Git history.
+Private environment files, provider archives, NFL/API-Sports/nflverse research, raw responses, caches, customer data, build outputs, screenshots and temporary reports are excluded. The completed stats source checkpoint `b93ce47` was separately authorized for publication after its full 641-blob ancestry passed path/token and hardcoded-secret screens. Its private research corpus and runtime remain local.
 
 See [verified release backlog](BACKLOG.md) for actionable gaps and acceptance criteria.
 
@@ -113,3 +113,7 @@ Use Node 22.16 or newer in an isolated source checkout without environment files
 The explicit suite allowlist includes completed-stack tests only when their package scripts exist. It does not discover arbitrary scripts or run live captures/imports/audits. A Node network guard protects local checks; GitHub additionally uses a Linux network namespace with only loopback. No repository secrets, deployments, billing setup, artifact uploads, or provider collectors are used.
 
 Next Google Fonts is replaced only for this CI build by a local CSS fixture, using the installed Next test hook. This verifies compilation, types, prerendering and routing, not production font downloads or typography. Normal builds remain unchanged. Lint currently allows existing warnings.
+
+## Stats publication update
+
+September 9, 2026 UTC: the stats implementation task completed `b93ce47` and authorized source-branch publication. This supersedes the initial temporary hold recorded in the inventory. Reviewed source includes minimal cited coach/game membership facts, not the private historical corpus. The running preview was not changed. Full-history checks found no restricted data paths or candidate secrets. Five stats fixture suites passed under an external-network guard in a separate source-only checkout.

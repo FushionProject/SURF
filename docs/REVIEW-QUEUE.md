@@ -1,6 +1,6 @@
 # Completed source review queue
 
-These branches are published. Pull request creation is pending GitHub write access. They form a stack; the CI/documentation branch is independent. Open the comparisons below to review or create each PR. No PR should include the active private NFL stats branch.
+These branches are published. Pull request creation is pending GitHub write access. They form a stack; the CI/documentation branch is independent. Open the comparisons below to review or create each PR. The separately authorized completed stats source checkpoint has its own prototype review below; do not merge or deploy it as part of the release stack.
 
 ## Restore current Surf features in the editorial layout
 
@@ -37,3 +37,15 @@ Adds one bounded GitHub Actions job for reviewed fixture suites, lint and a webp
 The independent CI branch and the combined completed source stack both pass the selected offline fixture suites, lint (existing warnings) and production build locally. The combined stack includes billing, layout, ratings and link regressions. This is not a browser typography test, production migration, provider validation or billing sandbox certification. GitHub-hosted execution remains unverified until a workflow run completes.
 
 Ancestry/path and token scans found no private archive/cache paths or credential-token matches in the inventoried history; a second assignment/entropy screen found no candidate hardcoded secrets in the publication ancestry. Source review included changed configuration templates, auth/billing boundaries, ratings, links and documentation. No private runtime or research files were uploaded.
+
+## Add a local-only matchup-linked NFL spot-stats prototype
+
+[Compare readability to stats source](https://github.com/FushionProject/SURF/compare/codex/surf-signal-readability...codex/surf-spot-stats?expand=1)
+
+Adds manual, bounded imports and validated archive/query logic, then links descriptive historical situations to upcoming NFL matchups. Cards show sample sizes, small-sample labels, ties/pushes and missing reference lines. Current coach and limited international membership context is a small set of cited public facts. Trial/scrambled results cannot enter real statistics.
+
+Based on `codex/surf-signal-readability`, with five commits ending at `b93ce47`. Treat this as a draft prototype PR: research pages require development mode, an explicit flag and loopback host; the supported preview binds to loopback. The public stats integration remains disabled by default. Imports are manual, and page visits do not call providers. Production tracing excludes research archives.
+
+Publication review scanned all 641 unique blobs in this checkpoint's ancestry for restricted paths, credential tokens and suspicious hardcoded secrets, with zero findings. Five offline stats suites passed independently in a source-only checkout with external networking blocked. The implementation task additionally reports passing build/typecheck/scoped lint, production 404 and archive-tracing checks. No running preview was changed for this publication review.
+
+Private NFLverse/API-Sports archives, QA ledgers, environment files, raw responses, caches and build output are excluded. No merge, deployment, billing change or customer launch is authorized. Release gates remain source/display rights, historical-line definition, refresh operations, expanded international coverage and browser/mobile acceptance. See `docs/spot-stats-feed.md` on the source branch.

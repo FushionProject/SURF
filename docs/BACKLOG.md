@@ -59,4 +59,4 @@ Acceptance:
 - If approved, compare schemas and responsibilities, then extract a focused change against current main.
 - Preserve the historical branch; do not merge its old UI, dependencies and persistence wholesale.
 
-The NFL stats prototype remains active in its existing task. Its source, archives and results are not part of this publication batch; that task owns its implementation and later release review.
+The NFL stats task completed source checkpoint `b93ce47`, now separately published for prototype review. Private archives and ledgers remain excluded. Customer release still requires source/display rights, historical-line definitions, schedule/coach refresh, broader international coverage and browser/mobile acceptance; source publication does not authorize those release steps.

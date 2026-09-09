@@ -12,6 +12,8 @@ const suites = [
   'test:sport-gating', 'test:cfb', 'test:cfb-postgres', 'test:auth-redirect',
   'test:layout-parity', 'test:billing', 'test:dynamic-ratings',
   'test:signal-readability', 'test:sportsbook-links',
+  'test:spot-stats', 'test:spot-stats:api-sports', 'test:spot-stats:nflverse',
+  'test:spot-stats:preview', 'test:spot-stats:feed',
 ];
 // Do not inherit API credentials or public environment values from a developer shell.
 const env = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'TEMP', 'SystemRoot'].flatMap(
