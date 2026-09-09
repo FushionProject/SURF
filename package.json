@@ -12,6 +12,7 @@
     "stats:audit:2010s": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/audit-nfl-history.mjs",
     "test:spot-stats:preview": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-local-preview.mjs",
     "test:spot-stats:preview:http": "node scripts/verify-spot-stats-preview-http.mjs",
+    "test:spot-stats:feed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-feed.mjs",
     "stats:import:nflverse": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/import-nflverse-research.mjs",
     "stats:research": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/query-nflverse-research.mjs",
     "stats:import:api-sports": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/import-api-sports-research.mjs",

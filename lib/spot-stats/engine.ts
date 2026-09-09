@@ -326,7 +326,7 @@ function auditSource(source: SpotSource): SpotSource {
   return { ...common, provider: "sportsdataio", access: source.access, lineBasis: "game-start" };
 }
 
-function perspective(game: SpotGame, team: string, includeTotals: boolean): SpotAuditRow {
+export function spotGamePerspective(game: SpotGame, team: string, includeTotals: boolean): SpotAuditRow {
   const home = game.homeTeam === team;
   const teamScore = home ? game.homeScore : game.awayScore;
   const opponentScore = home ? game.awayScore : game.homeScore;
@@ -414,7 +414,7 @@ function calculateSpotQuery(games: readonly SpotGame[], rawQuery: SpotQuery, acc
       exclusions[reason] += 1;
       continue;
     }
-    const row = perspective(game, query.team, query.includeTotals);
+    const row = spotGamePerspective(game, query.team, query.includeTotals);
     if (query.venue !== undefined && query.venue !== row.venue) {
       exclusions.venueRecords += 1;
       continue;

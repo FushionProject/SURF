@@ -1,12 +1,15 @@
 # NFL local research preview
 
+The main local research route now opens the matchup-linked [Spot Stats feed](spot-stats-feed.md).
+This document describes the retained results-only explorer at `/stats/research/explore`.
+
 Branch: `codex/surf-spot-stats`. Main, Games, Signals, and the licensed `/stats`
 workspace are unchanged. This is not a public release or a publication-rights approval.
 
 ## Open it
 
 Run `npm run stats:preview` from this worktree and open
-`http://127.0.0.1:3162/stats/research` on the same Mac. The launcher binds only to
+`http://127.0.0.1:3162/stats/research/explore` on the same Mac. The launcher binds only to
 loopback; it does not make the research available to a phone or the public internet.
 It takes no hostname override or credentials and does not modify environment files.
 

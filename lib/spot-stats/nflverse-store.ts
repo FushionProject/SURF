@@ -1,8 +1,8 @@
-// Private Node-only research archive. No app route imports this module.
+// Private Node-only research archive. Only explicitly gated local research may read it.
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import path from "node:path";
-import { NFLVERSE_GAMES_URL, normalizeNflverseCsv } from "./nflverse.ts";
+import { NFLVERSE_GAMES_URL, normalizeNflverseCsv, parseNflverseRecords } from "./nflverse.ts";
 
 export const NFLVERSE_LICENSE_URL = "https://raw.githubusercontent.com/nflverse/nflverse-data/main/LICENSE.md";
 export const NFLVERSE_MAX_BYTES = 8 * 1024 * 1024;
@@ -144,7 +144,7 @@ export async function saveNflverseResearch(
 }
 
 /** Re-parse and validate the original input on every research read. */
-export async function loadNflverseResearch(root = nflverseResearchDirectory()) {
+async function readResearchArchive(root: string) {
   const pointerFile = path.join(root, "current.json");
   if ((await stat(pointerFile)).size > 1024) throw new Error("Invalid research pointer.");
   const pointer = JSON.parse(await readFile(pointerFile, "utf8")) as { fileName?: unknown };
@@ -158,5 +158,17 @@ export async function loadNflverseResearch(root = nflverseResearchDirectory()) {
   if (pointer.fileName !== `games-${archiveSha256}.json`) throw new Error("Research fingerprint mismatch.");
   const archive = JSON.parse(body) as Archive;
   const report = validateArchive(archive);
-  return { report, retrievedAt: archive.retrievedAt, sha256: archive.sha256, archiveSha256, attribution: archive.attribution, path: file };
+  return { archive, report, retrievedAt: archive.retrievedAt, sha256: archive.sha256, archiveSha256, attribution: archive.attribution, path: file };
+}
+
+export async function loadNflverseResearch(root = nflverseResearchDirectory()) {
+  const { archive: _archive, ...result } = await readResearchArchive(root);
+  void _archive;
+  return result;
+}
+
+/** Schedule/coach context stays separate from the public and results-only adapters. */
+export async function loadNflverseContextResearch(root = nflverseResearchDirectory()) {
+  const { archive, ...result } = await readResearchArchive(root);
+  return { ...result, records: parseNflverseRecords(archive.rawCsv) };
 }

@@ -50,7 +50,7 @@ const mixed = { ...archive, games: [...games, game(4, { source: { ...source, pro
 assert.equal(buildPreview(mixed, parsePreviewQuery(filters, now)).result.sampleSize, 3);
 
 // Guard must run before archive loading; the supported launcher stays loopback-only.
-const page = await readFile(new URL("../app/stats/research/page.tsx", import.meta.url), "utf8");
+const page = await readFile(new URL("../app/stats/research/explore/page.tsx", import.meta.url), "utf8");
 const server = await readFile(new URL("../lib/spot-stats/local-preview-server.ts", import.meta.url), "utf8");
 const launcher = await readFile(new URL("./preview-spot-stats.mjs", import.meta.url), "utf8");
 assert.ok(page.indexOf("if (!localPreviewAllowed") < page.indexOf("await getLocalPreview"));

@@ -102,7 +102,7 @@ const easternClock = new Intl.DateTimeFormat("en-CA", {
 });
 
 /** nflverse gametime is Eastern even for international games. Never use the host timezone. */
-function easternKickoff(day: string, time: string): string | null {
+export function easternKickoff(day: string, time: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d{2}:\d{2}(?::\d{2})?$/.test(time)) return null;
   const clock = time.length === 5 ? `${time}:00` : time;
   const local = `${day}T${clock}.000Z`;
@@ -144,6 +144,13 @@ function line(value: string, minimum: number, maximum: number): number | null | 
 
 type RowResult = { game: SpotGame; reason?: never } | { game?: never; reason: SpotRejectionReason };
 type CsvRecord = Record<string, string>;
+
+/** Private context uses the same bounded CSV parser, never a comma split. */
+export function parseNflverseRecords(csv: string): CsvRecord[] {
+  const [header, ...rows] = parseCsv(csv);
+  return rows.filter(columns => columns.length === header.length)
+    .map(columns => Object.fromEntries(header.map((name, index) => [name, columns[index]])));
+}
 
 function normalizeRow(row: CsvRecord, retrievedAt: string): RowResult {
   const id = /^(\d{4})_(\d{2})_([A-Z]{2,3})_([A-Z]{2,3})$/.exec(row.game_id);
