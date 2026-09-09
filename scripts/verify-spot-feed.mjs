@@ -140,4 +140,22 @@ const renamed=qbInput([...qbHistory.map(r=>({...r,home_qb_name:"Joseph Burrow"})
 assert.equal(card(renamed,"coach-opener").sampleSize,5);
 assert.ok(card(renamed,"coach-opener").why.includes("Joe Burrow"));
 assert.deepEqual(qbInput([...qbHistory,qbCurrent].reverse()).cards,merged.cards,"deterministic deduplication");
-console.log("Spot feed tests passed, including QB ID matching, projection labels, minimum samples, exact-set deduplication, prominence and local guards.");
+const venueHistory = [2017,2018,2019,2020,2021].map(year => record(year, 4));
+const venueCurrent = {...current, location:"Home", week:"2", game_id:"2026_02_SF_LA", spread_line:"3"};
+const venueFeed = build([...venueHistory,venueCurrent]);
+assert.ok(venueFeed.cards.some(c => /Home/.test(c.category)), "home situations are generated");
+for (const c of venueFeed.cards.filter(c => /Home/.test(c.category))) {
+  assert.ok(c.rows.every(r => r.venue === "home"));
+  assert.equal(c.prominence,"Standout history");
+}
+const neutralFeed = build([...venueHistory,{...venueCurrent,location:"Neutral"}]);
+assert.equal(neutralFeed.cards.some(c => /Home|Road/.test(c.category)),false,"neutral upcoming games cannot receive venue splits");
+const unknownFeed = build([...venueHistory,{...venueCurrent,location:""}]);
+assert.equal(unknownFeed.cards.some(c => /Home|Road/.test(c.category)),false,"unknown upcoming venues cannot receive venue splits");
+const roadRows = venueHistory.map(r => ({...r,game_id:`${r.season}_04_LA_ARI`,home_team:"ARI",away_team:"LA",home_coach:"Other Coach",away_coach:"Sean McVay",home_score:"17",away_score:"24",spread_line:"-3"}));
+const roadCurrent = {...venueCurrent,game_id:"2026_02_LA_SF",home_team:"SF",away_team:"LA",spread_line:"-3"};
+const roadFeed = build([...roadRows,roadCurrent]);
+assert.ok(roadFeed.cards.some(c => /Road/.test(c.category)));
+for (const c of roadFeed.cards.filter(c => /Road/.test(c.category))) assert.ok(c.rows.every(r => r.venue === "away"));
+assert.equal(build([...venueHistory.slice(0,2),venueCurrent]).cards.some(c=>/Home/.test(c.category)),false,"venue minimum sample remains enforced");
+console.log("Spot feed tests passed, including home/road membership, neutral exclusion, sample gates, QB matching and deduplication.");

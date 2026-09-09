@@ -198,6 +198,17 @@ export function buildSpotFeed(input: {
       "after a loss by 14+ points", `The ${name} lost their previous regular-season game by at least 14 points. This is history in that situation, not a guaranteed bounce-back.`,
       coached.filter(item => afterHeavyLoss(feedTeam(item.row.team), item.row.season, item.row.week, item.row.kickoffAt)), 2, coachScope);
     const currentRaw = raw.get(game.id)!;
+    const venueLabel = side === "home" ? "Home" : "Road";
+    const venuePhrase = side === "home" ? "at home" : "on the road";
+    // Only an explicitly non-neutral fixture establishes a home/road situation.
+    if (currentRaw.location === "Home") {
+      add(game, team, "team-venue", `${venueLabel} history`, name, venuePhrase,
+        `The ${name} play ${venuePhrase} against the ${opponent}. This is their regular-season record in that setting, across coaching changes. Neutral-site games are excluded.`,
+        teamRows.filter(item => item.row.venue === side), 4, `${scope} · Franchise history`);
+      if (coach) add(game, team, "coach-venue", `Coach · ${venueLabel}`, coach, venuePhrase,
+        `${coach} leads the ${name} ${venuePhrase}. These are results from all teams he coached in that setting, excluding neutral-site games.`,
+        coached.filter(item => item.row.venue === side), 3, coachScope);
+    }
     const qb = qbIdentity(currentRaw, side);
     if (qb) {
       const starts = history.filter(item => item.qb?.id === qb.id);
@@ -205,6 +216,9 @@ export function buildSpotFeed(input: {
       const subject = `Teams with ${qb.name} starting`;
       const qbScope = `${scope} · All teams with ${qb.name} starting`;
       const projection = `${qb.name} is the projected QB in the saved schedule for the ${name}; this spot applies only if he starts. These are team results, not individual passing statistics.`;
+      if (currentRaw.location === "Home") add(game, team, "qb-venue", `QB · ${venueLabel}`, subject, venuePhrase,
+        `${projection} Only games ${venuePhrase} are included; neutral-site games are excluded.`,
+        starts.filter(item => item.row.venue === side), 3, qbScope);
       if (game.week === 1) add(game, team, "qb-week-one", "QB · Week 1", subject, "in Week 1 games", projection,
         starts.filter(item => item.row.week === 1), 1, qbScope);
       if (game.division) add(game, team, "qb-division", "QB · Division matchup", subject, "against division opponents", projection,
@@ -222,6 +236,13 @@ export function buildSpotFeed(input: {
     const line = !missing(currentRaw.spread_line) && Number.isFinite(Number(currentRaw.spread_line)) ? Number(currentRaw.spread_line) : null;
     // nflverse spread_line is positive when the home team is favored.
     const handicap = line === null ? null : side === "home" ? -line : line;
+    if (currentRaw.location === "Home" && handicap !== null && handicap < 0 && handicap >= -100) {
+      const explanation = `The saved reference line has the ${name} favored ${venuePhrase}. This is historical context, not a live quote or a prediction; neutral-site games are excluded.`;
+      add(game, team, "team-favorite", `${venueLabel} favorite`, name, `as a ${venueLabel.toLowerCase()} favorite`, explanation,
+        teamRows.filter(item => item.row.venue === side && item.row.role === "favorite"), 4, `${scope} · Franchise history`);
+      if (coach) add(game, team, "coach-favorite", `Coach · ${venueLabel} favorite`, coach, `as a ${venueLabel.toLowerCase()} favorite`, explanation,
+        coached.filter(item => item.row.venue === side && item.row.role === "favorite"), 3, coachScope);
+    }
     if (coach && currentRaw.location === "Home" && handicap !== null && handicap > 0 && handicap <= 100) add(game, team,
       "underdog", `${side === "home" ? "Home" : "Road"} underdog`, coach, `as a ${side === "home" ? "home" : "road"} underdog`,
       `The saved reference line has the ${name} as a ${side === "home" ? "home" : "road"} underdog. This context can change when the line changes; it is not a live quote.`,
