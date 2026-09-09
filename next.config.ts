@@ -7,6 +7,18 @@ const localNetworkOrigins = Object.values(networkInterfaces())
   .map((network) => network.address);
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      // Baseline restrictions without breaking Next's inline hydration scripts.
+      // A nonce-based script policy requires a separate browser compatibility pass.
+      { key: "Content-Security-Policy", value: "frame-ancestors 'self'; object-src 'none'; base-uri 'self'" },
+    ] }];
+  },
   turbopack: { root: process.cwd() },
   outputFileTracingRoot: process.cwd(),
   outputFileTracingExcludes: { "/*": ["./.surf-data/spot-stats/**/*"] },

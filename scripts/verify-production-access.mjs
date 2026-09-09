@@ -44,6 +44,16 @@ try {
   }
   const feed = await request("/feed");
   assert.equal(feed.response.status, 200);
+  assert.equal(feed.response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(feed.response.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.match(feed.response.headers.get("content-security-policy") ?? "", /frame-ancestors 'self'/);
+  assert.match(feed.response.headers.get("content-security-policy") ?? "", /object-src 'none'/);
+  assert.equal(feed.response.headers.get("x-powered-by"), null);
+  for (const path of ["/api/game-summaries?debug=1", "/api/surf-games?debug=1"]) {
+    const debug = await request(path);
+    assert.equal(debug.response.status, 400, "Public debug routes must close before provider calls");
+    assert.match(debug.response.headers.get("cache-control") ?? "", /private.*no-store/);
+  }
   assert.match(feed.body, /Your account &amp; plans/);
   assert.doesNotMatch(feed.body, /data-spot-card=|"whaleActivity"/);
   for (const path of ["/stats/research?sport=americanfootball_nfl", "/stats/research/explore"]) {

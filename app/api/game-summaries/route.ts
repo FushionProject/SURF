@@ -724,6 +724,9 @@ async function getLiveGameSummaries(request: Request) {
 }
 
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV === "production" && new URL(request.url).searchParams.has("debug")) {
+    return NextResponse.json({ error: "Debug access is unavailable." }, { status: 400, headers: { "Cache-Control": "private, no-store" } });
+  }
   if (isSurfDemoMode() && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
     return NextResponse.json(getDemoGameSummaries("demo"));
   }
