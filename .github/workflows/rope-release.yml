@@ -3,7 +3,7 @@ name: ROPE release regressions
 on:
   pull_request:
   push:
-    branches: [main, 'codex/rope-release-*']
+    branches: [main, 'codex/**']
   workflow_dispatch:
 
 permissions:
