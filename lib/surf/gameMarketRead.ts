@@ -33,7 +33,7 @@ export function buildGameMarketRead(options: {
       kind: "whale",
       headline: `${amount} ${whale.venueLabel} ${kind} on ${whale.outcomeTeam}`,
       detail: `${whale.tradeCount} executed ${whale.tradeCount === 1 ? "fill" : "fills"} at an average ${Math.round(whale.averagePrice * 100)}¢. Observed buying, not a prediction.${whale.isAnonymous ? whale.activityKind === "buying_burst" ? " May include multiple anonymous traders." : " Trader identity is unavailable." : ""}`,
-      sourceUrl: whale.sourceUrl,
+      sourceUrl: whale.venue === "kalshi" ? undefined : whale.sourceUrl,
     };
   }
 

@@ -3,6 +3,11 @@ import { readFile } from "node:fs/promises";
 import { localPreviewAllowed, parsePreviewQuery, buildPreview } from "../lib/spot-stats/local-preview.ts";
 
 const env = { NODE_ENV: "development", SURF_SPOT_STATS_LOCAL_PREVIEW: "true" };
+const lanEnv = { ...env, SURF_SPOT_STATS_LAN_HOST: "10.1.11.199:3165" };
+assert.equal(localPreviewAllowed(lanEnv, "10.1.11.199:3165"), true);
+assert.equal(localPreviewAllowed(lanEnv, "10.1.11.198:3165"), false);
+assert.equal(localPreviewAllowed({...lanEnv, NODE_ENV:"production"}, "10.1.11.199:3165"), false);
+for (const host of ["8.8.8.8:3165", "10.999.1.1:3165", "10.1.1.1:65536", "example.com:3165"]) assert.equal(localPreviewAllowed({...env,SURF_SPOT_STATS_LAN_HOST:host},host),false);
 for (const host of ["localhost", "localhost:3162", "127.0.0.1:3162", "[::1]:3162"]) assert.equal(localPreviewAllowed(env, host), true);
 for (const host of [null, "", "0.0.0.0:3162", "10.1.9.110:3162", "surf.com", "localhost.evil.com", "localhost:0", "localhost:65536", "localhost:abc", "localhost:3162@evil.com", "127.0.0.1,example.com", "localhost/anything"]) assert.equal(localPreviewAllowed(env, host), false);
 for (const value of [{}, { ...env, NODE_ENV: "production" }, { ...env, NODE_ENV: "test" }, { NODE_ENV: "development" }, { ...env, SURF_SPOT_STATS_LOCAL_PREVIEW: "false" }]) assert.equal(localPreviewAllowed(value, "localhost:3162"), false);

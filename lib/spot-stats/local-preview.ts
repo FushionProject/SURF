@@ -10,6 +10,13 @@ type Archive = Awaited<ReturnType<typeof loadApiSportsResearch>>;
  * A Host header is not authentication and must never replace that bind. */
 export function localPreviewAllowed(env: Record<string, string | undefined>, host: string | null) {
   if (env.NODE_ENV !== "development" || env.SURF_SPOT_STATS_LOCAL_PREVIEW !== "true" || !host) return false;
+  // Explicit private-LAN preview only. Never trust forwarded headers or enable
+  // this in production. This is not authentication: use only a trusted LAN.
+  const lan = env.SURF_SPOT_STATS_LAN_HOST;
+  if (lan && host === lan && /^(10\.(?:\d{1,3}\.){2}\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):\d{1,5}$/.test(lan)) {
+    const [ip, port] = lan.split(":");
+    return ip.split(".").every(part => Number(part) <= 255) && Number(port) > 0 && Number(port) <= 65535;
+  }
   const match = /^(localhost|127\.0\.0\.1|\[::1\])(?::([0-9]{1,5}))?$/.exec(host);
   return Boolean(match && (!match[2] || (Number(match[2]) >= 1 && Number(match[2]) <= 65535)));
 }

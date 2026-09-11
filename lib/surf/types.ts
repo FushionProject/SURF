@@ -9,6 +9,7 @@ export type OddsApiOutcome = {
 export type OddsApiMarket = {
   key: string;
   last_update?: string;
+  link?: string | null;
   outcomes?: OddsApiOutcome[];
 };
 
@@ -16,6 +17,7 @@ export type OddsApiBookmaker = {
   key: string;
   title: string;
   last_update?: string;
+  link?: string | null;
   markets?: OddsApiMarket[];
 };
 
