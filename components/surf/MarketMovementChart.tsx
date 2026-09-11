@@ -14,7 +14,7 @@ function lineValue(value: number, mode: MovementMarket): string {
 
 function localTimestamp(timestamp: number, localReady: boolean, short = false): string {
   return new Date(timestamp).toLocaleString(localReady ? undefined : "en-US", {
-    ...(short ? {} : { month: "short", day: "numeric", timeZoneName: "short" } as const),
+    ...(short ? { weekday: "short" } as const : { weekday: "short", month: "short", day: "numeric", timeZoneName: "short" } as const),
     hour: "numeric", minute: "2-digit", ...(!localReady ? { timeZone: "UTC" } : {}),
   });
 }

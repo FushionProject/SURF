@@ -35,7 +35,8 @@ assert.equal(read({ consensus }).kind, "consensus");
 assert.match(read({ consensus }).headline, /62%/);
 assert.match(read({ consensus }).detail, /not Surf's forecast/);
 assert.equal(read({ consensus, history }).kind, "movement", "tracked change takes priority over static consensus");
-assert.match(read({ history }).headline, /SEA spread -1 since first tracked/);
+assert.match(read({ history }).headline, /line has moved 1 point toward SEA since first tracked/);
+assert.match(read({ history: { ...history, spreadHistory: [point(0, -3), point(10, -1.5)] } }).headline, /1.5 points away from SEA/);
 assert.match(read({ history }).detail, /not the sportsbook's official opener/);
 assert.equal(read({ history: { ...history, spreadHistory: [point(0, -3)] } }).kind, "quiet", "a current scalar cannot invent a timestamped change");
 assert.equal(read({ history: { ...history, spreadHistory: [] } }).kind, "quiet", "an opening scalar is not recorded history");
@@ -62,7 +63,7 @@ assert.match(read({ whaleSignals: [whale(12_000, "game-1", "buying_burst")] }).h
 assert.match(read({ whaleSignals: [whale(12_000, "game-1", "buying_burst")] }).detail, /multiple anonymous traders/);
 assert.doesNotMatch(read({ whaleSignals: [whale(12_000, "game-1", "buying_burst")] }).detail, /the trader|one trader|single trader/);
 assert.equal(read({ whaleSignals: [{ ...whale(50_000), status: "resolved" }] }).kind, "quiet");
-assert.equal(read({ history: { ...history, spreadHistory: [], totalHistory: [point(0, null, 44), point(10, null, 45)] } }).headline, "Total +1 since first tracked");
+assert.equal(read({ history: { ...history, spreadHistory: [], totalHistory: [point(0, null, 44), point(10, null, 45)] } }).headline, "The total has moved up 1 point since first tracked");
 assert.match(read({ consensus: { ...consensus, homeProbability: .5, awayProbability: .5 } }).headline, /even matchup/);
 assert.equal(read({ history: { ...history, spreadHistory: [point(0, -3), point(5, -4), point(10, -3)] } }).kind, "quiet", "round trips remain in the chart without inventing net movement");
 console.log("Game Market Read: priority, source semantics, timestamp provenance, quiet/partial cases passed.");

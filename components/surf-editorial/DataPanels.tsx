@@ -68,7 +68,7 @@ export function GameDataPanels({
         data.currentMedianSnapshot?.[game.id]?.totals);
   const read = buildGameMarketRead({
     gameId: game.id,
-    homeLabel: getTeamAbbrev(game.home_team) ?? game.home_team,
+    homeLabel: game.home_team,
     board,
     // Executed trade activity has its own current cards in Signals.
     whaleSignals: [],

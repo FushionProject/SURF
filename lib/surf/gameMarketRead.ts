@@ -63,9 +63,12 @@ export function buildGameMarketRead(options: {
   })).filter((item) => item.delta != null && Math.abs(item.delta) >= 0.5)
     .sort((a, b) => Math.abs(b.delta!) - Math.abs(a.delta!))[0];
   if (movement) {
+    const distance = `${Math.abs(movement.delta!)} ${Math.abs(movement.delta!) === 1 ? "point" : "points"}`;
     return {
       kind: "movement",
-      headline: `${movement.mode === "totals" ? "Total" : `${options.homeLabel} ${options.spreadName}`} ${movement.delta! > 0 ? "+" : ""}${movement.delta} since first tracked`,
+      headline: movement.mode === "totals"
+        ? `The total has moved ${movement.delta! > 0 ? "up" : "down"} ${distance} since first tracked`
+        : `The line has moved ${distance} ${movement.delta! < 0 ? "toward" : "away from"} ${options.homeLabel} since first tracked`,
       detail: `Change across Surf's recorded observations, not the sportsbook's official opener.${movement.hasGaps ? " There are gaps in the retained history." : ""}`,
     };
   }

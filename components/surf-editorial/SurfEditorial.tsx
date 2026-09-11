@@ -1026,7 +1026,7 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
                 ? "Board"
                 : item.id === "signals"
                   ? "Signals"
-                  : "Watchlist"}
+                  : item.id === "stats" ? "Stats" : "Watchlist"}
             </span>
           </Link>
         ))}
