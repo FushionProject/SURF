@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { localPreviewAllowed } from "@/lib/spot-stats/local-preview";
 import { SurfAppHeader } from "@/components/surf/SurfAppHeader";
 import { getSpotStatsWorkspace } from "@/lib/spot-stats/server";
 import { runSpotQuery, SPOT_TEAM_CODES, type SpotQuery, type SpotQueryResult, type SpotTeamCode } from "@/lib/spot-stats/engine";
@@ -42,6 +45,9 @@ function ResearchCard({ title, description, result }: { title: string; descripti
 }
 
 export default async function StatsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (localPreviewAllowed(process.env, (await headers()).get("host"))) {
+    redirect("/stats/research?sport=americanfootball_nfl");
+  }
   const workspace = await getSpotStatsWorkspace();
   const params = await searchParams;
   const teams = [...new Set(workspace.games.flatMap((game) => [game.homeTeam, game.awayTeam]))].filter((team): team is SpotTeamCode => (SPOT_TEAM_CODES as readonly string[]).includes(team)).sort();
