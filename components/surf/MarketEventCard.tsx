@@ -246,14 +246,14 @@ export function MarketEventCard({ card, now }: Props) {
           </div>
           <div className="mt-3 flex items-center justify-between gap-3 border-t border-[color:var(--surf-line-06)] pt-3">
             <span className="text-[9px] text-[color:var(--surf-ink-35)]">Large activity, not a prediction.</span>
-            <a
+            {whale.venue !== "kalshi" && whale.sourceUrl && <a
               href={whale.sourceUrl}
               target="_blank"
               rel="noreferrer"
               className="text-[9px] font-semibold text-[color:var(--surf-primary)] hover:underline"
             >
               View market
-            </a>
+            </a>}
           </div>
         </div>
       ) : opportunity ? (

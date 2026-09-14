@@ -7,6 +7,7 @@ import type {
   TrackedBookPriceMove,
 } from "./types";
 import type { SurfLeague, SurfSportKey, SurfSportLabel } from "./sports";
+import { filterSurfBookmakers, SURF_BOOKMAKER_POOL_KEY } from "./bookmakers.ts";
 
 const MIN_BOOKS_IN_MARKET = 3;
 const MIN_LINE_CHANGE = 0.5;
@@ -68,6 +69,7 @@ type StoredHorizonEvent = MarketHorizonEvent & {
 };
 
 export type MarketHorizonStore = {
+  bookmakerPoolKey?: string;
   latestOutcomes: Map<string, OutcomeSnapshot>;
   markets: Map<string, MarketState>;
   rawPriceMoves: RawPriceMove[];
@@ -94,6 +96,7 @@ declare global {
 
 export function createMarketHorizonStore(): MarketHorizonStore {
   return {
+    bookmakerPoolKey: SURF_BOOKMAKER_POOL_KEY,
     latestOutcomes: new Map<string, OutcomeSnapshot>(),
     markets: new Map<string, MarketState>(),
     rawPriceMoves: [],
@@ -186,7 +189,7 @@ function gameMeta(game: OddsApiGame, sportKey: SurfSportKey): MarketHorizonEvent
 
 function extractOutcomes(game: OddsApiGame, sportKey: SurfSportKey, now: number): OutcomeSnapshot[] {
   const snapshots: OutcomeSnapshot[] = [];
-  for (const bookmaker of game.bookmakers ?? []) {
+  for (const bookmaker of filterSurfBookmakers(game.bookmakers)) {
     for (const market of bookmaker.markets ?? []) {
       if (market.key !== "spreads" && market.key !== "totals") continue;
       const rawProviderUpdatedAt = market.last_update ?? bookmaker.last_update;
@@ -360,6 +363,14 @@ function asPublicEvent(event: StoredHorizonEvent): MarketHorizonEvent {
 }
 
 function cleanup(store: MarketHorizonStore, now: number): void {
+  if (store.bookmakerPoolKey !== SURF_BOOKMAKER_POOL_KEY) {
+    // Only reset derived live state; leave persisted market observations intact.
+    store.latestOutcomes.clear();
+    store.markets.clear();
+    store.rawPriceMoves = [];
+    store.events.clear();
+    store.bookmakerPoolKey = SURF_BOOKMAKER_POOL_KEY;
+  }
   for (const [key, outcome] of store.latestOutcomes.entries()) {
     if (now - outcome.observedAt > STORE_TTL_MS) store.latestOutcomes.delete(key);
   }

@@ -1,6 +1,7 @@
 import { getTeamAbbrev } from "../teamAbbrevs";
 import { getSurfSportConfig, type SurfSportKey } from "./sports";
 import type { GamePredictionMarketConsensus, OddsApiGame, SignalCard } from "./types";
+import { whaleActivityStrength } from "./whaleStrength";
 import {
   aggregateKalshiWhaleBuys,
   aggregatePolymarketWhaleBuys,
@@ -340,14 +341,6 @@ function money(value: number): string {
   return `$${Math.round(absolute).toLocaleString("en-US")}`;
 }
 
-function activityStrength(activity: NormalizedWhaleActivity, thresholdUsd: number): number {
-  const sizeMultiple = Math.max(1, activity.committedUsd / thresholdUsd);
-  const sizeScore = Math.min(30, Math.log2(sizeMultiple) * 12);
-  const impactScore = Math.min(12, Math.max(0, activity.priceImpactPercentagePoints ?? 0) * 3);
-  const traceabilityScore = activity.isAnonymous ? 0 : 5;
-  return Math.round(Math.min(100, 58 + sizeScore + impactScore + traceabilityScore));
-}
-
 function activityVerb(activity: NormalizedWhaleActivity): string {
   if (activity.activityKind === "wallet_buy") return "bought";
   if (activity.activityKind === "buying_burst") return "buying burst on";
@@ -364,6 +357,7 @@ function activityCards(
     .map((activity): SignalCard => {
       const teamLabel = getTeamAbbrev(activity.outcomeTeam) ?? activity.outcomeTeam;
       const cents = Math.round(activity.averagePrice * 100);
+      const strengthScore = whaleActivityStrength(activity, thresholdUsd);
       const venueDetail = activity.participantLabel
         ? `${activity.venueLabel} wallet ${activity.participantLabel}`
         : activity.activityKind === "buying_burst"
@@ -385,7 +379,8 @@ function activityCards(
         detail: `${venueDetail} · ${activity.tradeCount} ${activity.tradeCount === 1 ? "fill" : "fills"} near ${cents}¢`,
         insight: "Large activity, not a prediction.",
         commenceTime: activity.game.commence_time,
-        strengthScore: activityStrength(activity, thresholdUsd),
+        strengthScore,
+        isTopSignal: strengthScore >= 80,
         detectedAt: activity.occurredAt,
         signalChangedAt: activity.occurredAt,
         lastMovedAt: activity.occurredAt,

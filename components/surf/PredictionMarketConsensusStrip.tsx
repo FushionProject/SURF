@@ -1,39 +1,6 @@
 import type { SurfLeague } from "@/lib/surf/sports";
-import type { GamePredictionMarketConsensus, PredictionMarketConsensusSource } from "@/lib/surf/types";
+import type { GamePredictionMarketConsensus } from "@/lib/surf/types";
 import { getTeamAbbrev } from "@/lib/teamAbbrevs";
-
-function TeamActivity({ source }: { source: PredictionMarketConsensusSource }) {
-  const sample = source.largeTradeActivity;
-  const unavailable = !sample || sample.coverage === "unavailable";
-  const threshold = sample ? `$${(sample.minimumActivityUsd / 1000).toLocaleString("en-US")}K+` : "$10K+";
-  const team = sample?.leaderTeam ? getTeamAbbrev(sample.leaderTeam) ?? sample.leaderTeam : undefined;
-  const description = unavailable
-    ? "Trade sample unavailable"
-    : sample.activityCount === 0
-      ? `No ${threshold} activity in sample`
-      : sample.tied
-        ? "Even in observed activity"
-        : team;
-
-  return (
-    <div className="flex min-w-0 flex-col gap-1 border-t border-[color:var(--surf-line-10)] py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-      <span className="text-sm text-[color:var(--surf-ink-55)]">{source.label}</span>
-      <div className="min-w-0 sm:text-right">
-        <div className={`break-words text-sm font-semibold ${team ? "text-[color:var(--surf-primary)]" : "text-[color:var(--surf-ink-60)]"}`}>
-          {description}
-        </div>
-        {!unavailable && sample.activityCount > 0 ? (
-          <div className="mt-0.5 text-xs text-[color:var(--surf-ink-40)]">
-            {sample.tied ? "Equal tracked value" : "More tracked value"} · {threshold} trades / bursts
-          </div>
-        ) : null}
-        {sample?.coverage === "partial" ? (
-          <div className="mt-0.5 text-xs text-amber-300">Partial trade coverage</div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
 
 export function PredictionMarketConsensusStrip({
   consensus,
@@ -69,11 +36,6 @@ export function PredictionMarketConsensusStrip({
         ))}
       </div>
 
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span className="text-sm font-semibold text-[color:var(--surf-ink-80)]">Large-trade direction</span>
-        <span className="text-xs text-[color:var(--surf-ink-40)]">Observed sample · past 24 hours</span>
-      </div>
-      {consensus.sources.map((source) => <TeamActivity key={source.venue} source={source} />)}
       {Number.isFinite(observedAt.getTime()) ? (
         <p className="pb-3 text-xs leading-relaxed text-[color:var(--surf-ink-40)]">
           As of <time dateTime={observedAt.toISOString()}>{observedAt.toLocaleString(undefined, {

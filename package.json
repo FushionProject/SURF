@@ -17,14 +17,31 @@
     "test:market-horizon": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-market-horizon.mjs",
     "test:opportunities": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-opportunities.mjs",
     "test:bookmakers": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-bookmakers.mjs",
+    "test:sportsbook-links": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-sportsbook-links.mjs",
     "test:prediction-markets": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-prediction-markets.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-prediction-snapshot.mjs",
     "test:market-clarity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-game-filters.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-team-logos.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-market-movement.mjs",
     "test:feed-schedule": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-feed-schedule.mjs",
     "test:signal-feed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-signal-feed.mjs",
+    "test:dynamic-ratings": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-dynamic-ratings.mjs",
+    "test:signal-readability": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-signal-meaning.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-signal-links.mjs && node scripts/verify-preview-ui.mjs",
+    "test:layout-parity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-editorial-board.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-signal-presentation.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-game-market-read.mjs",
     "test:sport-gating": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-sport-gating.mjs",
     "test:cfb": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-cfb.mjs",
     "test:cfb-postgres": "node scripts/verify-cfb-postgres.mjs",
-    "test:auth-redirect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-auth-redirect.mjs"
+    "test:auth-redirect": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-auth-redirect.mjs",
+    "test:billing": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-billing.mjs && node scripts/verify-billing-postgres.mjs",
+    "test:paid-access": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-paid-access.mjs",
+    "test:production-access": "node scripts/verify-production-access.mjs",
+    "test:release": "node scripts/run-release-regressions.mjs",
+    "test:spot-stats:preview": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-local-preview.mjs",
+    "test:spot-stats:preview:http": "node scripts/verify-spot-stats-preview-http.mjs",
+    "test:spot-stats:feed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-feed.mjs",
+    "stats:import:nflverse": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/import-nflverse-research.mjs",
+    "stats:import:api-sports": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/import-api-sports-research.mjs",
+    "stats:research:api-sports": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/query-api-sports-research.mjs",
+    "test:spot-stats:api-sports": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-api-sports.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-api-sports-research.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-api-sports-store.mjs",
+    "test:spot-stats:nflverse": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-nflverse.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-research.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-nflverse-store.mjs",
+    "test:spot-stats": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-provider.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-engine.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-store.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",
@@ -32,7 +49,8 @@
     "next": "16.3.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "stripe": "22.6.1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

@@ -3,26 +3,28 @@
 import Link from "next/link";
 import {
   GameDataPanels,
-  SignalEvidence,
   type FullGameData,
 } from "./DataPanels";
-import { WhaleTrackingStatus } from "@/components/surf/WhaleTrackingStatus";
+import { EditorialSignal } from "./EditorialSignal";
+import { SportsbookGameLink } from "./SportsbookGameLink";
+import { SportsbookLinkPreferences, SportsbookStateSelect } from "./SportsbookLinkPreferences";
+import { upcomingGames, upcomingSignals, matchesEditorialGame, matchesEditorialSignal, countNewSignals, nextEditorialRefreshDelay } from "@/lib/surf/editorialBoard";
 import { OvernightMoves } from "@/components/surf/OvernightMoves";
-import { filterSignalFeed, type SignalFeedFilter } from "@/lib/surf/signalFeed";
+import { filterSignalFeed } from "@/lib/surf/signalFeed";
+import { isTopRatedSignal } from "@/lib/surf/marketSignalStrength";
+import { signalAnchorId, signalHref, signalIdFromHash } from "@/lib/surf/signalLinks";
 import {
   cfbRankForTeam,
   isTop25Game,
-  matchesGameSearch,
   type CfbRankings,
 } from "@/lib/surf/cfbRankings";
 import {
-  nextRefreshDelayMs,
   refreshScheduleLabel,
 } from "@/lib/surf/feedSchedule";
 import type { PredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
 import type { OvernightMarketSummary } from "@/lib/surf/types";
 import { ThemeControl } from "./ThemeControl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import {
   SURF_VISIBLE_SPORTS,
@@ -32,6 +34,7 @@ import {
 import {
   buildGameOfferBoard,
   type BestMarketOffer,
+  type MarketOpportunity,
 } from "@/lib/surf/opportunities";
 import type {
   OddsApiGame,
@@ -177,20 +180,10 @@ export function Icon({
 export function Brand() {
   return (
     <Link href="/games" className="bn-brand" aria-label="Surf home">
-      <svg
-        className="bn-surf-mark"
-        width="38"
-        height="30"
-        viewBox="0 0 38 30"
-        aria-hidden="true"
-      >
-        <path
-          d="M2 11c6-10 11 10 17 0s11 10 17 0M2 21c6-10 11 10 17 0s11 10 17 0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-        />
-      </svg>
+      <span className="bn-logo-frame" aria-hidden="true">
+        {/* A luminance mask removes black without redrawing the supplied mark. */}
+        <span className="bn-logo-mark" />
+      </span>
       SURF
     </Link>
   );
@@ -202,15 +195,16 @@ const kickoff = (iso: string) =>
     hour: "numeric",
     minute: "2-digit",
   });
-function TeamLogo({ name, sport }: { name: string; sport: SurfSportKey }) {
-  const [failed, setFailed] = useState(false);
-  const logo = getTeamLogo(name, getSurfSportConfig(sport).league);
+function TeamLogo({ name, sport, providerLogo }: { name: string; sport: SurfSportKey; providerLogo?: string }) {
+  const [failedLogos, setFailedLogos] = useState<string[]>([]);
+  const mapped = getTeamLogo(name, getSurfSportConfig(sport).league);
+  const logo = [mapped, providerLogo].find((candidate): candidate is string => Boolean(candidate) && !failedLogos.includes(candidate!));
   return (
     <span className="bn-team-logo">
-      {logo && !failed ? (
+      {logo ? (
         // Provider logo URLs are already sized; keep their local error fallback.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={logo} alt="" loading="lazy" onError={() => setFailed(true)} />
+        <img src={logo} alt="" loading="lazy" onError={() => setFailedLogos((current) => [...current, logo])} />
       ) : (
         name.slice(0, 2).toUpperCase()
       )}
@@ -219,12 +213,16 @@ function TeamLogo({ name, sport }: { name: string; sport: SurfSportKey }) {
 }
 function Offer({
   offer,
+  game,
   market,
   side,
+  opportunity,
 }: {
   offer?: BestMarketOffer;
+  game: OddsApiGame;
   market: Market;
   side: number;
+  opportunity?: MarketOpportunity;
 }) {
   const value =
     market === "h2h"
@@ -239,8 +237,17 @@ function Offer({
         {market !== "h2h" && offer?.price != null
           ? `${price(offer.price)} · `
           : ""}
-        {offer?.bookTitle ?? "No quote"}
+        {offer?.bookTitle ? <SportsbookGameLink game={game} book={offer.bookTitle} /> : "No quote"}
       </small>
+      {offer && <small className="bn-offer-midpoint">
+        {market === "h2h" ? `Median ${price(offer.consensusPrice)}` : `Midpoint ${market === "spreads" ? price(offer.consensusPoint) : offer.consensusPoint ?? "—"}`} · {offer.booksCompared} books
+      </small>}
+      {opportunity && <span className="bn-offer-edge">
+        {opportunity.kind === "key_number" ? `Key ${opportunity.keyNumber}`
+          : opportunity.kind === "arbitrage" ? "Arbitrage"
+          : opportunity.kind === "favorite_split" ? "Favorite split"
+          : opportunity.lineEdge > 0 ? `${opportunity.lineEdge} pt better` : "Better price"}
+      </span>}
     </div>
   );
 }
@@ -276,7 +283,7 @@ function GameCard({
       : market === "h2h"
         ? [board.offers.awayMoneyline, board.offers.homeMoneyline]
         : [board.offers.over, board.offers.under];
-  const opportunity = board.opportunities.find((o) => o.market === market);
+  const opportunity = board.opportunities[0];
   return (
     <article className={`bn-game ${open ? "bn-game-open" : ""}`}>
       <div className="bn-game-meta">
@@ -297,7 +304,7 @@ function GameCard({
       <div className="bn-matchup">
         {[game.away_team, game.home_team].map((name, i) => (
           <div className="bn-team-row" key={name}>
-            <TeamLogo name={name} sport={sport} />
+            <TeamLogo name={name} sport={sport} providerLogo={fullData.cfbContext?.teams[name]?.logo ?? undefined} />
             <div className="bn-team-name">
               <small>{i ? "HOME" : "AWAY"}</small>
               <h3>
@@ -307,8 +314,10 @@ function GameCard({
                   : ""}
                 {name}
               </h3>
+              {sport === "americanfootball_ncaaf" && <span className="bn-team-record">{fullData.cfbContext?.teams[name]?.record ?? "Record unavailable"}</span>}
             </div>
-            <Offer offer={offers[i]} market={market} side={i} />
+            <Offer offer={offers[i]} game={game} market={market} side={i}
+              opportunity={board.opportunities.find((o) => o.slot === offers[i]?.slot)} />
           </div>
         ))}
       </div>
@@ -316,17 +325,14 @@ function GameCard({
         <span className={opportunity ? "bn-tag" : "bn-tag bn-tag-neutral"}>
           {opportunity ? "Worth a closer look" : "On the board"}
         </span>
-        <span>{board.booksInSample} books</span>
+        <span>{board.lastUpdatedAt ? `Quotes updated ${new Date(board.lastUpdatedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}` : "Quote update time unavailable"}</span>
       </div>
-      {opportunity && (
-        <p className="bn-opportunity-copy">{opportunity.reason}</p>
-      )}
       <button
         className="bn-compare"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        {open ? "Close market detail" : "Compare the market"}
+        {open ? "Hide sportsbook quotes" : "Compare all sportsbook quotes"}
         <span>{open ? "−" : "↗"}</span>
       </button>
       {open && (
@@ -349,7 +355,7 @@ function GameCard({
                   if (!outcomes?.length) return null;
                   return (
                     <tr key={book.key}>
-                      <td>{book.title}</td>
+                      <td><SportsbookGameLink game={game} book={book.title} /></td>
                       {[
                         market === "totals" ? "Over" : game.away_team,
                         market === "totals" ? "Under" : game.home_team,
@@ -369,104 +375,24 @@ function GameCard({
               </tbody>
             </table>
           </div>
-          <GameDataPanels
-            game={game}
-            sport={sport}
-            data={fullData}
-            consensus={consensus}
-            observedAt={observedAt}
-          />
           <p className="bn-fine">
-            {consensus
-              ? `${consensus.sources.length} prediction ${consensus.sources.length === 1 ? "venue" : "venues"} matched to this game.`
-              : "No verified prediction-market match."}{" "}
-            Quotes can change. A better price is not a prediction.
+            Best number first, then best price. Quotes can change. A better price is not a prediction.
           </p>
         </div>
       )}
-    </article>
-  );
-}
-function Signal({ signal, index }: { signal: SignalCard; index: number }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <article className="bn-signal">
-      <div className="bn-signal-top">
-        <span className="bn-signal-number">
-          {String(index + 1).padStart(2, "0")}
-        </span>
-        <span className="bn-tag">{signal.signalType}</span>
-      </div>
-      <h3>{signal.title}</h3>
-      {signal.isTopSignal && (
-        <span className="bn-tag">{signal.topBadge ?? "Top signal"}</span>
-      )}
-      <p className="bn-signal-matchup">
-        {signal.game.awayTeam} vs {signal.game.homeTeam} ·{" "}
-        {kickoff(signal.commenceTime)}
-      </p>
-      <p>{signal.insight || signal.detail}</p>
-      {signal.whaleActivity && (
-        <p className="bn-whale-amount">
-          {signal.whaleActivity.committedUsd.toLocaleString("en-US", {
-            style: "currency",
-            currency: "USD",
-            maximumFractionDigits: 0,
-          })}{" "}
-          committed · {signal.whaleActivity.venueLabel}
-        </p>
-      )}
-      <div
-        className="bn-strength"
-        title="Market relevance and magnitude, not pick confidence"
-      >
-        <span>Market relevance</span>
-        <div>
-          <i
-            style={{
-              width: `${Math.min(100, Math.max(0, signal.strengthScore ?? 0))}%`,
-            }}
-          />
-        </div>
-        <b>
-          {signal.strengthScore != null
-            ? `${Math.round(signal.strengthScore)}/100`
-            : "—"}
-        </b>
-      </div>
-      <button
-        className="bn-text-button"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        {open ? "Less detail −" : "Read the evidence +"}
-      </button>
-      {open && (
-        <div className="bn-signal-evidence">
-          <p>{signal.detail}</p>
-          <SignalEvidence signal={signal} />
-          <p>
-            {signal.game.awayTeam} vs {signal.game.homeTeam} ·{" "}
-            {kickoff(signal.commenceTime)}
-          </p>
-          {signal.whaleActivity?.sourceUrl && (
-            <a
-              href={signal.whaleActivity.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View original market ↗
-            </a>
-          )}
-        </div>
-      )}
+      <GameDataPanels game={game} sport={sport} data={fullData} consensus={consensus} observedAt={observedAt} board={board} />
     </article>
   );
 }
 
 export default function SurfEditorial({ view = "markets" }: { view?: View }) {
+  return <SportsbookLinkPreferences><SurfEditorialContent view={view} /></SportsbookLinkPreferences>;
+}
+
+function SurfEditorialContent({ view = "markets" }: { view?: View }) {
   const { sport, sportSynced, selectSport } = useSurfSport();
-  const [data, setData] = useState<Snapshot>();
+  const [snapshotData, setData] = useState<Snapshot>();
+  const data = (snapshotData?.games?.sportKey ?? snapshotData?.feed?.sportKey) === sport ? snapshotData : undefined;
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
@@ -474,16 +400,41 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
   const [market, setMarket] = useState<Market>("spreads");
   const [saved, setSaved] = useState<string[]>([]);
   const [sort, setSort] = useState("time");
-  const [feedFilter, setFeedFilter] = useState<SignalFeedFilter>("all");
   const [top25, setTop25] = useState(false);
   const [topSignals, setTopSignals] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [linkedSignal, setLinkedSignal] = useState<{ id: string | null; request: number }>({ id: null, request: 0 });
+  const lastScrolledLink = useRef(-1);
+  const [clock, setClock] = useState(0);
+  const [lastVisitAt, setLastVisitAt] = useState<number | null>(null);
+  const visitRecorded = useRef(false);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (new URLSearchParams(window.location.search).get("type") === "whales")
-        setFeedFilter("whales");
-    }, 0);
-    return () => clearTimeout(timer);
+    if (view !== "signals") return;
+    function readLink() {
+      const id = signalIdFromHash(window.location.hash);
+      setLinkedSignal((previous) => ({ id, request: previous.request + 1 }));
+      if (id) {
+        setSearch("");
+        setTopSignals(false);
+      }
+    }
+    const timer = window.setTimeout(readLink, 0);
+    window.addEventListener("hashchange", readLink);
+    window.addEventListener("popstate", readLink);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("hashchange", readLink);
+      window.removeEventListener("popstate", readLink);
+    };
+  }, [view]);
+  useEffect(() => {
+    // Old whale-only links should open the unified current feed, not a hidden filter.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("type")) {
+      url.searchParams.delete("type");
+      window.history.replaceState(null, "", url.toString());
+    }
+    const timer = window.setInterval(() => setClock(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -507,7 +458,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
         setLoading(true);
         setError("");
         setData((current) =>
-          current?.games?.sportKey === sport ? current : undefined,
+          (current?.games?.sportKey ?? current?.feed?.sportKey) === sport ? current : undefined,
         );
       }
     });
@@ -527,20 +478,36 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
     };
   }, [sport, sportSynced, refresh]);
   useEffect(() => {
-    if (!data || !autoRefresh || loading) return;
+    if (!sportSynced || loading) return;
     const future =
-      data.games?.games
+      data?.games?.games
         .map((g) => Date.parse(g.commence_time))
         .filter((t) => t > Date.now()) ?? [];
     const nextGame =
-      data.feed?.nextGameAt ??
+      data?.feed?.nextGameAt ??
       (future.length ? Math.min(...future) : undefined);
     const timer = setTimeout(
       () => setRefresh((v) => v + 1),
-      nextRefreshDelayMs(Date.now(), nextGame),
+      nextEditorialRefreshDelay(Date.now(), nextGame, Boolean(data)),
     );
     return () => clearTimeout(timer);
-  }, [data, autoRefresh, loading]);
+  }, [data, loading, sportSynced, sport, refresh]);
+  useEffect(() => {
+    if (view !== "signals" || !data?.feed || visitRecorded.current) return;
+    visitRecorded.current = true;
+    let previous = 0;
+    try {
+      previous = Number(window.localStorage.getItem("surf:lastFeedVisitAt"));
+      window.localStorage.setItem("surf:lastFeedVisitAt", String(Date.now()));
+    } catch { /* Storage may be disabled; the live feed must still work. */ }
+    const timer = window.setTimeout(() => {
+      if (Number.isFinite(previous) && previous > 0) setLastVisitAt(previous);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [data, view]);
+  const now = Math.max(clock, data?.fetchedAt ?? 0);
+  const currentGames = useMemo(() => upcomingGames(data?.games?.games ?? [], now), [data, now]);
+  const currentSignals = useMemo(() => filterSignalFeed(upcomingSignals(data?.signals ?? [], now), "all"), [data, now]);
   function toggleSave(id: string) {
     setSaved((current) => {
       const next = current.includes(id)
@@ -554,11 +521,11 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
   }
   const games = useMemo(
     () =>
-      (data?.games?.games ?? [])
+      currentGames
         .filter(
           (g) =>
             (view !== "saved" || saved.includes(`${sport}:${g.id}`)) &&
-            matchesGameSearch(g, search) &&
+            matchesEditorialGame(g, search) &&
             (sport !== "americanfootball_ncaaf" ||
               !top25 ||
               data?.rankings?.status !== "available" ||
@@ -569,22 +536,49 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
             ? (b.bookmakers?.length ?? 0) - (a.bookmakers?.length ?? 0)
             : Date.parse(a.commence_time) - Date.parse(b.commence_time),
         ),
-    [data, search, view, saved, sport, sort, top25],
+    [currentGames, data, search, view, saved, sport, sort, top25],
   );
-  const signals = filterSignalFeed(data?.signals ?? [], feedFilter)
-    .filter((s) => !topSignals || s.isTopSignal)
+  const signals = currentSignals
+    .filter((s) => !topSignals || isTopRatedSignal(s))
     .filter((s) =>
-      `${s.title} ${s.game.awayTeam} ${s.game.homeTeam}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+      matchesEditorialSignal(s, search),
     );
+  const linkedSignalExists = currentSignals.some((signal) => signal.id === linkedSignal.id);
+  const linkedSignalVisible = signals.some((signal) => signal.id === linkedSignal.id);
+  const linkedSignalUnavailable = Boolean(view === "signals" && linkedSignal.id && data?.feed && !data.signalError && !loading && !linkedSignalExists);
+  useEffect(() => {
+    if (view !== "signals" || !linkedSignal.id || loading || !data?.feed || data.signalError || lastScrolledLink.current === linkedSignal.request) return;
+    if (linkedSignalExists && !linkedSignalVisible) return;
+    // A shared fragment may arrive before the asynchronous feed has mounted.
+    const frame = requestAnimationFrame(() => {
+      const element = document.getElementById(linkedSignalExists ? signalAnchorId(linkedSignal.id!) : "signal-link-unavailable");
+      if (!element) return;
+      element.scrollIntoView({ block: "start", behavior: "instant" });
+      element.focus({ preventScroll: true });
+      lastScrolledLink.current = linkedSignal.request;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [view, linkedSignal, loading, data, linkedSignalExists, linkedSignalVisible]);
+
+  function clearSignalLink() {
+    const url = new URL(window.location.href);
+    if (signalIdFromHash(url.hash)) {
+      url.hash = "";
+      window.history.replaceState(null, "", url.toString());
+    }
+    setLinkedSignal((previous) => ({ id: null, request: previous.request + 1 }));
+  }
   const books = new Set(
-    data?.games?.games.flatMap((g) => g.bookmakers?.map((b) => b.key) ?? []),
+    currentGames.flatMap((g) => g.bookmakers?.map((b) => b.key) ?? []),
   );
+  const newSignals = countNewSignals(signals, lastVisitAt);
   const league = getSurfSportConfig(sport).label;
   const nav = [
     { id: "markets", href: "/games", label: "Market board", icon: "grid" },
     { id: "signals", href: "/feed", label: "The signals", icon: "pulse" },
+    ...(process.env.NODE_ENV === "development"
+      ? [{ id: "stats", href: "/stats/research", label: "Spot Stats", icon: "grid" } as const]
+      : []),
     { id: "saved", href: "/top", label: "My watchlist", icon: "save" },
   ] as const;
   return (
@@ -597,6 +591,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
               <Link
                 key={item.id}
                 href={`${item.href}?sport=${sport}`}
+                prefetch={item.id === "stats" ? false : undefined}
                 aria-current={view === item.id ? "page" : undefined}
               >
                 {item.label}
@@ -605,6 +600,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 )}
               </Link>
             ))}
+            <Link href="/how-to-use">How to use Surf</Link>
           </nav>
           <ThemeControl />
           <Link href="/account" className="bn-account-link">
@@ -658,7 +654,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 <span>01—03</span>
               </div>
               <div className="bn-waves">
-                {[0, 1, 2].map((layer) => (
+                {[0, 1, 2, 3].map((layer) => (
                   <svg
                     key={layer}
                     className={`bn-wave bn-wave-${layer}`}
@@ -667,27 +663,21 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                     focusable="false"
                   >
                     <path
-                      d="M0 120 C100 40 200 40 300 120 S500 200 600 120 S800 40 900 120 S1100 200 1200 120"
+                      d="M0 120 C100 90 200 90 300 120 S500 150 600 120 S800 90 900 120 S1100 150 1200 120"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
                       vectorEffect="non-scaling-stroke"
-                    />
-                    <path
-                      d="M0 120 C100 40 200 40 300 120 S500 200 600 120 S800 40 900 120 S1100 200 1200 120 V240 H0 Z"
-                      fill="currentColor"
-                      opacity="0.06"
                     />
                   </svg>
                 ))}
               </div>
               <div className="bn-art-bottom">
                 <span>
-                  ALL SIDES.
+                  SEE HOW THE
                   <br />
-                  ONE PLACE.
+                  MARKET FLOWS.
                 </span>
-                <span className="bn-art-bars" />
               </div>
             </div>
           </section>
@@ -695,7 +685,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
             <div>
               <span>01 / MATCHUPS</span>
               <strong>
-                {data?.games?.games.length ?? "—"}
+                {data?.games ? currentGames.length : "—"}
                 <small>upcoming games</small>
               </strong>
             </div>
@@ -709,7 +699,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
             <div>
               <span>03 / SIGNALS</span>
               <strong>
-                {data && !data.signalError ? data.signals.length : "—"}
+                {data && !data.signalError ? currentSignals.length : "—"}
                 <small>market signals</small>
               </strong>
             </div>
@@ -718,30 +708,15 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 {loading
                   ? "Checking the market…"
                   : data
-                    ? `Checked ${new Date(data.fetchedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+                    ? `Board checked ${new Date(data.fetchedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZoneName: "short" })}`
                     : "Waiting for data"}
               </span>
-              <label className="bn-auto-refresh">
-                <input
-                  type="checkbox"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                />{" "}
-                Auto refresh
-              </label>
-              <button
-                onClick={() => setRefresh((v) => v + 1)}
-                disabled={loading}
-              >
-                <Icon name="refresh" size={15} />
-                Refresh board
-              </button>
+              <span className="bn-system-refresh"><span className="bn-dot" /> Updates managed by Surf</span>
             </div>
           </section>
           <div className="bn-data-status">
             <span>
-              {autoRefresh
-                ? !data
+              {!data
                   ? "Automatic refresh when data is ready"
                   : refreshScheduleLabel(
                       data?.fetchedAt ?? 0,
@@ -756,8 +731,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                           },
                           undefined,
                         ),
-                    )
-                : "Manual refresh"}
+                    )} · CT schedule
             </span>
             <Link href="/how-to-use">How to read Surf ↗</Link>
           </div>
@@ -767,7 +741,6 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 summary={data?.feed?.overnight}
                 sportKey={sport}
               />
-              <WhaleTrackingStatus coverage={data?.feed?.activityCoverage} />
             </div>
           )}
           {(data?.games?.dataSource ||
@@ -812,7 +785,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                     <button
                       key={s.key}
                       aria-pressed={sport === s.key}
-                      onClick={() => selectSport(s.key)}
+                      onClick={() => { clearSignalLink(); selectSport(s.key); }}
                     >
                       {s.label === "CFB" ? "College football" : s.label}
                     </button>
@@ -828,6 +801,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                   />
                 </label>
               </div>
+              <SportsbookStateSelect />
               {sport === "americanfootball_ncaaf" && view !== "signals" && (
                 <div className="bn-cfb-filter">
                   <label>
@@ -843,31 +817,17 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                     {data?.rankings?.status === "available"
                       ? (data.rankings.edition ?? "Current AP poll")
                       : "Rankings unavailable"}
+                    {data?.rankings?.status === "available" && <>
+                      {data.rankings.publishedAt ? ` · ${new Date(data.rankings.publishedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}
+                      {" · "}<a href={data.rankings.sourceUrl} target="_blank" rel="noreferrer">AP poll via ESPN ↗</a>
+                    </>}
                   </span>
                 </div>
               )}
-              {view === "signals" && (
-                <div className="bn-feed-filters" aria-label="Signal category">
-                  {(
-                    [
-                      ["all", "All signals"],
-                      ["whales", "Whale activity"],
-                      ["opportunities", "Market opportunities"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      aria-pressed={feedFilter === key}
-                      onClick={() => setFeedFilter(key)}
-                    >
-                      {label}
-                      <span>
-                        {filterSignalFeed(data?.signals ?? [], key).length}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {view === "signals" && !loading && <div className="bn-current-signals" role="status">
+                <span>{signals.length} current {signals.length === 1 ? "signal" : "signals"} · Sportsbooks and prediction markets</span>
+                {newSignals != null && newSignals > 0 && <strong>{newSignals} since your last visit</strong>}
+              </div>}
               {view === "signals" && (
                 <label className="bn-top-signals">
                   <input
@@ -878,12 +838,17 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                   Top signals only
                 </label>
               )}
+              {linkedSignalUnavailable && <div className="bn-notice bn-linked-signal-notice" id="signal-link-unavailable" role="status" tabIndex={-1}>
+                <strong>This signal is no longer in the current feed.</strong>
+                <p>It may have expired, the game may have started, or the opportunity may have changed. The latest signals are below.</p>
+                <a href="#market-board" onClick={clearSignalLink}>Browse current signals ↓</a>
+              </div>}
               {view !== "signals" && (
                 <div className="bn-market-controls">
                   <div className="bn-market-tabs" aria-label="Market type">
                     {(
                       [
-                        ["spreads", "Spread"],
+                        ["spreads", sport === "baseball_mlb" ? "Run line" : "Spread"],
                         ["h2h", "Moneyline"],
                         ["totals", "Total"],
                       ] as const
@@ -919,7 +884,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
               ) : view === "signals" ? (
                 <div className="bn-signal-grid">
                   {signals.map((s, i) => (
-                    <Signal key={s.id} signal={s} index={i} />
+                    <EditorialSignal key={s.id} signal={s} index={i} now={now} sport={sport} game={currentGames.find((game) => game.id === s.game.id)} />
                   ))}
                   {signals.length === 0 && (
                     <div className="bn-empty">
@@ -942,7 +907,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                       market={market}
                       saved={saved.includes(`${sport}:${game.id}`)}
                       onSave={() => toggleSave(`${sport}:${game.id}`)}
-                      observedAt={data?.fetchedAt ?? 0}
+                      observedAt={now}
                       fullData={data!.games!}
                       rankings={data?.rankings}
                       consensus={
@@ -986,18 +951,24 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 <p className="bn-rail-intro">
                   Three signals from across the market.
                 </p>
-                {(data?.signals ?? []).slice(0, 3).map((s, i) => (
+                {currentSignals.slice(0, 3).map((s, i) => (
                   <div key={s.id} className="bn-rail-signal">
                     <span>
                       0{i + 1} / {s.signalType}
                     </span>
-                    <h3>{s.title}</h3>
+                    <h3><a href={signalHref(s.id, sport)} onClick={(event) => {
+                      if (view !== "signals" || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                      setSearch("");
+                      setTopSignals(false);
+                      // Also handle clicking the same fragment again after filtering or scrolling.
+                      setLinkedSignal((previous) => ({ id: s.id, request: previous.request + 1 }));
+                    }}>{s.title}</a></h3>
                     <p>
                       {s.game.awayTeam} <i>vs</i> {s.game.homeTeam}
                     </p>
                   </div>
                 ))}
-                {!data?.signals.length && (
+                {!currentSignals.length && (
                   <p className="bn-rail-quiet">
                     {loading
                       ? "Listening to the market…"
@@ -1055,7 +1026,7 @@ export default function SurfEditorial({ view = "markets" }: { view?: View }) {
                 ? "Board"
                 : item.id === "signals"
                   ? "Signals"
-                  : "Watchlist"}
+                  : item.id === "stats" ? "Stats" : "Watchlist"}
             </span>
           </Link>
         ))}

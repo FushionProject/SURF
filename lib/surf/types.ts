@@ -9,6 +9,7 @@ export type OddsApiOutcome = {
 export type OddsApiMarket = {
   key: string;
   last_update?: string;
+  link?: string | null;
   outcomes?: OddsApiOutcome[];
 };
 
@@ -16,6 +17,7 @@ export type OddsApiBookmaker = {
   key: string;
   title: string;
   last_update?: string;
+  link?: string | null;
   markets?: OddsApiMarket[];
 };
 
@@ -248,6 +250,9 @@ export type MarketOpportunityEvidence = {
   kind: "arbitrage" | "best_line" | "best_price" | "key_number" | "favorite_split";
   isMiddle?: boolean;
   middleWidth?: number;
+  middleOutsideCostPercentage?: number;
+  middleWinningOutcomes?: number;
+  middleLegs?: Array<{ selection: string; bookTitle: string; point: number; price: number }>;
   score: number;
   reason: string;
   selection: string;

@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { paidAccessRequired } from "../lib/billing/access-policy.ts";
+assert.equal(paidAccessRequired({ NODE_ENV: "production" }), true);
+assert.equal(paidAccessRequired({ NODE_ENV: "production", SURF_PAID_ACCESS_ENFORCED: "false" }), true);
+assert.equal(paidAccessRequired({ NODE_ENV: "development" }), false);
+assert.equal(paidAccessRequired({ NODE_ENV: "development", SURF_PAID_ACCESS_ENFORCED: "true" }), true);
+const route = await readFile(new URL("../app/api/surf-feed/route.ts", import.meta.url), "utf8");
+const get = route.slice(route.indexOf("export async function GET(request"));
+assert.ok(get.indexOf('paidFeatureDenial("signals")') < get.indexOf("isSurfDemoMode()"));
+assert.match(get, /if \(denial\) return denial/);
+assert.match(get, /Cache-Control.*private, no-store/);
+console.log("Paid access policy and feed guard ordering passed (static contract; not live checkout).");
+const board = await readFile(new URL("../app/api/game-summaries/route.ts", import.meta.url), "utf8");
+assert.match(board, /predictionMarketWhaleSignals: paidAccessRequired\(\) \? \[\] : predictionMarketSnapshot.whaleSignals/);
+const proxy = await readFile(new URL("../proxy.ts", import.meta.url), "utf8");
+assert.ok(proxy.includes('"/feed"') && proxy.includes('"/api/surf-feed"'));

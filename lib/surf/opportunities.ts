@@ -1,5 +1,6 @@
 import type { SurfSportKey } from "./sports";
 import type { OddsApiGame, SurfOpportunityMarketType } from "./types";
+import { arbitrageStrength, favoriteSplitStrength, lineOpportunityStrength, priceOpportunityStrength } from "./opportunityStrength.ts";
 
 export type OfferSlot = "awayMoneyline" | "homeMoneyline" | "awaySpread" | "homeSpread" | "over" | "under";
 
@@ -71,6 +72,7 @@ export type MarketOpportunity = {
   score: number;
   reason: string;
   observedAt: number;
+  providerUpdatedAt?: number;
   favoriteSplit?: MoneylineFavoriteSplit;
   arbitrage?: MarketArbitrage;
 };
@@ -240,7 +242,7 @@ function buildArbitrageForMarket(
     price: best.first.price,
     lineEdge: 0,
     booksCompared,
-    score: Math.min(100, Math.round(92 + estimatedReturnPercentage * 2)),
+    score: arbitrageStrength({ estimatedReturnPercentage, booksCompared }),
     reason: `The best opposite ${marketLabel} prices combine to ${(combinedProbability * 100).toFixed(2)}% implied probability, leaving an estimated ${estimatedReturnPercentage.toFixed(2)}% theoretical return if both quotes can be filled.`,
     observedAt,
     arbitrage: {
@@ -446,7 +448,7 @@ function buildSlot(
       return { offer };
     }
 
-    const score = Math.min(100, Math.round(60 + Math.min(30, priceEdgePercentagePoints * 6)));
+    const score = priceOpportunityStrength({ price: best.price, priceEdgePercentagePoints, booksCompared });
     return {
       offer,
       opportunity: {
@@ -466,6 +468,7 @@ function buildSlot(
         score,
         reason: `This moneyline is about ${priceEdgePercentagePoints.toFixed(1)} implied-probability points cheaper than the market median. That is a line-shopping advantage, not a win-probability forecast.`,
         observedAt,
+        providerUpdatedAt: best.providerUpdatedAt,
       },
     };
   }
@@ -518,16 +521,22 @@ function buildSlot(
 
   if (!lineQualifies && !priceQualifies) return { offer };
   const kind: MarketOpportunityKind = keyNumber != null ? "key_number" : lineQualifies ? "best_line" : "best_price";
-  const score = Math.min(
-    sportKey === "americanfootball_ncaaf" && Math.abs(consensus) >= 28 && best.market === "spreads" ? 78 : 100,
-    Math.round(
-      kind === "key_number"
-        ? 86 + Math.min(8, lineEdge * 4)
-        : kind === "best_line"
-          ? 68 + Math.min(24, lineEdge * 12) - Math.round(pricePenaltyPp * 2)
-          : 60 + Math.min(30, (priceEdgePercentagePoints ?? 0) * 6),
-    ),
-  );
+  const isLargeCollegeSpread = sportKey === "americanfootball_ncaaf" &&
+    Math.abs(consensus) >= 28 && best.market === "spreads";
+  const score = kind === "best_price" && best.price != null
+    ? Math.min(isLargeCollegeSpread ? 78 : 100, priceOpportunityStrength({
+        price: best.price,
+        priceEdgePercentagePoints: priceEdgePercentagePoints ?? 0,
+        booksCompared: offer.booksCompared,
+      }))
+    : lineOpportunityStrength({
+        lineEdge,
+        keyNumber,
+        price: best.price,
+        pricePenaltyPercentagePoints: pricePenaltyPp,
+        booksCompared: offer.booksCompared,
+        isLargeCollegeSpread,
+      });
   const reason =
     kind === "key_number"
       ? `This improves on the market midpoint and crosses NFL key number ${keyNumber}.`
@@ -557,6 +566,7 @@ function buildSlot(
       score,
       reason,
       observedAt,
+      providerUpdatedAt: best.providerUpdatedAt,
     },
   };
 }
@@ -639,7 +649,12 @@ function buildFavoriteSplit(
     consensusPrice: undefined,
     lineEdge: 0,
     booksCompared,
-    score: Math.min(94, 84 + Math.min(10, booksCompared)),
+    score: favoriteSplitStrength({
+      awayMarginPercentagePoints: awayExample.margin * 100,
+      homeMarginPercentagePoints: homeExample.margin * 100,
+      awayBooks: awayFavorites.length,
+      homeBooks: homeFavorites.length,
+    }),
     reason: `${awayFavorites.length} books favor ${game.away_team}, while ${homeFavorites.length} favor ${game.home_team}. This is a current cross-book split, not evidence that either side just moved.`,
     observedAt,
     favoriteSplit,

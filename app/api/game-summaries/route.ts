@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 
 import type { GamePredictionMarketConsensus, OddsApiGame, SignalCard, SurfSignalDetection } from "@/lib/surf/types";
 import { detectSurfSignals } from "@/lib/surf/signals";
+import { paidAccessRequired } from "@/lib/billing/access-policy";
 import { getNbaOddsSnapshot } from "@/lib/surf/nbaOddsScheduler";
 import type { NbaRefreshMode } from "@/lib/surf/nbaOddsScheduler";
 import type { GameMarketContext } from "@/lib/surf/marketContext";
@@ -696,7 +697,8 @@ async function getLiveGameSummaries(request: Request) {
     coreBooksIncluded: [...includedBooks.entries()].map(([key, title]) => ({ key, title })),
     injuries,
     predictionMarketConsensus: predictionMarketSnapshot.consensusByGame,
-    predictionMarketWhaleSignals: predictionMarketSnapshot.whaleSignals,
+    // The free board keeps probabilities/quotes, never full paid whale cards.
+    predictionMarketWhaleSignals: paidAccessRequired() ? [] : predictionMarketSnapshot.whaleSignals,
   };
 
   if (isDebug) {
@@ -722,6 +724,9 @@ async function getLiveGameSummaries(request: Request) {
 }
 
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV === "production" && new URL(request.url).searchParams.has("debug")) {
+    return NextResponse.json({ error: "Debug access is unavailable." }, { status: 400, headers: { "Cache-Control": "private, no-store" } });
+  }
   if (isSurfDemoMode() && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
     return NextResponse.json(getDemoGameSummaries("demo"));
   }

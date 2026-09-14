@@ -23,8 +23,8 @@ const steps = [
     description: "Open Signals for qualifying price differences, middles, arbitrage quotes, and large prediction-market buys—not a card for every small change.",
   },
   {
-    title: "Read the evidence",
-    description: "Expand Evidence & method to see why a card qualified. Check its timestamp, then confirm the number, price, and rules at the venue.",
+    title: "Check the details",
+    description: "Each card shows the number, price, source, and timestamp. Confirm those details and the settlement rules at the venue before acting.",
   },
 ];
 
@@ -34,7 +34,8 @@ const definitions = [
     paragraphs: [
       "Best available compares the offers Surf currently tracks. The market midpoint is a reference from the books in that snapshot—not a prediction or the true value of a bet.",
       "Example—not live: +3.5 gives you an extra half-point versus +3 on the same team. But +3.5 at -130 costs more than +3 at -110. The number alone does not establish an edge.",
-      "Signal strength measures the card’s opportunity or activity evidence. It is not the probability a team wins, a confidence rating for a pick, or a promise of profit.",
+      "Signal relevance sets the feed’s priority. It weighs price and line advantages, middle width and both-leg costs, executed trade size, and confirmed movement. Longshot prices are given less priority; a larger payout alone does not make a stronger signal.",
+      "Strong signals score at least 80 on Surf’s relevance scale. Top signals only uses that same cutoff. This is a product ranking, not a measured win probability, a confidence rating for a pick, or a promise of profit.",
     ],
   },
   {
@@ -50,8 +51,8 @@ const definitions = [
       "Surf flags qualifying $10K+ buying activity in game-winner markets. A card can represent an individual large trade, a Polymarket wallet’s buys grouped within 90 seconds, or a Kalshi buying burst across nearby trades.",
       "Kalshi activity is anonymous. A burst is not proof that one person placed the entire amount. A Polymarket wallet is also not a verified person or proof of an informed bettor.",
       "The activity is an observed sample, not all trading volume or net positions. Check the venue, team, amount, and activity label—not just the headline.",
-      "Use the Whales filter to see this activity separately from sportsbook prices. Surf only shows activity for upcoming games; whale cards leave the feed when the game starts.",
-      "Surf checks on its market-refresh schedule, not continuously when nobody is using it. Public trade searches are bounded and incomplete scans are labeled. It does not claim to capture every fill, maker trade, or historical position.",
+      "Current whale activity appears alongside sportsbook opportunities in Signals. Surf only shows activity for upcoming games; whale cards leave the feed when the game starts.",
+      "Surf checks on its market-refresh schedule, not continuously when nobody is using it. Public trade searches are bounded. Surf does not claim to capture every fill, maker trade, or historical position.",
     ],
   },
   {
@@ -71,7 +72,7 @@ const definitions = [
   {
     title: "Prediction markets and injuries",
     paragraphs: [
-      "Kalshi and Polymarket percentages show market-implied win probability, not Surf’s forecast. Large-trade direction separately shows which team leads the qualifying observed buying activity; it is not the total market’s volume split.",
+      "Games shows Kalshi and Polymarket market-implied win probability, not Surf’s forecast. Qualifying large buys appear in Signals, separate from those probabilities; they are not the total market’s volume split.",
       "Injuries are matchup context. A listed injury does not establish why a price moved, and an unavailable report does not mean a team is injury-free.",
     ],
   },
@@ -86,7 +87,7 @@ const definitions = [
 
 export default function HowToUsePage() {
   return (
-    <div className="surf-bg min-h-full flex-1 bg-[color:var(--surf-base)]">
+    <div className="bn-app bn-secondary-page surf-bg min-h-full flex-1 bg-[color:var(--surf-base)]">
       <main className="surf-content surf-shell mx-auto w-full px-4 pb-28">
         <SurfAppHeader
           title="How to use Surf"

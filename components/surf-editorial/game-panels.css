@@ -1,0 +1,97 @@
+/* Detailed data belongs to the card, not inside its sportsbook comparison. */
+.bn-game .bn-data-panels {
+  margin: 0;
+  padding: 0 26px 22px;
+  gap: 0;
+  --surf-ink-70: var(--ed-muted);
+  --surf-ink-75: var(--ed-ink);
+  --surf-ink-80: var(--ed-ink);
+  --surf-ink-85: var(--ed-ink);
+  --surf-ink-90: var(--ed-ink);
+}
+.bn-market-read-panel {
+  border-top: 1px solid var(--ed-line);
+  padding: 22px 0;
+}
+.bn-market-read-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 15px;
+  color: var(--ed-blue-ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.bn-market-read-label small {
+  color: var(--ed-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.bn-market-read-panel h4 {
+  color: var(--ed-ink);
+  font-size: 21px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: -.5px;
+  margin: 12px 0 6px;
+  overflow-wrap: anywhere;
+}
+.bn-market-read-panel p {
+  color: var(--ed-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+}
+.bn-market-read-panel a {
+  display: inline-block;
+  color: var(--ed-blue-ink);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  margin-top: 12px;
+}
+.bn-game .bn-data-section {
+  border: 0;
+  border-top: 1px solid var(--ed-line);
+  padding: 20px 0;
+  background: transparent;
+}
+.bn-game .bn-data-section h4 { font-size: 15px; }
+.bn-game .bn-data-section > section { padding: 0; }
+.bn-game .bn-data-section p { font-size: 12px; }
+.bn-game .bn-data-section h5 { font-size: 14px; }
+.bn-game .bn-report-disclosure > summary {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.bn-game .bn-report-disclosure > summary small {
+  display: block;
+  font-size: 11px;
+  color: var(--ed-muted);
+  font-weight: 400;
+  margin-top: 3px;
+}
+.bn-game .bn-report-disclosure > summary::after {
+  font-size: 20px;
+  font-weight: 400;
+}
+.bn-game .bn-history-disclosure .bn-data-heading {
+  margin: 0 0 14px;
+  align-items: center;
+}
+.bn-game .bn-data-tabs button { font-size: 12px; padding: 8px 12px; }
+.bn-game .bn-injury { font-size: 12px; }
+.bn-game .bn-injury span { color: var(--ed-muted); }
+.bn-game .bn-whale-summary { font-size: 14px; }
+.bn-game .bn-team-reports { margin-top: 18px; }
+.bn-game .bn-data-section:last-child { padding-bottom: 0; }
+.bn-game .bn-data-panels .bg-white\/10 { background: var(--ed-line); }
+.bn-game .bn-data-panels .bg-black\/15 { background: var(--ed-soft); }
+@media (max-width: 600px) {
+  .bn-game .bn-data-panels { padding: 0 17px 18px; }
+  .bn-market-read-panel h4 { font-size: 20px; }
+  .bn-market-read-panel p { font-size: 13px; }
+}

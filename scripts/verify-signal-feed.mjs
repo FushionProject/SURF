@@ -5,7 +5,7 @@ const quote = { id: "quote", strengthScore: 100, detectedAt: 300 };
 const whale = { id: "whale", strengthScore: 58, whaleActivity: { occurredAt: 100 } };
 const latestWhale = { id: "latest", strengthScore: 58, whaleActivity: { occurredAt: 200 } };
 const cards = [quote, whale, latestWhale];
-assert.deepEqual(filterSignalFeed(cards, "all"), [latestWhale, whale, quote], "real whale activity is not buried under higher scored price cards");
+assert.deepEqual(filterSignalFeed(cards, "all"), [quote, latestWhale, whale], "all categories rank by relevance, with actual event time breaking ties");
 assert.deepEqual(filterSignalFeed(cards, "whales"), [latestWhale, whale], "Whales shows executed activity only");
 assert.deepEqual(filterSignalFeed(cards, "opportunities"), [quote]);
 assert.deepEqual(filterSignalFeed([quote], "whales"), [], "no quote is relabeled as a whale to fill an empty view");

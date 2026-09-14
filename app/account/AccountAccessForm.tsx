@@ -42,14 +42,14 @@ export function AccountAccessForm() {
         </h2>
         <p className="mt-2 text-sm leading-6 text-[color:var(--surf-ink-55)]">
           {mode === "sign-in"
-            ? "Sign in to keep your Surf experience connected across devices."
-            : "Create the identity that saved teams, alerts, and your plan will use."}
+            ? "Sign in to manage your Surf account and plan."
+            : "Create your Surf account. Games and Signals remain available without signing in."}
         </p>
       </div>
 
       <form action={mode === "sign-in" ? signInAction : signUpAction} className="space-y-4 p-5">
         <label className="block">
-          <span className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--surf-ink-40)]">
+          <span className="mb-2 block text-xs font-semibold text-[color:var(--surf-ink-55)]">
             Email
           </span>
           <input
@@ -62,13 +62,13 @@ export function AccountAccessForm() {
           />
         </label>
         <label className="block">
-          <span className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--surf-ink-40)]">
+          <span className="mb-2 block text-xs font-semibold text-[color:var(--surf-ink-55)]">
             Password
           </span>
           <input
             name="password"
             type="password"
-            minLength={8}
+            minLength={mode === "create" ? 8 : undefined}
             maxLength={128}
             autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
             required
