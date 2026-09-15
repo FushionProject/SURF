@@ -577,7 +577,7 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
     { id: "markets", href: "/games", label: "Market board", icon: "grid" },
     { id: "signals", href: "/feed", label: "The signals", icon: "pulse" },
     ...(process.env.NODE_ENV === "development"
-      ? [{ id: "stats", href: "/stats/research", label: "Spot Stats", icon: "grid" } as const]
+      ? [{ id: "stats", href: "/stats", label: "Spot Stats", icon: "grid" } as const]
       : []),
     { id: "saved", href: "/top", label: "My watchlist", icon: "save" },
   ] as const;
@@ -889,9 +889,9 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
                   {signals.length === 0 && (
                     <div className="bn-empty">
                       <Icon name="pulse" size={28} />
-                      <h3>A quiet market is still a read.</h3>
+                      <h3>{error || data?.signalError ? "Market activity unavailable." : "A quiet market is still a read."}</h3>
                       <p>
-                        {data?.signalError ??
+                        {error || data?.signalError ||
                           "No matching signals right now. Check another sport or come back after the market changes."}
                       </p>
                     </div>
@@ -922,14 +922,16 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
                         size={28}
                       />
                       <h3>
-                        {view === "saved"
+                        {error || data?.gameError
+                          ? "Game board unavailable."
+                          : view === "saved"
                           ? "Make this space yours."
                           : "No matchups found."}
                       </h3>
                       <p>
-                        {view === "saved"
+                        {error || data?.gameError || (view === "saved"
                           ? "Save a game from the market board. Upcoming saved games for this sport will appear here, on this device."
-                          : "Try another team or sport. We only show the games returned by the market."}
+                          : "Try another team or sport. We only show the games returned by the market.")}
                       </p>
                       {view === "saved" && (
                         <Link href={`/games?sport=${sport}`}>

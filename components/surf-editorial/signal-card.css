@@ -52,13 +52,7 @@
 .bn-card-execution dd { margin: 5px 0 0; font-size: 21px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .bn-card-flow-note { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 15px; margin-top: 12px; color: var(--ed-muted); font-size: 13px; line-height: 1.7; }
 .bn-card-flow-note a { color: var(--ed-blue-ink); font-weight: 500; white-space: nowrap; }
-.bn-card-share { display: flex; align-items: center; flex-wrap: wrap; gap: 0 14px; border-top: 1px solid var(--ed-line); margin-top: 22px; padding-top: 10px; }
-.bn-card-share button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--ed-blue-ink); font: inherit; font-size: 14px; cursor: pointer; }
-.bn-card-copy-status { font-size: 13px; color: var(--ed-secondary); }
-.bn-card-manual-link { flex-basis: 100%; min-width: 0; display: grid; gap: 10px; padding-bottom: 10px; }
-.bn-card-manual-link input { width: 100%; min-width: 0; border: 1px solid var(--ed-line); border-radius: 0; padding: 10px; color: var(--ed-ink); background: var(--ed-page); font: inherit; font-size: 16px; }
-.bn-card-manual-link a { color: var(--ed-blue-ink); font-size: 14px; padding: 6px 0; }
-.bn-card-share :is(button, input, a):focus-visible, .bn-rail-signal a:focus-visible { outline: 2px solid var(--ed-blue-ink); outline-offset: 4px; }
+.bn-rail-signal a:focus-visible { outline: 2px solid var(--ed-blue-ink); outline-offset: 4px; }
 .bn-rail-signal h3 a { color: inherit; text-decoration: none; }
 .bn-rail-signal h3 a:hover { color: var(--ed-blue-ink); text-decoration: underline; text-underline-offset: 4px; }
 .bn-linked-signal-notice { scroll-margin-top: 28px; }

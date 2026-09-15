@@ -87,7 +87,6 @@ export function GameDataPanels({
         <div className="bn-market-read-label"><span>Surf Market Read</span><small>Not a pick</small></div>
         <h4>{read.headline}</h4>
         <p>{read.detail}</p>
-        {read.sourceUrl ? <a href={read.sourceUrl} target="_blank" rel="noreferrer">View trade source ↗</a> : null}
       </section>
       <section className="bn-data-section">
         <h4>Prediction markets</h4>

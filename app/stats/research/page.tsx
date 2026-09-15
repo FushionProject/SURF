@@ -31,7 +31,7 @@ function TrendCard({ card }: { card: SpotCard }) {
       {card.totalSummary ? <ul>{card.rows.map(row => <li key={row.gameId}>{date(row.kickoffAt)} · {feedTeamName(row.team)} vs {feedTeamName(row.opponent)}: {row.totalScore} points / reference total {row.totalLine ?? "unavailable"} · {row.totalOutcome ?? "missing"}</li>)}</ul> : null}
       <div className={styles.tableWrap}><table><caption className={styles.srOnly}>Games behind {card.headline}</caption><thead><tr><th>Date</th><th>Team / opponent</th><th>Score</th><th>Spread</th><th>Result</th></tr></thead><tbody>{card.rows.map(row => <tr key={`${row.gameId}-${row.team}`}><td>{date(row.kickoffAt)}</td><td><strong>{feedTeamName(row.team)}</strong><br />vs {feedTeamName(row.opponent)}</td><td>{row.teamScore}–{row.opponentScore}</td><td>{signed(row.teamSpread)}</td><td>{row.su === "win" ? "Won" : row.su === "loss" ? "Lost" : "Tied"}<br /><span>{row.ats === "win" ? "Covered" : row.ats === "loss" ? "Did not cover" : row.ats === "push" ? "Pushed" : "No line"}</span></td></tr>)}</tbody></table></div>
     </details>
-    <div className={styles.cardFoot}><span>{card.smallSample ? "A small slice of history, not a prediction." : "Past results describe the spot—not the next result."}</span><a href={`?game=${encodeURIComponent(card.game.id)}#${card.id}`}>Link to stat ↗</a></div>
+    <div className={styles.cardFoot}><span>{card.smallSample ? "A small slice of history, not a prediction." : "Past results describe the spot—not the next result."}</span></div>
   </article>;
 }
 

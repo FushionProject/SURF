@@ -177,8 +177,9 @@ try {
   await kalshi.getByText("$25,000", { exact: true }).waitFor();
   await kalshi.getByText("50¢", { exact: true }).waitFor();
   const poly = signalCard("Offline polymarket executed purchase");
-  const polyLink = poly.getByRole("link", { name: /View market/ });
-  await assertLink(polyLink, "https://polymarket.com/event/offline-game");
+  assert.equal(await poly.locator('a[href*="polymarket.com"]').count(), 0, "Prediction-market activity stays informational, without trading links.");
+  assert.equal(await poly.getByRole("link", { name: /view.*(?:trade|market)/i }).count(), 0);
+  await poly.getByText("$25,000", { exact: true }).waitFor();
 
   const stateSelect = page.getByRole("combobox", { name: "Sportsbook state", exact: true });
   await stateSelect.selectOption("ny");

@@ -6,8 +6,7 @@ import { getTeamLogo } from "@/lib/teamLogos";
 import type { OddsApiGame, SignalCard } from "@/lib/surf/types";
 import { signalAdditionalQuotes, signalKindLabel, signalQuoteRows, signalStrength, signalRatingNote, signalTimestamp, signalTimingLabel, type SignalQuoteRow } from "@/lib/surf/signalPresentation";
 import { signalMeaning } from "@/lib/surf/signalMeaning";
-import { signalAnchorId, signalHref } from "@/lib/surf/signalLinks";
-import { SignalShareLink } from "./SignalShareLink";
+import { signalAnchorId } from "@/lib/surf/signalLinks";
 import { SportsbookGameLink } from "./SportsbookGameLink";
 import "./signal-card.css";
 
@@ -38,7 +37,7 @@ function QuoteRows({ rows, label, game }: { rows: SignalQuoteRow[]; label: strin
   </dl>;
 }
 
-export function EditorialSignal({ signal, index, now, sport, game }: { signal: SignalCard; index: number; now: number; sport: string; game?: OddsApiGame }) {
+export function EditorialSignal({ signal, index, now, game }: { signal: SignalCard; index: number; now: number; sport: string; game?: OddsApiGame }) {
   const titleId = useId();
   // Initial server/client markup agrees even when their time zones differ.
   const localReady = useSyncExternalStore(subscribe, clientSnapshot, serverSnapshot);
@@ -102,7 +101,6 @@ export function EditorialSignal({ signal, index, now, sport, game }: { signal: S
         <span>{whale.isAnonymous
           ? whale.activityKind === "buying_burst" ? "Anonymous buying burst · may include multiple traders" : "Anonymous public trade · trader identity unavailable"
           : `Wallet ${whale.participantLabel ?? "tracked"}`}</span>
-        {whale.venue !== "kalshi" && whale.sourceUrl && <a href={whale.sourceUrl} target="_blank" rel="noopener noreferrer">View market ↗</a>}
       </div>
     </> : <>
       <div className="bn-card-quote-label">{opportunity?.isMiddle || opportunity?.arbitrage ? "Both sides of the opportunity" : status}</div>
@@ -114,6 +112,5 @@ export function EditorialSignal({ signal, index, now, sport, game }: { signal: S
         : "A current price comparison, not evidence a book just moved."}</p>}
     </>}
 
-    <SignalShareLink href={signalHref(signal.id, sport)} />
   </article>;
 }
