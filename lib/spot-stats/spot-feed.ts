@@ -2,10 +2,21 @@ import { easternKickoff } from "./nflverse.ts";
 import { spotGamePerspective, type SpotAuditRow } from "./engine.ts";
 import type { SpotGame } from "./types.ts";
 
-export const FEED_FROM = 2010;
+export const FEED_FROM = 2020;
 export const FEED_THROUGH = 2025;
 export const SCHEDULE_MAX_AGE_DAYS = 7;
 const DAY = 86_400_000;
+/** Complete weekday cohort; never infer broadcast membership from kickoff hour. */
+export function scheduledWeekday(kickoff: string): string | null {
+  if (!Number.isFinite(Date.parse(kickoff))) return null;
+  const date = new Date(kickoff);
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "long" }).format(date);
+  return ["Thursday", "Friday", "Saturday", "Monday"].includes(day) ? `${day} games` : null;
+}
+// No time-of-day threshold or broadcast inference.
+export function hasWeekdayContext(kickoff: string): boolean {
+  return scheduledWeekday(kickoff) !== null;
+}
 type CsvRow = Record<string, string>;
 export type InternationalFixture = { gameId: string; country: string; sourceUrl: string };
 export type InternationalCoverage = {
@@ -61,6 +72,30 @@ export type SpotFeed = {
   season: number | null; week: number | null; seasonFrom: number; seasonThrough: number;
   notices: string[]; state: "ready" | "stale" | "empty";
 };
+
+/** Editorial redundancy rule, not a statistical test. Never merge sample counts. */
+export function suppressOverlappingSpots(cards: SpotCard[]): SpotCard[] {
+  const ranked = [...cards].sort((a, b) =>
+    Number(b.leadMetric === "ats" && b.prominence !== null) - Number(a.leadMetric === "ats" && a.prominence !== null)
+    || Number(b.prominence !== null) - Number(a.prominence !== null)
+    || b.sampleSize - a.sampleSize || a.order - b.order || a.id.localeCompare(b.id));
+  const kept: SpotCard[] = [];
+  for (const card of ranked) {
+    const venue = /\bRoad\b/i.test(card.category) ? "road" : /\bHome\b/i.test(card.category) ? "home" : null;
+    const duplicate = venue && !card.totalSummary && kept.some(prior => {
+      if (prior.totalSummary || prior.game.id !== card.game.id || prior.team !== card.team
+        || prior.headline.split(":")[0] !== card.headline.split(":")[0]
+        || !new RegExp(`\\b${venue}\\b`, "i").test(prior.category)) return false;
+      const a = new Set(card.rows.map(row => `${row.gameId}:${feedTeam(row.team)}`));
+      const b = new Set(prior.rows.map(row => `${row.gameId}:${feedTeam(row.team)}`));
+      const intersection = [...a].filter(key => b.has(key)).length;
+      return intersection / new Set([...a, ...b]).size >= 0.75;
+    });
+    if (!duplicate) kept.push(card);
+  }
+  const ids = new Set(kept.map(card => card.id));
+  return cards.filter(card => ids.has(card.id));
+}
 
 function uniqueRaw(records: CsvRow[]) {
   const groups = new Map<string, CsvRow[]>();
@@ -198,10 +233,22 @@ export function buildSpotFeed(input: {
       "after a loss by 14+ points", `The ${name} lost their previous regular-season game by at least 14 points. This is history in that situation, not a guaranteed bounce-back.`,
       coached.filter(item => afterHeavyLoss(feedTeam(item.row.team), item.row.season, item.row.week, item.row.kickoffAt)), 2, coachScope);
     const currentRaw = raw.get(game.id)!;
+    const night = scheduledWeekday(game.kickoffAt);
+    const evening = night !== null;
+    const nightExplanation = "Includes every regular-season start on this weekday, afternoon and evening, including holidays. Day is determined in Eastern time. This is a weekday record, not a verified primetime or TV-program record.";
+    const totalsExplanation = "Over/under grades the game's combined final points against its saved reference total, not a player prop or a prediction of today's total.";
+    if (coach && evening) {
+      const nights = coached.filter(item => hasWeekdayContext(item.row.kickoffAt));
+      const specific = nights.filter(item => scheduledWeekday(item.row.kickoffAt) === night);
+      add(game, team, "coach-night", `Coach · ${night}`, coach, `in ${night}`, nightExplanation, specific, 2, coachScope);
+      add(game, team, "coach-night-totals", `Coach · ${night} totals`, coach, `in ${night}`, `${nightExplanation} ${totalsExplanation}`, specific, 2, coachScope, true);
+    }
     const venueLabel = side === "home" ? "Home" : "Road";
     const venuePhrase = side === "home" ? "at home" : "on the road";
     // Only an explicitly non-neutral fixture establishes a home/road situation.
     if (currentRaw.location === "Home") {
+      if (coach) add(game, team, "coach-venue-totals", `Coach · ${venueLabel} totals`, coach, venuePhrase,
+        `${totalsExplanation} Only ${venuePhrase} games are included; neutral sites are excluded.`, coached.filter(item => item.row.venue === side), 3, coachScope, true);
       add(game, team, "team-venue", `${venueLabel} history`, name, venuePhrase,
         `The ${name} play ${venuePhrase} against the ${opponent}. This is their regular-season record in that setting, across coaching changes. Neutral-site games are excluded.`,
         teamRows.filter(item => item.row.venue === side), 4, `${scope} · Franchise history`);
@@ -213,9 +260,17 @@ export function buildSpotFeed(input: {
     if (qb) {
       const starts = history.filter(item => item.qb?.id === qb.id);
       // Never turn a populated future schedule field into a confirmed starter claim.
-      const subject = `Teams with ${qb.name} starting`;
+      const subject = qb.name;
       const qbScope = `${scope} · All teams with ${qb.name} starting`;
       const projection = `${qb.name} is the projected QB in the saved schedule for the ${name}; this spot applies only if he starts. These are team results, not individual passing statistics.`;
+      if (evening) {
+        const nights = starts.filter(item => hasWeekdayContext(item.row.kickoffAt));
+        const specific = nights.filter(item => scheduledWeekday(item.row.kickoffAt) === night);
+        add(game, team, "qb-night", `QB · ${night}`, subject, `in ${night}`, `${projection} ${nightExplanation}`, specific, 2, qbScope);
+        add(game, team, "qb-night-totals", `QB · ${night} totals`, subject, `in ${night}`, `${projection} ${nightExplanation} ${totalsExplanation}`, specific, 2, qbScope, true);
+      }
+      if (currentRaw.location === "Home") add(game, team, "qb-venue-totals", `QB · ${venueLabel} totals`, subject, venuePhrase,
+        `${projection} ${totalsExplanation} Neutral-site games are excluded.`, starts.filter(item => item.row.venue === side), 3, qbScope, true);
       if (currentRaw.location === "Home") add(game, team, "qb-venue", `QB · ${venueLabel}`, subject, venuePhrase,
         `${projection} Only games ${venuePhrase} are included; neutral-site games are excluded.`,
         starts.filter(item => item.row.venue === side), 3, qbScope);
@@ -276,7 +331,7 @@ export function buildSpotFeed(input: {
     if (game.international && coach && input.international && coach === input.international.coach && team === feedTeam(input.international.team)) {
       const coverage = input.international;
       const selected = coached.filter(item => feedTeam(item.row.team) === team && item.international && item.row.season >= coverage.seasonFrom && item.row.season <= coverage.seasonThrough);
-      const expected = coverage.fixtures.filter(item => Number(item.gameId.slice(0, 4)) >= coverage.seasonFrom && Number(item.gameId.slice(0, 4)) <= coverage.seasonThrough);
+      const expected = coverage.fixtures.filter(item => Number(item.gameId.slice(0, 4)) >= Math.max(FEED_FROM, coverage.seasonFrom) && Number(item.gameId.slice(0, 4)) <= Math.min(through, coverage.seasonThrough));
       const complete = selected.length === expected.length && expected.every(fixture => selected.some(item => item.row.gameId === fixture.gameId));
       if (complete) add(game, team, "international", "International game", coach, "in international games",
         `The ${name} face the ${opponent} in ${game.international.country}. These games were played outside the United States—not simply at a neutral venue.`,
@@ -301,6 +356,14 @@ export function buildSpotFeed(input: {
       prior.scope += ` · Also: ${card.scope}`;
     } else unique.set(`${key}:${card.id}`, card);
   }
-  result.cards = [...unique.values()];
+  const distinct = [...unique.values()].filter(card => {
+    if (!/-evening(?:-totals)?$/.test(card.id)) return true;
+    const specificId = card.id.replace(/-evening(?=-totals$|$)/, "-night");
+    const specific = result.cards.find(candidate => candidate.id === specificId);
+    // Identical evidence should not become two cards simply by changing the label.
+    return !specific || specific.rows.length !== card.rows.length
+      || specific.rows.some(row => !card.rows.some(other => other.gameId === row.gameId && other.team === row.team));
+  });
+  result.cards = suppressOverlappingSpots(distinct);
   return result;
 }
