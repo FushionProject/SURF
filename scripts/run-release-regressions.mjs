@@ -8,7 +8,7 @@ const suites = [
   "test:market-history", "test:market-tape", "test:market-horizon",
   "test:opportunities", "test:bookmakers", "test:prediction-markets", "test:removed-market-links",
   "test:market-clarity", "test:feed-schedule", "test:signal-feed",
-  "test:dynamic-ratings", "test:layout-parity", "test:sport-gating",
+  "test:dynamic-ratings", "test:layout-parity", "test:sport-gating", "test:game-briefs",
   "test:cfb", "test:cfb-postgres", "test:auth-redirect", "test:billing",
   "test:paid-access", "test:spot-stats:preview", "test:spot-stats:feed",
   "test:spot-stats:api-sports", "test:spot-stats:nflverse", "test:spot-stats",

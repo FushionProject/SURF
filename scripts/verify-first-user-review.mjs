@@ -35,7 +35,7 @@ try {
       for (let i = 0; i < await details.count(); i++) await details.nth(i).locator('summary').click();
     }
     if (route === '/feed') assert.equal(await page.getByRole('heading', { name: 'Market activity unavailable.' }).count(), 1);
-    if (route === '/') assert.equal(await page.getByRole('heading', { name: 'Game board unavailable.' }).count(), 1);
+    if (route === '/') assert.equal(new URL(page.url()).pathname, '/stats');
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(origin + '/games?sport=americanfootball_nfl');

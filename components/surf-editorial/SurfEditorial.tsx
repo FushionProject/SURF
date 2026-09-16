@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SurfLoading } from "@/components/surf/SurfLoading";
 import {
   GameDataPanels,
   type FullGameData,
@@ -179,7 +180,7 @@ export function Icon({
 }
 export function Brand() {
   return (
-    <Link href="/games" className="bn-brand" aria-label="Surf home">
+    <Link href="/stats" className="bn-brand" aria-label="Surf home">
       <span className="bn-logo-frame" aria-hidden="true">
         {/* A luminance mask removes black without redrawing the supplied mark. */}
         <span className="bn-logo-mark" />
@@ -232,16 +233,15 @@ function Offer({
         : price(offer?.point);
   return (
     <div className="bn-offer">
-      <strong>{value}</strong>
+      <small className="bn-offer-midpoint">{market === "h2h" ? "Market median" : "Market midpoint"}{offer ? ` · ${offer.booksCompared} books` : ""}</small>
+      <strong>{market === "h2h" ? price(offer?.consensusPrice) : market === "totals" ? `${side ? "U" : "O"} ${offer?.consensusPoint ?? "—"}` : price(offer?.consensusPoint)}</strong>
+      <small className="bn-offer-best">Best number · {value}</small>
       <small>
         {market !== "h2h" && offer?.price != null
           ? `${price(offer.price)} · `
           : ""}
         {offer?.bookTitle ? <SportsbookGameLink game={game} book={offer.bookTitle} /> : "No quote"}
       </small>
-      {offer && <small className="bn-offer-midpoint">
-        {market === "h2h" ? `Median ${price(offer.consensusPrice)}` : `Midpoint ${market === "spreads" ? price(offer.consensusPoint) : offer.consensusPoint ?? "—"}`} · {offer.booksCompared} books
-      </small>}
       {opportunity && <span className="bn-offer-edge">
         {opportunity.kind === "key_number" ? `Key ${opportunity.keyNumber}`
           : opportunity.kind === "arbitrage" ? "Arbitrage"
@@ -285,7 +285,7 @@ function GameCard({
         : [board.offers.over, board.offers.under];
   const opportunity = board.opportunities[0];
   return (
-    <article className={`bn-game ${open ? "bn-game-open" : ""}`}>
+    <article data-game-id={game.id} className={`bn-game ${open ? "bn-game-open" : ""}`}>
       <div className="bn-game-meta">
         <span>
           <span className="bn-dot" />
@@ -332,8 +332,8 @@ function GameCard({
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        {open ? "Hide sportsbook quotes" : "Compare all sportsbook quotes"}
-        <span>{open ? "−" : "↗"}</span>
+              {open ? "Hide sportsbooks" : "Compare sportsbooks"}
+        <span aria-hidden="true">{open ? "−" : "↗"}</span>
       </button>
       {open && (
         <div className="bn-detail">
@@ -399,7 +399,6 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
   const [search, setSearch] = useState("");
   const [market, setMarket] = useState<Market>("spreads");
   const [saved, setSaved] = useState<string[]>([]);
-  const [sort, setSort] = useState("time");
   const [top25, setTop25] = useState(false);
   const [topSignals, setTopSignals] = useState(false);
   const [linkedSignal, setLinkedSignal] = useState<{ id: string | null; request: number }>({ id: null, request: 0 });
@@ -532,11 +531,9 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
               isTop25Game(g, data?.rankings ?? null)),
         )
         .sort((a, b) =>
-          sort === "books"
-            ? (b.bookmakers?.length ?? 0) - (a.bookmakers?.length ?? 0)
-            : Date.parse(a.commence_time) - Date.parse(b.commence_time),
+          Date.parse(a.commence_time) - Date.parse(b.commence_time) || a.id.localeCompare(b.id),
         ),
-    [currentGames, data, search, view, saved, sport, sort, top25],
+    [currentGames, data, search, view, saved, sport, top25],
   );
   const signals = currentSignals
     .filter((s) => !topSignals || isTopRatedSignal(s))
@@ -574,11 +571,9 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
   const newSignals = countNewSignals(signals, lastVisitAt);
   const league = getSurfSportConfig(sport).label;
   const nav = [
-    { id: "markets", href: "/games", label: "Market board", icon: "grid" },
+    { id: "stats", href: "/stats", label: "Spot Stats", icon: "grid" },
+    { id: "markets", href: "/games", label: "Game briefs", icon: "grid" },
     { id: "signals", href: "/feed", label: "The signals", icon: "pulse" },
-    ...(process.env.NODE_ENV === "development"
-      ? [{ id: "stats", href: "/stats", label: "Spot Stats", icon: "grid" } as const]
-      : []),
     { id: "saved", href: "/top", label: "My watchlist", icon: "save" },
   ] as const;
   return (
@@ -773,7 +768,7 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
                       ? "The signals"
                       : view === "saved"
                         ? "My watchlist"
-                        : "Market overview"}
+                        : "Game briefs"}
                     <span>↘</span>
                   </h2>
                 </div>
@@ -862,25 +857,11 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
                       </button>
                     ))}
                   </div>
-                  <label className="bn-sort">
-                    <span>Sort by</span>
-                    <select
-                      value={sort}
-                      onChange={(e) => setSort(e.target.value)}
-                      aria-label="Sort games"
-                    >
-                      <option value="time">Game time</option>
-                      <option value="books">Book coverage</option>
-                    </select>
-                  </label>
+                  <span className="bn-data-muted">In game-time order</span>
                 </div>
               )}
               {loading && !data ? (
-                <div className="bn-loading" role="status">
-                  <span className="bn-loading-flower">↗</span>
-                  <h3>Building your market view.</h3>
-                  <p>Checking the current {league} market.</p>
-                </div>
+                <SurfLoading detail={`Checking the current ${league} games.`} />
               ) : view === "signals" ? (
                 <div className="bn-signal-grid">
                   {signals.map((s, i) => (
@@ -930,7 +911,7 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
                       </h3>
                       <p>
                         {error || data?.gameError || (view === "saved"
-                          ? "Save a game from the market board. Upcoming saved games for this sport will appear here, on this device."
+                          ? "Save a game from Game briefs. Upcoming saved games for this sport will appear here, on this device."
                           : "Try another team or sport. We only show the games returned by the market.")}
                       </p>
                       {view === "saved" && (
@@ -1025,7 +1006,7 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
             <Icon name={item.icon} size={19} />
             <span>
               {item.id === "markets"
-                ? "Board"
+                ? "Briefs"
                 : item.id === "signals"
                   ? "Signals"
                   : item.id === "stats" ? "Stats" : "Watchlist"}

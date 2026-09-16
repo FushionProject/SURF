@@ -1838,6 +1838,7 @@ body {
 .bn-offer { max-width: 140px; flex-shrink: 0; }
 .bn-offer small { font-size: 12px; }
 .bn-offer small.bn-offer-midpoint { font-size: 11px; }
+.bn-offer small.bn-offer-best { color: var(--ed-ink); font-size: 14px; font-weight: 600; margin-top: 8px; }
 .bn-offer-edge {
   display: inline-block;
   color: var(--ed-blue-ink);

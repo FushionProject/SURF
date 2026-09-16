@@ -34,6 +34,7 @@
     "test:paid-access": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-paid-access.mjs",
     "test:production-access": "node scripts/verify-production-access.mjs",
     "test:release": "node scripts/run-release-regressions.mjs",
+    "test:game-briefs": "node scripts/verify-game-briefs.mjs",
     "test:spot-stats:preview": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-local-preview.mjs",
     "test:spot-stats:preview:http": "node scripts/verify-spot-stats-preview-http.mjs",
     "test:spot-stats:feed": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-feed.mjs",

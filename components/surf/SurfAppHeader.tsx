@@ -15,7 +15,7 @@ export function SurfAppHeader({
         <Brand />
         <ThemeControl />
         <Link href="/games" className="bn-account-back">
-          Back to the board ↗
+          Game briefs ↗
         </Link>
       </div>
       <h1>{title}</h1>

@@ -19,7 +19,7 @@ function localTimestamp(timestamp: number, localReady: boolean, short = false): 
   });
 }
 
-export function MarketMovementChart({ mode, current, history, homeAbbrev, spreadName, lastObservedAt, historySource }: {
+export function MarketMovementChart({ mode, current, history, homeAbbrev, spreadName, lastObservedAt }: {
   mode: MovementMarket;
   open?: number;
   current?: number;
@@ -64,9 +64,8 @@ export function MarketMovementChart({ mode, current, history, homeAbbrev, spread
   const last = plotted.at(-1);
   const changes = plotted.flatMap((point, index) => index > 0 && point.value !== plotted[index - 1].value
     ? [{ ...point, fromValue: plotted[index - 1].value }] : []);
-  const recentChanges = changes.slice(-3).reverse();
   // Label actual changes, not every unchanged poll. Keep text readable when
-  // movements cluster; every time remains visible in the change list below.
+  // movements cluster; every observation remains in accessible chart text.
   const ticks = [first, ...changes].filter((point): point is NonNullable<typeof point> => point != null)
     .reduce<typeof plotted>((selected, point) => {
       const prior = selected.at(-1);
@@ -75,8 +74,6 @@ export function MarketMovementChart({ mode, current, history, homeAbbrev, spread
       return selected;
     }, []);
   const timelineDescription = points.map((point, index) => `${index === 0 ? "First tracked" : "Observed"} ${localTimestamp(point.timestamp, localReady)}: ${lineValue(point.value, mode)}${point.gapBefore ? ", after a tracking gap" : ""}`).join(". ");
-  const source = historySource === "local" ? "Saved on this development server"
-    : historySource === "supabase" ? "Saved market observations" : "Current server session";
 
   return (
     <div ref={containerRef} data-testid="movement-chart" className="overflow-hidden rounded-[14px] border border-[color:var(--surf-line-08)] bg-black/15">
@@ -109,27 +106,7 @@ export function MarketMovementChart({ mode, current, history, homeAbbrev, spread
         </g>)}
       </svg>
       <div className="space-y-2 px-4 pb-4 text-xs leading-5 text-[color:var(--surf-ink-55)]">
-        {first ? <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
-          <span>First tracked · <time dateTime={new Date(first.timestamp).toISOString()}>{localTimestamp(first.timestamp, localReady)}</time></span>
-        </div> : null}
-        {recentChanges.length > 0 ? <ol aria-label="Recent recorded movements" className="surf-movement-changes space-y-2">
-          {recentChanges.map(point => <li key={point.timestamp} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-[color:var(--surf-line-06)] pt-2">
-            <time dateTime={new Date(point.timestamp).toISOString()}>{localTimestamp(point.timestamp, localReady)}</time>
-            <span className="font-semibold tabular-nums text-[color:var(--surf-ink-90)]">{lineValue(point.fromValue, mode)} → {lineValue(point.value, mode)}</span>
-            {point.gapBefore && <span className="basis-full">Observed after a tracking gap</span>}
-          </li>)}
-        </ol> : null}
-        {changes.length > 3 ? <details>
-          <summary className="cursor-pointer py-1 font-semibold text-[color:var(--surf-primary)]">View {changes.length - 3} earlier {changes.length - 3 === 1 ? "change" : "changes"}</summary>
-          <ol className="mt-2 max-h-44 space-y-2 overflow-y-auto">
-            {changes.slice(0, -3).reverse().map(point => <li key={point.timestamp} className="flex flex-wrap justify-between gap-x-4 gap-y-1 border-t border-[color:var(--surf-line-06)] pt-2">
-              <time dateTime={new Date(point.timestamp).toISOString()}>{localTimestamp(point.timestamp, localReady)}</time>
-              <span className="font-semibold tabular-nums text-[color:var(--surf-ink-90)]">{lineValue(point.fromValue, mode)} → {lineValue(point.value, mode)}</span>
-            </li>)}
-          </ol>
-        </details> : null}
-        <p>{points.length <= 1 ? "Earlier movement is unavailable. New observations will build this timeline." : "Points connect recorded averages. Times show when Surf first observed each change, not an official opening line."}{timeline.hasGaps ? " Dotted sections indicate tracking gaps." : ""}</p>
-        <p className="text-[color:var(--surf-ink-40)]">{source}</p>
+        <p>{points.length <= 1 ? "Earlier movement is unavailable. New observations will build this timeline." : "Surf-recorded averages, not official opening lines."}{timeline.hasGaps ? " Dotted sections indicate tracking gaps." : ""}</p>
       </div>
     </div>
   );

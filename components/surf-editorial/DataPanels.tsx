@@ -73,7 +73,7 @@ export function GameDataPanels({
     // Executed trade activity has its own current cards in Signals.
     whaleSignals: [],
     history,
-    consensus,
+    consensus: sport === "baseball_mlb" ? consensus : undefined,
     spreadName: config.league === "MLB" ? "run line" : "spread",
   });
   const activeHistory = (mode === "spreads" ? history?.spreadHistory : history?.totalHistory) ?? [];
@@ -83,8 +83,8 @@ export function GameDataPanels({
   const reportLabel = config.league === "CFB" ? "Team context & availability" : "Injury reports";
   return (
     <div className="bn-data-panels">
-      <section className="bn-market-read-panel" aria-label="Surf Market Read">
-        <div className="bn-market-read-label"><span>Surf Market Read</span><small>Not a pick</small></div>
+      <section className="bn-market-read-panel" aria-label="Surf read on the game">
+        <div className="bn-market-read-label"><span>Surf read on the game</span><small>Not a pick</small></div>
         <h4>{read.headline}</h4>
         <p>{read.detail}</p>
       </section>
