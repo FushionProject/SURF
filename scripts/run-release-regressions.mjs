@@ -10,7 +10,7 @@ const suites = [
   "test:market-clarity", "test:feed-schedule", "test:signal-feed",
   "test:dynamic-ratings", "test:layout-parity", "test:sport-gating", "test:game-briefs",
   "test:cfb", "test:cfb-postgres", "test:auth-redirect", "test:billing",
-  "test:paid-access", "test:comp-access", "test:spot-stats:preview", "test:spot-stats:feed", "test:spot-research", "test:spot-stats:published", "test:spot-research-postgres", "test:spot-research-refresh", "test:legal",
+  "test:paid-access", "test:comp-access", "test:spot-stats:preview", "test:spot-stats:feed", "test:spot-research", "test:spot-stats:published", "test:spot-research-postgres", "test:spot-research-refresh", "test:legal", "test:market-readiness",
   "test:spot-stats:api-sports", "test:spot-stats:nflverse", "test:spot-stats",
 ];
 for (const suite of suites) {

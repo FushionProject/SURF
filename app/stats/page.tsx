@@ -9,7 +9,7 @@ import { feedTeamName, type SpotCard } from "@/lib/spot-stats/spot-feed";
 import { selectSpotFeedGame } from "@/lib/spot-stats/feed-query";
 import styles from "./research/feed.module.css";
 
-export const metadata: Metadata = { title: "Spot Stats · Surf", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Spot Stats · Surf" };
 export const dynamic = "force-dynamic";
 const date = (value: string, time = false) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", ...(time ? { hour: "numeric", minute: "2-digit", timeZoneName: "short" } as const : { year: "numeric" } as const) }).format(new Date(value));
 const signed = (value: number | null) => value === null ? "—" : value > 0 ? `+${value}` : String(value);

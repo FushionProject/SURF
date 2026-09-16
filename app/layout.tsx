@@ -13,10 +13,27 @@ const manrope = Manrope({
   subsets: ["latin"],
 });
 
+const SITE_DESCRIPTION =
+  "Real lines. Different opinions. One clearer picture. Sports-market perspective by Surf.";
+
 export const metadata: Metadata = {
+  // Required for the share-card image paths to resolve to absolute URLs.
+  metadataBase: new URL("https://surfodds.com"),
   title: "Surf — Every line. Every angle.",
-  description:
-    "Real lines. Different opinions. One clearer picture. Sports-market perspective by Surf.",
+  description: SITE_DESCRIPTION,
+  applicationName: "Surf",
+  openGraph: {
+    type: "website",
+    siteName: "Surf",
+    url: "https://surfodds.com",
+    title: "Surf — Every line. Every angle.",
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Surf — Every line. Every angle.",
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({
