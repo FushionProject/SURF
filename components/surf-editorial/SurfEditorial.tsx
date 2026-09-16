@@ -1,5 +1,7 @@
 "use client";
 
+import { SurfNavigation } from "@/components/surf/SurfNavigation";
+
 import Link from "next/link";
 import { SurfLoading } from "@/components/surf/SurfLoading";
 import {
@@ -24,7 +26,7 @@ import {
 } from "@/lib/surf/feedSchedule";
 import type { PredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
 import type { OvernightMarketSummary } from "@/lib/surf/types";
-import { ThemeControl } from "./ThemeControl";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import {
@@ -180,7 +182,7 @@ export function Icon({
 }
 export function Brand() {
   return (
-    <Link href="/stats" className="bn-brand" aria-label="Surf home">
+    <Link href="/" className="bn-brand" aria-label="Surf home">
       <span className="bn-logo-frame" aria-hidden="true">
         {/* A luminance mask removes black without redrawing the supplied mark. */}
         <span className="bn-logo-mark" />
@@ -575,31 +577,7 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
   ] as const;
   return (
     <div className="bn-app">
-      <header className="bn-masthead">
-        <div className="bn-header-inner">
-          <Brand />
-          <nav aria-label="Main navigation">
-            {nav.map((item) => (
-              <Link
-                key={item.id}
-                href={`${item.href}?sport=${sport}`}
-                prefetch={item.id === "stats" ? false : undefined}
-                aria-current={view === item.id ? "page" : undefined}
-              >
-                {item.label}
-                {item.id === "saved" && (
-                  <span className="bn-nav-count">{saved.length}</span>
-                )}
-              </Link>
-            ))}
-            <Link href="/how-to-use">How to use Surf</Link>
-          </nav>
-          <ThemeControl />
-          <Link href="/account" className="bn-account-link">
-            Your account <Icon name="arrow" size={16} />
-          </Link>
-        </div>
-      </header>
+      <SurfNavigation sport={sport} savedCount={saved.length} />
       <div className="bn-main-shell">
         <main className="bn-main">
           <section className="bn-hero">
