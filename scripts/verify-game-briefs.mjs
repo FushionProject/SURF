@@ -13,6 +13,8 @@ assert(!read('lib/surf/gameMarketRead.ts').includes('sportsbooks checked'));
 assert(!editorial.includes('setSort'));
 assert(editorial.includes('Date.parse(a.commence_time) - Date.parse(b.commence_time)'));
 assert(editorial.indexOf('id: "stats", href:') < editorial.indexOf('id: "markets", href:'));
+assert(editorial.indexOf('id: "signals", href:') < editorial.indexOf('id: "markets", href:'));
+assert(!editorial.includes('THE SURF STANDARD'));
 assert(read('app/page.tsx').includes('redirect("/stats")'));
 assert(!graph.includes('Recent recorded movements'));
 assert(graph.includes('Dotted sections indicate tracking gaps'));
