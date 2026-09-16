@@ -569,8 +569,8 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
   const league = getSurfSportConfig(sport).label;
   const nav = [
     { id: "stats", href: "/stats", label: "Spot Stats", icon: "grid" },
-    { id: "markets", href: "/games", label: "Game briefs", icon: "grid" },
     { id: "signals", href: "/feed", label: "The signals", icon: "pulse" },
+    { id: "markets", href: "/games", label: "Game briefs", icon: "grid" },
     { id: "saved", href: "/top", label: "My watchlist", icon: "save" },
   ] as const;
   return (
@@ -953,24 +953,6 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
                   See all signals
                   <Icon name="arrow" size={16} />
                 </Link>
-              </section>
-              <section className="bn-note">
-                <span className="bn-note-icon">↗</span>
-                <p className="bn-eyebrow">THE SURF STANDARD</p>
-                <h3>
-                  See more.
-                  <br />
-                  Decide better.
-                </h3>
-                <p>
-                  Sportsbooks don’t always agree. We make those differences
-                  easier to see.
-                </p>
-                <div>
-                  No picks. No promises.
-                  <br />
-                  Independent context. Always.
-                </div>
               </section>
               <p className="bn-rail-footnote">
                 Independent market context.
