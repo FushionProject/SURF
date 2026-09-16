@@ -1,0 +1,17 @@
+.header { background: #050505; color: #f4f4f4; border-bottom: 1px solid #282828; font-family: Arial, Helvetica, sans-serif; }
+.inner { max-width: 1440px; min-height: 92px; margin: auto; padding: 0 48px; display: flex; align-items: center; gap: 30px; }
+.brand { display: inline-flex; align-items: center; color: #f4f4f4; font-size: 29px; font-weight: 900; letter-spacing: -1.8px; text-decoration: none; flex-shrink: 0; }
+.logoFrame { position: relative; width: 44px; height: 44px; overflow: hidden; }
+.logoFrame span { position: absolute; inset: -35%; background: #39dcf3; mask-image: url('/brand/surf-logo.png'), url('/brand/surf-logo.png'), url('/brand/surf-logo.png'); mask-mode: luminance; mask-composite: add; mask-size: contain; mask-position: center; mask-repeat: no-repeat; }
+.links { display: flex; gap: 18px; align-self: stretch; align-items: stretch; }
+.links a { display: flex; align-items: center; gap: 6px; color: #aaa; border-bottom: 3px solid transparent; padding-top: 3px; text-decoration: none; font-size: 12px; white-space: nowrap; }
+.links a:hover, .links a[aria-current] { color: #f4f4f4; border-bottom-color: #39dcf3; }
+.theme { margin-left: auto; }
+.account { margin-left: 0; display: flex; align-items: center; gap: 16px; white-space: nowrap; font-size: 12px; text-decoration: none; color: #f4f4f4; }
+.account:hover, .account[aria-current] { color: #39dcf3; }
+.count { font-size: 9px; border: 1px solid #666; padding: 0 4px; }
+.header a:focus-visible { outline: 2px solid #39dcf3; outline-offset: 4px; }
+@media (max-width: 1150px) { .inner { flex-wrap: wrap; gap: 0 24px; padding-top: 16px; } .links { order: 3; width: 100%; overflow-x: auto; gap: 24px; } .links a { min-height: 52px; } }
+@media (max-width: 600px) { .inner { padding: 14px 20px 0; } .brand { font-size: 26px; } .logoFrame { width: 38px; height: 38px; } .links { gap: 22px; } .links a { font-size: 11px; } }
+
+@media (max-width: 600px) { .inner { column-gap: 12px; } .account { gap: 6px; font-size: 11px; } }

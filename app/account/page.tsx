@@ -4,7 +4,6 @@ import { AccountAccessForm } from "@/app/account/AccountAccessForm";
 import { AccountBilling } from "@/components/surf/AccountBilling";
 import { signOut } from "@/app/account/actions";
 import { SurfAppHeader } from "@/components/surf/SurfAppHeader";
-import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -94,7 +93,6 @@ export default async function AccountPage({ searchParams }: {
           Continue without an account
         </Link>
       </main>
-      <SurfBottomNav />
     </div>
   );
 }

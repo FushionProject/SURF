@@ -19,11 +19,6 @@ export default function Home() {
   return (
     <div className={styles.page}>
       <a href="#main" className={styles.skip}>Skip to content</a>
-      <header className={styles.header}>
-        <Link href="/" className={styles.brand} aria-label="Surf home"><span className={styles.logoFrame}><span className={styles.logo} /></span>SURF</Link>
-        <nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#pricing">Pricing</a><Link href="/how-to-use">Field guide</Link></nav>
-        <Link href="/games" className={styles.navCta}>Open Surf <Arrow /></Link>
-      </header>
       <main id="main">
         <section className={styles.hero} aria-labelledby="hero-title">
           <div className={styles.heroCopy}>

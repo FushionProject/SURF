@@ -1,5 +1,6 @@
 "use client";
 
+
 import Link from "next/link";
 import { SurfLoading } from "@/components/surf/SurfLoading";
 import {
@@ -24,7 +25,7 @@ import {
 } from "@/lib/surf/feedSchedule";
 import type { PredictionMarketSnapshot } from "@/lib/surf/predictionMarkets";
 import type { OvernightMarketSummary } from "@/lib/surf/types";
-import { ThemeControl } from "./ThemeControl";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSurfSport } from "@/components/surf/useSurfSport";
 import {
@@ -180,7 +181,7 @@ export function Icon({
 }
 export function Brand() {
   return (
-    <Link href="/stats" className="bn-brand" aria-label="Surf home">
+    <Link href="/" className="bn-brand" aria-label="Surf home">
       <span className="bn-logo-frame" aria-hidden="true">
         {/* A luminance mask removes black without redrawing the supplied mark. */}
         <span className="bn-logo-mark" />
@@ -567,39 +568,8 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
   }
   const newSignals = countNewSignals(signals, lastVisitAt);
   const league = getSurfSportConfig(sport).label;
-  const nav = [
-    { id: "stats", href: "/stats", label: "Spot Stats", icon: "grid" },
-    { id: "signals", href: "/feed", label: "The signals", icon: "pulse" },
-    { id: "markets", href: "/games", label: "Game briefs", icon: "grid" },
-    { id: "saved", href: "/top", label: "My watchlist", icon: "save" },
-  ] as const;
   return (
     <div className="bn-app">
-      <header className="bn-masthead">
-        <div className="bn-header-inner">
-          <Brand />
-          <nav aria-label="Main navigation">
-            {nav.map((item) => (
-              <Link
-                key={item.id}
-                href={`${item.href}?sport=${sport}`}
-                prefetch={item.id === "stats" ? false : undefined}
-                aria-current={view === item.id ? "page" : undefined}
-              >
-                {item.label}
-                {item.id === "saved" && (
-                  <span className="bn-nav-count">{saved.length}</span>
-                )}
-              </Link>
-            ))}
-            <Link href="/how-to-use">How to use Surf</Link>
-          </nav>
-          <ThemeControl />
-          <Link href="/account" className="bn-account-link">
-            Your account <Icon name="arrow" size={16} />
-          </Link>
-        </div>
-      </header>
       <div className="bn-main-shell">
         <main className="bn-main">
           <section className="bn-hero">
@@ -968,24 +938,6 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
           </footer>
         </main>
       </div>
-      <nav className="bn-mobile-nav" aria-label="Mobile navigation">
-        {nav.map((item) => (
-          <Link
-            key={item.id}
-            href={`${item.href}?sport=${sport}`}
-            aria-current={view === item.id ? "page" : undefined}
-          >
-            <Icon name={item.icon} size={19} />
-            <span>
-              {item.id === "markets"
-                ? "Briefs"
-                : item.id === "signals"
-                  ? "Signals"
-                  : item.id === "stats" ? "Stats" : "Watchlist"}
-            </span>
-          </Link>
-        ))}
-      </nav>
     </div>
   );
 }
