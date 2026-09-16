@@ -20,28 +20,28 @@ export default function Home() {
     <div className={styles.page}>
       <a href="#main" className={styles.skip}>Skip to content</a>
       <header className={styles.header}>
-        <Link href="/" className={styles.brand} aria-label="Surf home"><span className={styles.logoFrame}><span className={styles.logo} /></span>surf<span className={styles.brandPeriod}>.</span></Link>
+        <Link href="/" className={styles.brand} aria-label="Surf home"><span className={styles.logoFrame}><span className={styles.logo} /></span>SURF</Link>
         <nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#pricing">Pricing</a><Link href="/how-to-use">Field guide</Link></nav>
         <Link href="/games" className={styles.navCta}>Open Surf <Arrow /></Link>
       </header>
       <main id="main">
         <section className={styles.hero} aria-labelledby="hero-title">
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}><span className={styles.dot} /> AN INDEPENDENT VIEW OF THE MARKET</p>
-            <h1 id="hero-title">The market moves.<br />Find your <em>perspective.</em></h1>
-            <p className={styles.intro}>Every sportsbook tells a slightly different story. Surf brings the lines, the movement, and the context into one clearer picture.</p>
+            <p className={styles.eyebrow}><span className={styles.dot} /> THE INDEPENDENT MARKET DESK</p>
+            <h1 id="hero-title">Every line.<br /><em>Every angle.</em></h1>
+            <p className={styles.intro}>The numbers. The context. The whole picture. Compare sportsbook prices, follow market movement, and understand what stands out.</p>
             <div className={styles.actions}><Link href="/games" className={styles.primary}>Explore the free board <Arrow /></Link><a href="#how-it-works" className={styles.textLink}>Get to know Surf <span aria-hidden="true">↓</span></a></div>
             <p className={styles.micro}>Built for curious sports fans. No bet placement. Your decisions.</p>
           </div>
           <div className={styles.ocean}>
-            <div className={styles.chartHeader}><span>SURF / MARKET FLOW</span><span>01 — 03</span></div>
+            <div className={styles.chartHeader}><span>SURF / MARKET RESEARCH</span><span>01 — 03</span></div>
             <div className={styles.chartGrid} aria-hidden="true" />
             <div className={styles.waveField} aria-hidden="true">{[0, 1, 2, 3].map(layer => <svg key={layer} className={styles.wave} style={{ top: `${layer * 11 - 12}%`, animationDuration: `${22 + layer * 3}s`, animationDelay: `${-layer * 5}s`, opacity: layer === 2 ? 1 : .25 + layer * .12 }} viewBox="0 0 1200 240" preserveAspectRatio="none"><path d="M0 120 C100 90 200 90 300 120 S500 150 600 120 S800 90 900 120 S1100 150 1200 120" fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>)}</div>
-            <div className={styles.chartMarker}><span /> A DIFFERENT ANGLE.</div>
-            <div className={styles.chartBottom}><p>See how the<br /><strong>market flows.</strong></p><span>ILLUSTRATIVE GRAPHIC<br />NOT LIVE MARKET DATA</span></div>
+
+            <div className={styles.chartBottom}><p>SEE HOW THE<br />MARKET FLOWS.</p><span>ILLUSTRATIVE GRAPHIC<br />NOT LIVE MARKET DATA</span></div>
           </div>
         </section>
-        <div className={styles.strip}><span>LESS TAB SWITCHING.</span><span>MORE CONTEXT.</span><span>ONE CLEARER PICTURE.</span><span className={styles.stripAccent}>THAT’S SURF. ↗</span></div>
+        <div className={styles.strip}><div><span>01 / COMPARE</span><p>Every book.<small>One market view.</small></p></div><div><span>02 / UNDERSTAND</span><p>More context.<small>Beyond the odds.</small></p></div><div><span>03 / EXPLORE</span><p>Your perspective.<small>Your decision.</small></p></div></div>
         <section id="how-it-works" className={styles.section}>
           <div className={styles.sectionHeading}><p className={styles.eyebrow}>A LITTLE CLARITY GOES A LONG WAY</p><h2>From a wall of numbers<br />to a point of view.</h2><p>You don’t need to speak fluent odds.<br />Start with a matchup. Let the context come together.</p></div>
           <div className={styles.features}>{features.map(feature => <article key={feature.number}><span className={styles.number}>{feature.number}</span><p className={styles.eyebrow}>{feature.tag}</p><h3>{feature.title}</h3><p>{feature.description}</p><Link href={feature.href} className={styles.textLink}>{feature.label} <Arrow /></Link></article>)}</div>
@@ -65,7 +65,7 @@ export default function Home() {
         ].map(([question, answer]) => <details key={question}><summary>{question}<span aria-hidden="true">+</span></summary><p>{answer}</p></details>)}</div></section>
         <section className={styles.closing}><p className={styles.eyebrow}>LESS NOISE. MORE PERSPECTIVE.</p><h2>Get a feel for the market.</h2><Link href="/games" className={styles.primary}>Take a look around <Arrow /></Link></section>
       </main>
-      <footer className={styles.footer}><Link href="/" className={styles.brand}><span className={styles.logoFrame}><span className={styles.logo} /></span>surf.</Link><p>Independent sports analytics.<br />Information, never a guaranteed outcome.</p><div><a href="#pricing">Pricing</a><Link href="/how-to-use">Field guide</Link><Link href="/account">Account</Link></div><small>For adults of legal betting age in their jurisdiction. If you choose to bet, set limits and only risk what you can afford to lose.</small></footer>
+      <footer className={styles.footer}><Link href="/" className={styles.brand}><span className={styles.logoFrame}><span className={styles.logo} /></span>SURF</Link><p>Independent sports analytics.<br />Information, never a guaranteed outcome.</p><div><a href="#pricing">Pricing</a><Link href="/how-to-use">Field guide</Link><Link href="/account">Account</Link></div><small>For adults of legal betting age in their jurisdiction. If you choose to bet, set limits and only risk what you can afford to lose.</small></footer>
     </div>
   );
 }
