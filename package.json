@@ -44,6 +44,7 @@
     "test:spot-stats:published": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-stats-published.mjs",
     "test:spot-research-postgres": "node scripts/verify-spot-research-postgres.mjs",
     "test:spot-research-refresh": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-spot-research-refresh.mjs",
+    "test:legal": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/verify-legal-pages.mjs",
     "stats:import:nflverse": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/import-nflverse-research.mjs",
     "stats:import:api-sports": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/import-api-sports-research.mjs",
     "stats:research:api-sports": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/query-api-sports-research.mjs",
