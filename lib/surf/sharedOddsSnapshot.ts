@@ -1,6 +1,7 @@
 import type { SurfSportKey } from "./sports";
 import type { OddsApiGame } from "./types";
 import { refreshIntervalMs } from "./feedSchedule.ts";
+import { quotaFloorMs } from "./oddsQuota.ts";
 import { filterSurfGames, SURF_ODDS_API_BOOKMAKER_KEYS } from "./bookmakers.ts";
 
 const ODDS_API_BASE = "https://api.the-odds-api.com/v4";
@@ -141,11 +142,19 @@ export async function getSharedOddsSnapshot(options: {
 }): Promise<{ games: OddsApiGame[]; fetchedAt: number; reused: boolean }> {
   const now = Date.now();
   const existing = snapshots.get(options.sportKey);
+  // Stretch the schedule as provider credit runs down, and stop entirely once it
+  // is gone: a spent quota would fail every request while still being charged.
+  const quotaFloor = quotaFloorMs(telemetryFor(options.sportKey).quota?.remaining);
+  const exhausted = !Number.isFinite(quotaFloor);
+  const interval = Math.max(
+    refreshIntervalMs(now, nextGameAt(existing?.games ?? [], now)),
+    exhausted ? 0 : quotaFloor,
+  );
   if (
-    !options.force &&
+    (!options.force || exhausted) &&
     existing?.games &&
     existing.fetchedAt != null &&
-    now - existing.fetchedAt < refreshIntervalMs(now, nextGameAt(existing.games, now))
+    (exhausted || now - existing.fetchedAt < interval)
   ) {
     telemetryFor(options.sportKey).cacheReuseCount += 1;
     // A hot reload can retain snapshots captured before the curated pool changed.
