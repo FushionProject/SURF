@@ -96,7 +96,7 @@ assert.equal(card(build(history.map(row => ({ ...row, div_game: "" })).concat(cu
 const page = await readFile(new URL("../app/stats/research/page.tsx", import.meta.url), "utf8");
 const server = await readFile(new URL("../lib/spot-stats/spot-feed-server.ts", import.meta.url), "utf8");
 assert.ok(page.indexOf("if (!localPreviewAllowed") < page.indexOf("await getLocalSpotFeed"));
-assert.ok(server.indexOf("if (!localPreviewAllowed") < server.indexOf("await loadNflverseContextResearch"));
+assert.ok(server.indexOf("if (!localPreviewAllowed") < server.indexOf("await loadSpotResearchArchive"));
 assert.match(server, /import "server-only"/);
 assert.doesNotMatch(server + page, /fetch\(|x-forwarded-host|RIGHTS_CONFIRMED|api-sports-client/);
 assert.match(page, /Historical-reference spread results/);

@@ -1,5 +1,6 @@
 import "server-only";
 import { paidAccessRequired } from "./access-policy";
+import { hasCompAccess } from "./comp-access";
 import { billingError, billingJson, billingRuntime, billingUser } from "./server";
 
 /** Run before collecting or serializing paid data, including debug/demo paths. */
@@ -7,6 +8,7 @@ export async function paidFeatureDenial(feature: "signals" | "spotStats"): Promi
   if (!paidAccessRequired()) return null;
   try {
     const user = await billingUser();
+    if (hasCompAccess(user.email)) return null;
     const runtime = billingRuntime();
     if (!runtime) return billingJson({ message: "Paid access is temporarily unavailable. No payment is required while billing is unavailable." }, 503);
     const access = await runtime.service.entitlements(user.id);

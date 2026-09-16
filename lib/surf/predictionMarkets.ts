@@ -19,6 +19,7 @@ import {
   type PolymarketEvent,
   type PolymarketTrade,
 } from "./predictionMarketCore";
+import { predictionProvidersEnabled } from "./predictionProviders";
 
 const KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 const POLYMARKET_GAMMA_BASE = "https://gamma-api.polymarket.com";
@@ -409,9 +410,12 @@ function activityCards(
 async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: number): Promise<PredictionMarketSnapshot> {
   const thresholdUsd = configuredThreshold();
   const series = predictionSeriesForSport(sportKey);
+  const enabled = predictionProvidersEnabled();
   const [kalshiResult, polymarketResult] = await Promise.allSettled([
-    fetchKalshiMarkets(series.kalshi),
-    fetchPolymarketEvents(series.polymarket, games, series.polymarketFilter),
+    enabled.kalshi ? fetchKalshiMarkets(series.kalshi) : Promise.resolve([] as KalshiWinnerMarket[]),
+    enabled.polymarket
+      ? fetchPolymarketEvents(series.polymarket, games, series.polymarketFilter)
+      : Promise.resolve([] as PolymarketEvent[]),
   ]);
 
   const kalshiMarkets = kalshiResult.status === "fulfilled"
@@ -467,20 +471,22 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
         kalshi: {
           matchedGames: new Set(kalshiMarkets.map((market) => market.game.id)).size,
           sampledTrades: samples.kalshi.trades.length,
-          coverage: kalshiResult.status === "rejected" ? "unavailable" : kalshiMarkets.length === 0 ? "no_coverage"
+          coverage: !enabled.kalshi ? "disabled" : kalshiResult.status === "rejected" ? "unavailable" : kalshiMarkets.length === 0 ? "no_coverage"
             : kalshiCoverage === "sampled" && kalshiMarkets.length < games.length ? "partial" : kalshiCoverage,
         },
         polymarket: {
           matchedGames: new Set(polymarketMarkets.map((market) => market.game.id)).size,
           sampledTrades: samples.polymarket.trades.length,
-          coverage: polymarketResult.status === "rejected" ? "unavailable" : polymarketMarkets.length === 0 ? "no_coverage"
+          coverage: !enabled.polymarket ? "disabled" : polymarketResult.status === "rejected" ? "unavailable" : polymarketMarkets.length === 0 ? "no_coverage"
             : polymarketCoverage === "sampled" && polymarketMarkets.length < games.length ? "partial" : polymarketCoverage,
         },
       },
     },
     providers: {
       kalshi:
-        kalshiResult.status === "rejected"
+        !enabled.kalshi
+          ? "disabled"
+          : kalshiResult.status === "rejected"
           ? "unavailable"
           : kalshiMarkets.length > 0
             ? kalshiCoverage !== "sampled"
@@ -488,7 +494,9 @@ async function buildSnapshot(games: OddsApiGame[], sportKey: SurfSportKey, now: 
               : kalshiMarkets.length < games.length ? "partial" : "available"
             : "no_coverage",
       polymarket:
-        polymarketResult.status === "rejected"
+        !enabled.polymarket
+          ? "disabled"
+          : polymarketResult.status === "rejected"
           ? "unavailable"
           : polymarketMarkets.length > 0
             ? polymarketCoverage !== "sampled"
@@ -516,11 +524,12 @@ export async function getPredictionMarketSnapshot(
   sportKey: SurfSportKey,
   now = Date.now(),
 ): Promise<PredictionMarketSnapshot> {
-  if (process.env.SURF_PREDICTION_MARKETS_ENABLED === "false" || games.length === 0) {
+  const providers = predictionProvidersEnabled();
+  if ((!providers.kalshi && !providers.polymarket) || games.length === 0) {
     return emptySnapshot(now);
   }
 
-  const key = snapshotCacheKey(games, sportKey);
+  const key = `${snapshotCacheKey(games, sportKey)}:k${providers.kalshi ? 1 : 0}p${providers.polymarket ? 1 : 0}`;
   for (const [cacheKey, entry] of SNAPSHOT_CACHE) {
     if (!entry.pending && entry.expiresAt <= now) SNAPSHOT_CACHE.delete(cacheKey);
   }
