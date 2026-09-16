@@ -88,6 +88,6 @@ export function buildGameMarketRead(options: {
   return {
     kind: "quiet",
     headline: "No standout difference in this snapshot",
-    detail: `${options.board.booksInSample} sportsbooks checked. Best available quotes are shown above.`,
+    detail: "Best available quotes are shown above. Compare sportsbooks for the underlying prices.",
   };
 }

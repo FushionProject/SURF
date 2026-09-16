@@ -301,7 +301,7 @@ body {
 }
 .bn-stats {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   background: var(--ed-stats-bg);
   color: var(--ed-stats-ink);
   padding: 25px 28px;
@@ -1140,14 +1140,14 @@ body {
     font-size: 12px;
   }
   .bn-stats {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     padding: 16px 12px;
     margin-bottom: 30px;
   }
   .bn-stats > div {
     padding: 0 8px;
   }
-  .bn-stats > div:nth-child(3) {
+  .bn-stats > div:nth-child(2) {
     border: 0;
     padding-right: 0;
   }
