@@ -44,6 +44,8 @@ import type {
   GamePredictionMarketConsensus,
 } from "@/lib/surf/types";
 import { getTeamLogo } from "@/lib/teamLogos";
+import { teamLogosEnabled } from "@/lib/teamMarks";
+import { getTeamAbbrev } from "@/lib/teamAbbrevs";
 
 type View = "markets" | "signals" | "saved";
 type Market = "spreads" | "h2h" | "totals";
@@ -200,7 +202,9 @@ const kickoff = (iso: string) =>
 function TeamLogo({ name, sport, providerLogo }: { name: string; sport: SurfSportKey; providerLogo?: string }) {
   const [failedLogos, setFailedLogos] = useState<string[]>([]);
   const mapped = getTeamLogo(name, getSurfSportConfig(sport).league);
-  const logo = [mapped, providerLogo].find((candidate): candidate is string => Boolean(candidate) && !failedLogos.includes(candidate!));
+  // A provider-supplied URL is third-party artwork too, so text marks drop it.
+  const candidates = teamLogosEnabled() ? [mapped, providerLogo] : [];
+  const logo = candidates.find((candidate): candidate is string => Boolean(candidate) && !failedLogos.includes(candidate!));
   return (
     <span className="bn-team-logo">
       {logo ? (
@@ -208,7 +212,7 @@ function TeamLogo({ name, sport, providerLogo }: { name: string; sport: SurfSpor
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logo} alt="" loading="lazy" onError={() => setFailedLogos((current) => [...current, logo])} />
       ) : (
-        name.slice(0, 2).toUpperCase()
+        getTeamAbbrev(name) ?? name.slice(0, 3).toUpperCase()
       )}
     </span>
   );

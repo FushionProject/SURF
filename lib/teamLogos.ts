@@ -1,4 +1,5 @@
 import { getMlbLogo } from "./mlbLogos";
+import { teamLogosEnabled } from "./teamMarks";
 import { getCfbTeamLogo } from "./cfbTeamLogos";
 import type { SurfLeague } from "./surf/sports";
 
@@ -71,6 +72,9 @@ const NFL_TEAM_LOGOS: Record<string, string> = {
 };
 
 export function getTeamLogo(teamName: string, league?: SurfLeague) {
+  // Text marks suppress third-party artwork everywhere; each caller already
+  // renders an abbreviation when no logo is available.
+  if (!teamLogosEnabled()) return null;
   if (league === "CFB") return getCfbTeamLogo(teamName);
   if (league === "MLB") return getMlbLogo(teamName);
   if (league === "NFL") {

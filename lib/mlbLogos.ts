@@ -1,3 +1,4 @@
+import { teamLogosEnabled } from "./teamMarks";
 export const MLB_LOGOS: Record<string, string> = {
   ARI: "ari",
   ATL: "atl",
@@ -149,6 +150,7 @@ export function getMlbLogo(team: string): string {
   return `https://a.espncdn.com/i/teamlogos/mlb/500/${code}.png`;
 }
 
-export function getMlbDefaultLogo(): string {
+export function getMlbDefaultLogo(): string | null {
+  if (!teamLogosEnabled()) return null;
   return MLB_DEFAULT_LOGO;
 }
