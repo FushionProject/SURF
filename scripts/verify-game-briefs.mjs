@@ -15,7 +15,10 @@ assert(editorial.includes('Date.parse(a.commence_time) - Date.parse(b.commence_t
 assert(editorial.indexOf('id: "stats", href:') < editorial.indexOf('id: "markets", href:'));
 assert(editorial.indexOf('id: "signals", href:') < editorial.indexOf('id: "markets", href:'));
 assert(!editorial.includes('THE SURF STANDARD'));
-assert(read('app/page.tsx').includes('redirect("/stats")'));
+const landing = read('app/page.tsx');
+assert(!landing.includes('redirect('), 'Homepage presents the landing page instead of redirecting');
+assert(landing.includes('href="/games"'), 'Landing page preserves access to the market board');
+assert(landing.includes('id="pricing"') && landing.includes('href="#pricing"'), 'Pricing navigation resolves on the landing page');
 assert(!graph.includes('Recent recorded movements'));
 assert(graph.includes('Dotted sections indicate tracking gaps'));
 assert(graph.includes('not official opening lines'));
