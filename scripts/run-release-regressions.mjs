@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const suites = [
   "test:rope", "test:persistence-reliability", "test:supabase-schema",
   "test:market-history", "test:market-tape", "test:market-horizon",
-  "test:opportunities", "test:bookmakers", "test:prediction-markets",
+  "test:opportunities", "test:bookmakers", "test:prediction-markets", "test:removed-market-links",
   "test:market-clarity", "test:feed-schedule", "test:signal-feed",
   "test:dynamic-ratings", "test:layout-parity", "test:sport-gating",
   "test:cfb", "test:cfb-postgres", "test:auth-redirect", "test:billing",

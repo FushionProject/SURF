@@ -51,20 +51,16 @@ let feedStatus = 200;
 let responseDelay = 350;
 
 async function setupContext({ mobile = false } = {}) {
-  const browserOrigin = mobile ? "http://surf-mobile.test:3160" : origin;
+  const browserOrigin = origin;
   const context = await browser.newContext({ viewport: { width: mobile ? 390 : 1440, height: 1000 }, timezoneId: "America/Los_Angeles" });
-  await context.addInitScript(({ manualClipboard }) => {
+  await context.addInitScript(() => {
     window.__signalScrolls = [];
-    window.__copiedSignalLink = "";
     const scroll = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = function (...args) {
       window.__signalScrolls.push(this.id);
       return scroll.apply(this, args);
     };
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: manualClipboard ? undefined : {
-      writeText: async value => { window.__copiedSignalLink = value; },
-    } });
-  }, { manualClipboard: mobile });
+  });
   await context.route("**/*", async route => {
     const url = new URL(route.request().url());
     if (url.origin !== browserOrigin) return route.abort();
@@ -75,9 +71,6 @@ async function setupContext({ mobile = false } = {}) {
       if (url.pathname === "/api/surf-feed") return route.fulfill({ status: feedStatus, json: feedStatus === 200 ? feedPayload : { error: "Offline source unavailable" } });
       return route.fulfill({ status: 503, json: { error: "Offline test endpoint unavailable" } });
     }
-    // A fake non-loopback HTTP origin exercises actual insecure-context behavior,
-    // but every page/static request is served only by the provided local preview.
-    if (mobile) return route.fulfill({ response: await route.fetch({ url: `${origin}${url.pathname}${url.search}` }) });
     return route.continue();
   });
   const page = await context.newPage();
@@ -152,11 +145,9 @@ try {
   await waitForTarget(page);
   assert(await page.evaluate(() => window.__signalScrolls.length) > scrollsBeforeRepeat, "Clicking the same fragment again still jumps to the card");
 
-  // Copy URL uses current browser origin and the exact stable ID, never feed index.
+  // Share controls are intentionally absent; existing direct-link navigation still works.
   const target = page.locator(".bn-signal-card").filter({ has: page.getByRole("heading", { name: targetTitle, exact: true }) });
-  await target.getByRole("button", { name: "Copy link to this signal" }).click();
-  await target.getByRole("status").getByText("Link copied", { exact: true }).waitFor();
-  assert.equal(await page.evaluate(() => window.__copiedSignalLink), `${origin}${signalHref(targetId, sport)}`);
+  assert.equal(await target.getByRole("button", { name: /Copy link/i }).count(), 0);
   assert.equal(await target.getByRole("textbox", { name: "Direct link to this signal" }).count(), 0);
 
   for (const theme of ["dark", "light"]) {
@@ -224,21 +215,14 @@ try {
   const mobile = await setupContext({ mobile: true });
   await mobile.page.goto(`${mobile.browserOrigin}${signalHref(targetId, sport)}`);
   await waitForTarget(mobile.page);
-  assert.equal(await mobile.page.evaluate(() => window.isSecureContext), false, "Manual path is exercised on real insecure HTTP origin");
   const mobileCard = mobile.page.locator(".bn-signal-card").filter({ has: mobile.page.getByRole("heading", { name: targetTitle, exact: true }) });
-  await mobileCard.getByRole("button", { name: "Copy link to this signal" }).click();
-  const manual = mobileCard.getByRole("textbox", { name: "Direct link to this signal" });
-  await manual.waitFor();
-  assert.equal(await manual.inputValue(), `${mobile.browserOrigin}${signalHref(targetId, sport)}`);
-  await manual.focus();
-  assert.equal(await manual.evaluate(input => input.selectionEnd - input.selectionStart), (await manual.inputValue()).length, "Manual link is fully selected for copying");
-  await noOverflow(mobile.page, "HTTP manual-copy fallback");
-  await mobileCard.getByRole("link", { name: "Open this signal ↗" }).click();
-  await waitForTarget(mobile.page);
+  assert.equal(await mobileCard.getByRole("button", { name: /Copy link/i }).count(), 0);
+  assert.equal(await mobileCard.getByRole("textbox", { name: "Direct link to this signal" }).count(), 0);
+  await noOverflow(mobile.page, "Mobile direct link");
   await mobile.context.close();
   assert.deepEqual(errors, [], "No browser errors or hydration mismatches");
   assert(apiRequests.length > 0 && apiRequests.every(path => path === "/api/surf-games" || path === "/api/surf-feed"), "Only expected, fully intercepted endpoints were requested");
-  console.log("Signal readability UI passed: delayed exact-card fragments, encoded IDs, briefing navigation, filtered/same-fragment jumps, refresh stability, copy success/HTTP fallback, honest unavailable states, both themes, 320/390/1440 widths, accessible top ratings, meaning text and no hydration errors. All API data was intercepted.");
+  console.log("Signal readability UI passed: delayed exact-card fragments, encoded IDs, briefing navigation, filtered/same-fragment jumps, refresh stability, removed copy controls, honest unavailable states, both themes, 320/390/1440 widths, accessible top ratings, meaning text and no hydration errors. All API data was intercepted.");
 } finally {
   await browser.close();
 }
