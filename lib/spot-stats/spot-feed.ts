@@ -3,7 +3,6 @@ import { spotGamePerspective, type SpotAuditRow } from "./engine.ts";
 import type { SpotGame } from "./types.ts";
 
 export const FEED_FROM = 2020;
-export const FEED_THROUGH = 2025;
 export const SCHEDULE_MAX_AGE_DAYS = 7;
 const DAY = 86_400_000;
 /** Complete weekday cohort; never infer broadcast membership from kickoff hour. */
@@ -115,7 +114,7 @@ export function buildSpotFeed(input: {
   const now = Date.parse(input.now), retrieved = Date.parse(input.retrievedAt);
   if (!Number.isFinite(now) || !Number.isFinite(retrieved)) throw new Error("Invalid research time.");
   const result: SpotFeed = { games: [], cards: [], retrievedAt: input.retrievedAt, asOf: input.now, season: null, week: null,
-    seasonFrom: FEED_FROM, seasonThrough: FEED_THROUGH, notices: [], state: "empty" };
+    seasonFrom: FEED_FROM, seasonThrough: new Date(now).getUTCFullYear(), notices: [], state: "empty" };
   if (retrieved > now + 60_000 || now - retrieved > SCHEDULE_MAX_AGE_DAYS * DAY) {
     result.state = "stale"; result.notices.push("The saved schedule needs updating. Old matchups are not presented as current."); return result;
   }
@@ -152,7 +151,7 @@ export function buildSpotFeed(input: {
   if (!next) { result.notices.push("No upcoming NFL matchups in the next 14 days are available in this snapshot."); return result; }
   result.games = scheduled.filter(game => game.season === next.season && game.week === next.week);
   result.season = next.season; result.week = next.week; result.state = "ready";
-  const through = Math.min(FEED_THROUGH, next.season - 1);
+  const through = next.season;
   result.seasonThrough = through;
   const history: HistoryRow[] = [];
   const ids = new Set<string>();
@@ -196,7 +195,7 @@ export function buildSpotFeed(input: {
     if (totals) prominence = totalMissing === 0 ? notableRecord(overs, unders) : null;
     const totalSummary = `${overs} overs · ${unders} unders · ${totalPushes} pushes${totalMissing ? ` · ${totalMissing} missing totals` : ""}`;
     result.cards.push({ id: `spot-${game.id}-${team}-${key}`, game, team, category,
-      headline: totals ? `${subject}: ${unders >= overs ? unders : overs} ${unders >= overs ? "unders" : "overs"} in ${overs + unders} decided totals ${phrase}` : `${subject}: ${leadMetric === "ats" ? atsRecord + " ATS" : record + " straight up"} ${phrase}`, why, scope, record, atsRecord,
+      headline: totals ? `${subject} games have gone ${unders >= overs ? "under" : "over"} in ${unders >= overs ? unders : overs} of ${overs + unders} ${phrase.replace(/^in /, "")}${totalPushes ? ` (${totalPushes} pushes excluded)` : ""}` : `${subject}: ${leadMetric === "ats" ? atsRecord + " ATS" : record + " straight up"} ${phrase}`, why, scope, record, atsRecord,
       wins, losses, ties, covers, nonCovers, pushes, missingLines,
       sampleSize: rows.length, atsSample, smallSample: rows.length < 10 || atsSample < 10, rows, order, prominence, leadMetric,
       ...(totals ? { totalSummary } : {}) });
@@ -241,14 +240,16 @@ export function buildSpotFeed(input: {
       const nights = coached.filter(item => hasWeekdayContext(item.row.kickoffAt));
       const specific = nights.filter(item => scheduledWeekday(item.row.kickoffAt) === night);
       add(game, team, "coach-night", `Coach · ${night}`, coach, `in ${night}`, nightExplanation, specific, 2, coachScope);
-      add(game, team, "coach-night-totals", `Coach · ${night} totals`, coach, `in ${night}`, `${nightExplanation} ${totalsExplanation}`, specific, 2, coachScope, true);
     }
+    if (evening) add(game, team, "team-night-totals", `${night} totals`, name, `in ${night}`,
+      `${nightExplanation} ${totalsExplanation} Includes all ${name} quarterbacks and coaches.`,
+      teamRows.filter(item => scheduledWeekday(item.row.kickoffAt) === night), 2, `${scope} · ${name} team history`, true);
     const venueLabel = side === "home" ? "Home" : "Road";
     const venuePhrase = side === "home" ? "at home" : "on the road";
     // Only an explicitly non-neutral fixture establishes a home/road situation.
     if (currentRaw.location === "Home") {
-      if (coach) add(game, team, "coach-venue-totals", `Coach · ${venueLabel} totals`, coach, venuePhrase,
-        `${totalsExplanation} Only ${venuePhrase} games are included; neutral sites are excluded.`, coached.filter(item => item.row.venue === side), 3, coachScope, true);
+      add(game, team, "team-venue-totals", `${venueLabel} totals`, name, `games ${venuePhrase}`,
+        `${totalsExplanation} Only ${venuePhrase} games are included; neutral sites are excluded. Includes all ${name} quarterbacks and coaches.`, teamRows.filter(item => item.row.venue === side), 3, `${scope} · ${name} team history`, true);
       add(game, team, "team-venue", `${venueLabel} history`, name, venuePhrase,
         `The ${name} play ${venuePhrase} against the ${opponent}. This is their regular-season record in that setting, across coaching changes. Neutral-site games are excluded.`,
         teamRows.filter(item => item.row.venue === side), 4, `${scope} · Franchise history`);
@@ -267,10 +268,7 @@ export function buildSpotFeed(input: {
         const nights = starts.filter(item => hasWeekdayContext(item.row.kickoffAt));
         const specific = nights.filter(item => scheduledWeekday(item.row.kickoffAt) === night);
         add(game, team, "qb-night", `QB · ${night}`, subject, `in ${night}`, `${projection} ${nightExplanation}`, specific, 2, qbScope);
-        add(game, team, "qb-night-totals", `QB · ${night} totals`, subject, `in ${night}`, `${projection} ${nightExplanation} ${totalsExplanation}`, specific, 2, qbScope, true);
       }
-      if (currentRaw.location === "Home") add(game, team, "qb-venue-totals", `QB · ${venueLabel} totals`, subject, venuePhrase,
-        `${projection} ${totalsExplanation} Neutral-site games are excluded.`, starts.filter(item => item.row.venue === side), 3, qbScope, true);
       if (currentRaw.location === "Home") add(game, team, "qb-venue", `QB · ${venueLabel}`, subject, venuePhrase,
         `${projection} Only games ${venuePhrase} are included; neutral-site games are excluded.`,
         starts.filter(item => item.row.venue === side), 3, qbScope);
@@ -278,9 +276,6 @@ export function buildSpotFeed(input: {
         starts.filter(item => item.row.week === 1), 1, qbScope);
       if (game.division) add(game, team, "qb-division", "QB · Division matchup", subject, "against division opponents", projection,
         starts.filter(item => item.division === true), 3, qbScope);
-      const qbRest = game[`${side}Rest`];
-      if (game.week > 1 && qbRest !== null && qbRest <= 6) add(game, team, "qb-short-rest", "QB · Short rest", subject,
-        "on six or fewer days between games", projection, starts.filter(item => item.rest !== null && item.rest <= 6), 2, qbScope);
       const qbLine = !missing(currentRaw.spread_line) && Number.isFinite(Number(currentRaw.spread_line)) ? Number(currentRaw.spread_line) : null;
       const qbHandicap = qbLine === null ? null : side === "home" ? -qbLine : qbLine;
       if (currentRaw.location === "Home" && qbHandicap !== null && qbHandicap > 0 && qbHandicap <= 100) add(game, team,
@@ -313,14 +308,11 @@ export function buildSpotFeed(input: {
     if (game.division) add(game, team, "division", "Division matchup", name, "against division opponents",
       `The ${name} and ${opponent} are division rivals. These are the team's regular-season division matchups, across coaches.`,
       teamRows.filter(item => item.division === true), 4, `${scope} · Franchise history`);
-    if (game.division) add(game, team, "division-totals", "Division totals", name, "against division opponents",
+    if (game.division) add(game, team, "division-totals", "Division totals", name, "games against division opponents",
       `The ${name} face a division rival. Over/under compares combined points with the saved historical total—not whether this week's total will go over or under.`,
       teamRows.filter(item => item.division === true), 4, `${scope} · Franchise history · Reference totals`, true);
     const rest = game[`${side}Rest`];
     if (coach && rest !== null && game.week > 1) {
-      if (rest <= 6) add(game, team, "short-rest", "Short rest", coach, "on six or fewer days between games",
-        `The ${name} have ${rest} days between scheduled games before facing the ${opponent}.`,
-        coached.filter(item => item.rest !== null && item.rest <= 6), 2, coachScope);
       if (afterBye(team, game.season, game.week, rest)) add(game, team, "after-bye", "After a bye", coach, "after a scheduled week off",
         `The ${name} have an empty schedule week and ${rest} days between games before facing the ${opponent}.`,
         coached.filter(item => afterBye(feedTeam(item.row.team), item.row.season, item.row.week, item.rest)), 2, coachScope);
