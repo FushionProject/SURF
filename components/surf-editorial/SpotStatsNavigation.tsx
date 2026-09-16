@@ -5,9 +5,9 @@ import { Brand, Icon } from "./SurfEditorial";
 import { ThemeControl } from "./ThemeControl";
 
 const links = [
-  { href: "/games", label: "Market board", short: "Board", icon: "grid" },
-  { href: "/feed", label: "The signals", short: "Signals", icon: "pulse" },
   { href: "/stats", label: "Spot Stats", short: "Stats", icon: "grid" },
+  { href: "/games", label: "Game briefs", short: "Briefs", icon: "grid" },
+  { href: "/feed", label: "The signals", short: "Signals", icon: "pulse" },
   { href: "/top", label: "My watchlist", short: "Watchlist", icon: "save" },
 ] as const;
 

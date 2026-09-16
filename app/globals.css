@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+.surf-loading { display: flex; min-height: 180px; padding: 32px 16px; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--surf-ink-90); text-align: center; }
+.surf-loading > span:last-child { font-size: 14px; color: var(--surf-ink-55); }
+.surf-loading-mark { display: block; width: 64px; height: 64px; background: #00d4ec; mask-image: url('/brand/surf-logo.png'), url('/brand/surf-logo.png'), url('/brand/surf-logo.png'); mask-mode: luminance; mask-composite: add; mask-size: contain; mask-repeat: no-repeat; mask-position: center; animation: surf-loading-bob 1.8s ease-in-out infinite; }
+@keyframes surf-loading-bob { 0%, 100% { transform: translateY(3px) rotate(-5deg); opacity: .65; } 50% { transform: translateY(-4px) rotate(3deg); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .surf-loading-mark { animation: none; } }
+
 /* ============================================================================
    SURF THEMES
 
