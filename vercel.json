@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/internal/spot-research", "schedule": "0 9 * * *" }
+  ]
+}
