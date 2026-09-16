@@ -1,96 +1,60 @@
 import type { Metadata } from "next";
+import { CloseSpotGames } from "@/components/surf/CloseSpotGames";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { localPreviewAllowed } from "@/lib/spot-stats/local-preview";
-import { SurfAppHeader } from "@/components/surf/SurfAppHeader";
-import { getSpotStatsWorkspace } from "@/lib/spot-stats/server";
-import { runSpotQuery, SPOT_TEAM_CODES, type SpotQuery, type SpotQueryResult, type SpotTeamCode } from "@/lib/spot-stats/engine";
-import styles from "./stats.module.css";
+import { getPublishedSpotFeed } from "@/lib/spot-stats/spot-feed-server";
+import { localPreviewAllowed, type PreviewParams } from "@/lib/spot-stats/local-preview";
+import { feedTeamName, type SpotCard } from "@/lib/spot-stats/spot-feed";
+import { selectSpotFeedGame } from "@/lib/spot-stats/feed-query";
+import styles from "./research/feed.module.css";
 
 export const metadata: Metadata = { title: "Spot Stats · Surf", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
+const date = (value: string, time = false) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", ...(time ? { hour: "numeric", minute: "2-digit", timeZoneName: "short" } as const : { year: "numeric" } as const) }).format(new Date(value));
+const signed = (value: number | null) => value === null ? "—" : value > 0 ? `+${value}` : String(value);
 
-const situations: { title: string; description: string; filters: Partial<SpotQuery> }[] = [
-  { title: "Regular-season record", description: "Every matching regular-season game in the imported archive.", filters: {} },
-  { title: "At home", description: "Home games with a confirmed non-neutral venue.", filters: { venue: "home" } },
-  { title: "On the road", description: "Away games with a confirmed non-neutral venue.", filters: { venue: "away" } },
-  { title: "Week 1", description: "Season openers in the imported regular-season history.", filters: { week: 1 } },
-  { title: "As the favorite", description: "Games where the provider’s game-start spread favored this team.", filters: { role: "favorite" } },
-];
-
-function ResearchCard({ title, description, result }: { title: string; description: string; result: SpotQueryResult }) {
-  const graded = result.ats.wins + result.ats.losses;
-  return <article className={styles.card}>
-    <div className={styles.cardHeading}><h2>{title}</h2><span className={styles.badge}>{result.sampleSize} games</span></div>
-    <p>{description}</p>
-    <dl className={styles.numbers}>
-      <div><dt>Against the spread</dt><dd>{graded + result.ats.pushes ? `${result.ats.wins}–${result.ats.losses}–${result.ats.pushes}` : "—"}</dd><small>Wins · losses · pushes</small></div>
-      <div><dt>Straight up</dt><dd>{result.sampleSize ? `${result.su.wins}–${result.su.losses}–${result.su.ties}` : "—"}</dd><small>Wins · losses · ties</small></div>
+function TrendCard({ card }: { card: SpotCard }) {
+  return <article className={styles.card} id={card.id} data-spot-card={card.category}>
+    <div className={styles.cardTop}><span className={styles.category}>{card.prominence ?? "Matchup context"} · {card.category}</span><span>{card.sampleSize} games{card.smallSample ? " · Small sample" : ""}</span></div>
+    <div className={styles.matchup}><Link href={`?game=${encodeURIComponent(card.game.id)}`} prefetch={false}>{feedTeamName(card.game.away)} vs {feedTeamName(card.game.home)}</Link><time dateTime={card.game.kickoffAt}>{date(card.game.kickoffAt, true)}</time></div>
+    <h2>{card.headline}</h2>
+    <p className={styles.why}>{card.why}</p>
+    {card.totalSummary ? <p className={styles.category}>Reference totals: {card.totalSummary}</p> : null}
+    <dl className={styles.records}>
+      <div><dt>Won the game</dt><dd>{card.record}</dd><span>{card.wins} wins · {card.losses} losses{card.ties ? ` · ${card.ties} ties` : ""}</span></div>
+      <div><dt>Against the spread <small>Reference lines</small></dt><dd>{card.atsRecord}</dd><span>{card.atsSample ? `${card.covers} covers · ${card.nonCovers} misses${card.pushes ? ` · ${card.pushes} pushes` : ""}` : "No reference lines"}{card.missingLines ? ` · ${card.missingLines} lines missing` : ""}</span></div>
     </dl>
-    <p className={styles.caution}>{graded < 10 ? "Small ATS sample—context only, not evidence of an edge." : "Descriptive history—not a measured edge or a forecast."} {result.ats.missingSpread > 0 ? `${result.ats.missingSpread} games have no usable spread.` : ""}</p>
-    <p className={styles.source}>SportsDataIO game-start spread · not verified sportsbook closing odds</p>
-    <details className={styles.audit}>
-      <summary>View the matching games <span aria-hidden="true">+</span></summary>
-      {result.rows.length === 0 ? <p>No completed games match this situation in the imported data.</p> : <ol className={styles.gameList}>
-        {result.rows.map((row) => <li key={row.gameId}>
-          <div className={styles.gameTitle}><strong>{row.team} vs {row.opponent}</strong><span>{row.teamScore}–{row.opponentScore}</span></div>
-          <p>{row.season} · Week {row.week} · {row.venue} · {row.kickoffAt.slice(0, 10)} (UTC)</p>
-          <div className={styles.gameResult}><span>Team spread: {row.teamSpread === null ? "Unknown" : row.teamSpread > 0 ? `+${row.teamSpread}` : row.teamSpread}</span><strong>{row.ats === "win" ? "Covered" : row.ats === "loss" ? "Did not cover" : row.ats === "push" ? "Push" : "ATS unavailable"}</strong></div>
-          <small>SportsDataIO game {row.gameId}</small>
-        </li>)}
-      </ol>}
+    <p className={styles.scope}>{card.scope}</p>
+    <details className={styles.proof}><summary>See the {card.sampleSize} games <span aria-hidden="true">＋</span></summary>
+      <p>Spread results use historical reference lines, not verified sportsbook closing quotes. A cover means the final score beat the listed handicap; a push means it landed exactly on it.</p>
+      {card.totalSummary ? <ul>{card.rows.map(row => <li key={row.gameId}>{date(row.kickoffAt)} · {feedTeamName(row.team)} vs {feedTeamName(row.opponent)}: {row.totalScore} points / reference total {row.totalLine ?? "unavailable"} · {row.totalOutcome ?? "missing"}</li>)}</ul> : null}
+      <div className={styles.tableWrap}><table><caption className={styles.srOnly}>Games behind {card.headline}</caption><thead><tr><th>Date</th><th>Team / opponent</th><th>Score</th><th>Spread</th><th>Result</th></tr></thead><tbody>{card.rows.map(row => <tr key={`${row.gameId}-${row.team}`}><td>{date(row.kickoffAt)}</td><td><strong>{feedTeamName(row.team)}</strong><br />vs {feedTeamName(row.opponent)}</td><td>{row.teamScore}–{row.opponentScore}</td><td>{signed(row.teamSpread)}</td><td>{row.su === "win" ? "Won" : row.su === "loss" ? "Lost" : "Tied"}<br /><span>{row.ats === "win" ? "Covered" : row.ats === "loss" ? "Did not cover" : row.ats === "push" ? "Pushed" : "No line"}</span></td></tr>)}</tbody></table></div>
+      <CloseSpotGames />
     </details>
+    <div className={styles.cardFoot}><span>{card.smallSample ? "A small slice of history, not a prediction." : "Past results describe the spot—not the next result."}</span></div>
   </article>;
 }
 
-export default async function StatsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  if (localPreviewAllowed(process.env, (await headers()).get("host"))) {
-    redirect("/stats/research?sport=americanfootball_nfl");
-  }
-  const workspace = await getSpotStatsWorkspace();
+export default async function StatsPage({ searchParams }: { searchParams: Promise<PreviewParams> }) {
+  const host = (await headers()).get("host");
+  if (localPreviewAllowed(process.env, host)) redirect("/stats/research?sport=americanfootball_nfl");
   const params = await searchParams;
-  const teams = [...new Set(workspace.games.flatMap((game) => [game.homeTeam, game.awayTeam]))].filter((team): team is SpotTeamCode => (SPOT_TEAM_CODES as readonly string[]).includes(team)).sort();
-  const selected = teams.find((team) => team === params.team) ?? teams[0];
-  const years = workspace.games.map((game) => game.season);
-  const from = years.length ? Math.min(...years) : 0;
-  const to = years.length ? Math.max(...years) : 0;
-  const cutoffAt = new Date().toISOString();
-  const results = selected ? situations.map((situation) => ({ ...situation, result: runSpotQuery(workspace.games, { team: selected, cutoffAt, seasonTypes: [1], seasonFrom: from, seasonTo: to, ...situation.filters }) })) : [];
-  // These checks run before cohort matching; report the archive exclusions once,
-  // not five times for the same source rows across the fixed situations.
-  const exclusions = results[0]?.result.exclusions;
-  const invalidArchiveRecords = exclusions ? exclusions.invalidRecords + exclusions.conflictingIdRecords + exclusions.conflictingFixtureRecords : 0;
-
-  return <div className={`bn-app bn-secondary-page ${styles.page}`}>
-    <main className={styles.shell}>
-      <SurfAppHeader title="Spot Stats" subtitle="The history behind the matchup. A new research workspace for situations worth understanding." />
-      <div className={styles.intro}><span className={styles.eyebrow}>NFL · Research preview</span><Link href="/games" prefetch={false}>Back to Games ↗</Link></div>
-      <section className={styles.status} aria-labelledby="data-status">
-        <h2 id="data-status">{workspace.state === "ready" ? "History connected" : "Waiting for real history"}</h2>
-        <p>{workspace.message}</p>
-        {workspace.state === "ready" ? <p>{workspace.games.length} completed records · {workspace.importedSeasons} season imports · {from}–{to}</p> : <p>We won’t fill this page with invented trends or scrambled trial results.</p>}
-        {workspace.invalidFiles > 0 ? <p role="status">{workspace.invalidFiles} unreadable imports were excluded. Coverage is incomplete.</p> : null}
-        {workspace.rejectedRecords > 0 ? <p role="status">{workspace.rejectedRecords} source rows were excluded because they were unfinished or did not pass validation. These records are not a complete history.</p> : null}
-        {invalidArchiveRecords > 0 ? <p role="status">{invalidArchiveRecords} additional invalid or conflicting archive records were excluded before matching. Coverage is incomplete.</p> : null}
-        {workspace.latestImport ? <p>Last import: {workspace.latestImport.replace("T", " ").slice(0, 16)} UTC</p> : null}
-      </section>
-
-      {workspace.state === "ready" && selected ? <>
-        <form className={styles.controls} action="/stats">
-          <label htmlFor="stats-team">Explore a team</label>
-          <select id="stats-team" name="team" defaultValue={selected}>{teams.map((team) => <option key={team} value={team}>{team}</option>)}</select>
-          <button type="submit">View situations</button>
-        </form>
-        <p className={styles.scope}>Regular season · Imported years {from}–{to} · Provider team codes stay distinct across relocations. These are fixed situations, not hand-picked winning records.</p>
-        <div className={styles.cards}>{results.map(({ title, description, result }) => <ResearchCard key={title} title={title} description={description} result={result} />)}</div>
-      </> : <section className={styles.next} aria-labelledby="next-heading">
-        <h2 id="next-heading">What this is being built to answer</h2>
-        <ul><li>How does this team perform at home, away, or as a favorite?</li><li>What happened in comparable Week 1 situations?</li><li>Which historical angles apply to the next matchup?</li></ul>
-        <p>The first calculations and import path are ready. Coach records, championship carryover, and AI-assisted discovery come after the data is validated.</p>
-      </section>}
-
-      <footer className={styles.footer}>Research uses final historical revisions, not a point-in-time backtest. Missing data stays missing. A past record does not predict the next result.</footer>
-    </main>
-  </div>;
+  let feed: Awaited<ReturnType<typeof getPublishedSpotFeed>> | undefined;
+  let issue: string | undefined;
+  if (process.env.SURF_SPOT_STATS_PUBLISHED !== "true") {
+    issue = "Spot Stats is not available yet.";
+  } else {
+    try { feed = await getPublishedSpotFeed(); } catch { issue = "The saved research archive could not be validated. No stats are shown until it is available."; }
+  }
+  const selection = selectSpotFeedGame(params, feed?.games ?? []);
+  const selected = selection ?? "all";
+  if (selection === null) issue = "Choose a current matchup. The old archive filters are available in Research tools.";
+  const cards = issue ? [] : feed?.cards.filter(card => selected === "all" ? card.prominence !== null : card.game.id === selected) ?? [];
+  return <div className={`bn-app ${styles.page}`}><main className={styles.shell}>
+    <div className={styles.intro}><p className={styles.eyebrow}>{feed?.week ? `NFL ${feed.season} · Week ${feed.week}` : "NFL"}</p><h1>Spot Stats</h1><p>NFL history from 2020 to the latest completed games in our saved data.</p><p>New results join the history when the archive is refreshed. Explore the situations behind this week’s matchups—past results are context, not predictions.</p></div>
+    <div className={styles.toolbar}><form action="/stats"><label htmlFor="matchup">Matchup</label><select name="game" id="matchup" defaultValue={selected}><option value="all">All upcoming matchups</option>{feed?.games.map(game => <option value={game.id} key={game.id}>{feedTeamName(game.away)} vs {feedTeamName(game.home)}</option>)}</select><button type="submit">Show</button></form><span>{cards.length} spots</span></div>
+    {issue ? <section className={styles.empty} role="alert"><h2>Stats paused</h2><p>{issue}</p><Link href="/stats" prefetch={false}>Back to this week</Link></section> : !cards.length ? <section className={styles.empty}><h2>No matching spots yet</h2><p>{feed?.notices[0] ?? "No supported records meet this view’s threshold. Choose a matchup to explore its available history; we do not invent trends to fill the feed."}</p></section> : <div className={styles.feed}>{cards.map(card => <TrendCard key={card.id} card={card} />)}</div>}
+<footer className={styles.footer}><p>Historical-reference spread results, not verified closing lines.</p><p>Regular-season history from 2020 through completed games available in the latest saved archive. New results are included on refresh; future and unfinished games are excluded. Standouts have at least 5 decided games and 75% wins or losses; early patterns are unbeaten or winless across 3–4 decided games. Ties and pushes do not count toward those thresholds. Near-duplicate home/road samples with at least 75% shared membership are shown once, preferring an already-qualified spread record; otherwise the broader sample stays. These are editorial filters, not statistical significance. Searching many situations can produce extreme records by chance. Franchise records include relocations; coach records use the coach listed for each game.</p>{feed ? <p>Saved schedule: {date(feed.retrievedAt, true)} · No live sportsbook calls on this page. Started games leave the feed when the page is loaded again.</p> : null}<details><summary>Data source</summary><p>nflverse / nfldata contributors · <a href="https://github.com/nflverse/nflverse-data/releases/tag/schedules" target="_blank" rel="noreferrer">Schedules archive ↗</a> · CC BY 4.0. Surf normalizes records and calculates descriptive statistics; data is provided without warranties and no endorsement is implied. The separate API-Sports archive and its pending corrections are not mixed into these cards.</p></details></footer>
+  </main></div>;
 }
