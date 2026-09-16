@@ -8,6 +8,7 @@ await db.exec('create role anon; create role authenticated; create role service_
 for (const file of readdirSync('supabase/migrations').filter(f => f.endsWith('.sql')).sort()) await db.exec(readFileSync('supabase/migrations/' + file, 'utf8'));
 // Re-applying the newest migration must stay idempotent.
 await db.exec(readFileSync('supabase/migrations/20260916061500_add_spot_research_archive.sql', 'utf8'));
+await db.exec(readFileSync('supabase/migrations/20260916190000_prune_spot_research_archives.sql', 'utf8'));
 await db.exec('set role service_role');
 
 const sha = (text) => createHash('sha256').update(text).digest('hex');
@@ -52,10 +53,18 @@ await assert.rejects(db.query("insert into public.surf_spot_research_archives (p
 // Two selected archives can never coexist.
 await assert.rejects(db.query('update public.surf_spot_research_archives set is_current = true'));
 
+// Retention: the selected archive plus the two most recent superseded ones.
+for (const n of [3, 4, 5, 6]) await record('{"schemaVersion":1,"body":"gen' + n + '"}');
+const kept = await db.query('select archive_json, is_current from public.surf_spot_research_archives order by created_at desc, id desc');
+assert.equal(kept.rows.length, 3, 'older superseded archives are pruned');
+assert.equal(kept.rows.filter(r => r.is_current).length, 1);
+assert.equal(kept.rows.find(r => r.is_current).archive_json, '{"schemaVersion":1,"body":"gen6"}');
+assert.ok(kept.rows.every(r => r.archive_json !== '{"schemaVersion":1,"body":"first"}'), 'the oldest body is gone');
+
 await db.exec('reset role; set role anon');
 await assert.rejects(db.query('select * from public.surf_spot_research_archives'));
 await assert.rejects(db.query('select public.surf_spot_research_health()'));
 await assert.rejects(db.query("select public.record_surf_spot_research(1,'https://example.com',now(),$1,$1,$1,'{}'::jsonb,'{}')", [sha('z')]));
 
-console.log('Spot research PostgreSQL passed: migrations idempotent, single selected archive, idempotent re-import, provenance constraints enforced, anonymous access denied.');
+console.log('Spot research PostgreSQL passed: migrations idempotent, single selected archive, idempotent re-import, provenance constraints enforced, retention keeps three archives, anonymous access denied.');
 await db.close();
