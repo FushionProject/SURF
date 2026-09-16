@@ -1,5 +1,6 @@
 import { SurfNavigation } from "@/components/surf/SurfNavigation";
 import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
+import { SurfLegalFooter } from "@/components/surf/SurfLegalFooter";
 import { THEME_INIT } from "@/components/surf-editorial/theme-init";
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
@@ -35,6 +36,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col" style={{ paddingBottom: "calc(76px + env(safe-area-inset-bottom))" }}>
         <SurfNavigation />
         {children}
+        <SurfLegalFooter />
         <SurfBottomNav />
       </body>
     </html>
