@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { SurfAppHeader } from "@/components/surf/SurfAppHeader";
-import { SurfBottomNav } from "@/components/surf/SurfBottomNav";
 
 export const metadata: Metadata = {
   title: "How to use Surf",
@@ -159,7 +158,6 @@ export default function HowToUsePage() {
           Surf translates market data. It does not place bets or tell you what will win.
         </p>
       </main>
-      <SurfBottomNav />
     </div>
   );
 }

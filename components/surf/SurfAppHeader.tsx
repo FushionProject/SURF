@@ -1,5 +1,4 @@
 "use client";
-import { SurfNavigation } from "./SurfNavigation";
 export function SurfAppHeader({
   title,
   subtitle,
@@ -9,7 +8,6 @@ export function SurfAppHeader({
 }) {
   return (
     <>
-    <SurfNavigation />
     <header className="bn-account-header">
       <h1>{title}</h1>
       <p>{subtitle}</p>

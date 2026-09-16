@@ -1,4 +1,3 @@
-import { SurfNavigation } from "@/components/surf/SurfNavigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BILLING_PLANS } from "@/lib/billing/config";
@@ -20,7 +19,6 @@ export default function Home() {
   return (
     <div className={styles.page}>
       <a href="#main" className={styles.skip}>Skip to content</a>
-      <SurfNavigation />
       <main id="main">
         <section className={styles.hero} aria-labelledby="hero-title">
           <div className={styles.heroCopy}>

@@ -2,47 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import styles from "./SurfBottomNav.module.css";
 
-type Item = {
-  label: string;
-  href: string;
-  isActive: (pathname: string) => boolean;
-};
-
-const ITEMS: Item[] = [
-  { label: "Games", href: "/games", isActive: (p) => p === "/games" || p.startsWith("/games/") },
-  { label: "Signals", href: "/feed", isActive: (p) => p === "/feed" || p.startsWith("/top") },
+const items = [
+  { label: "Home", href: "/", path: "M3 10 12 3l9 7v11h-6v-7H9v7H3Z" },
+  { label: "Spot Stats", href: "/stats", path: "M5 20V10M12 20V4M19 20v-7" },
+  { label: "Signals", href: "/feed", path: "M2 12h5l3-8 4 16 3-8h5" },
+  { label: "Game briefs", href: "/games", path: "M4 5h16v16H4ZM8 3v4M16 3v4M4 11h16" },
 ];
 
 export function SurfBottomNav() {
   const pathname = usePathname();
-
-  return (
-    <nav aria-label="Primary navigation" className="sports-nav fixed bottom-0 left-0 right-0 z-50 border-t border-[color:var(--surf-line-06)] bg-[color:var(--surf-chrome-bg)]">
-      <div className="sports-nav-inner">
-        <div className="sports-nav-tabs">
-          {ITEMS.map((it) => {
-            const active = pathname ? it.isActive(pathname) : false;
-            return (
-              <Link
-                key={it.href}
-                href={it.href}
-                aria-current={active ? "page" : undefined}
-                className="sports-nav-link"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  {it.label === "Games" ? (
-                    <><rect x="3" y="5" width="18" height="15" rx="3" /><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2" /></>
-                  ) : (
-                    <><path d="M3 15h4l3-8 4 12 3-8h4" /><path d="M3 4h18" opacity=".35" /></>
-                  )}
-                </svg>
-                <span>{it.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    </nav>
-  );
+  return <nav aria-label="Bottom navigation" className={styles.bar}>
+    <div className={styles.inner}>
+      {items.map(({ label, href, path }) => <Link key={href} href={href} prefetch={false}
+        aria-current={(pathname === href || (href !== "/" && pathname.startsWith(`${href}/`))) ? "page" : undefined}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>
+        <span>{label}</span>
+      </Link>)}
+    </div>
+  </nav>;
 }

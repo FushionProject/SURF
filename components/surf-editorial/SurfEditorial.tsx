@@ -1,6 +1,5 @@
 "use client";
 
-import { SurfNavigation } from "@/components/surf/SurfNavigation";
 
 import Link from "next/link";
 import { SurfLoading } from "@/components/surf/SurfLoading";
@@ -569,15 +568,8 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
   }
   const newSignals = countNewSignals(signals, lastVisitAt);
   const league = getSurfSportConfig(sport).label;
-  const nav = [
-    { id: "stats", href: "/stats", label: "Spot Stats", icon: "grid" },
-    { id: "signals", href: "/feed", label: "The signals", icon: "pulse" },
-    { id: "markets", href: "/games", label: "Game briefs", icon: "grid" },
-    { id: "saved", href: "/top", label: "My watchlist", icon: "save" },
-  ] as const;
   return (
     <div className="bn-app">
-      <SurfNavigation sport={sport} savedCount={saved.length} />
       <div className="bn-main-shell">
         <main className="bn-main">
           <section className="bn-hero">
@@ -946,24 +938,6 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
           </footer>
         </main>
       </div>
-      <nav className="bn-mobile-nav" aria-label="Mobile navigation">
-        {nav.map((item) => (
-          <Link
-            key={item.id}
-            href={`${item.href}?sport=${sport}`}
-            aria-current={view === item.id ? "page" : undefined}
-          >
-            <Icon name={item.icon} size={19} />
-            <span>
-              {item.id === "markets"
-                ? "Briefs"
-                : item.id === "signals"
-                  ? "Signals"
-                  : item.id === "stats" ? "Stats" : "Watchlist"}
-            </span>
-          </Link>
-        ))}
-      </nav>
     </div>
   );
 }
