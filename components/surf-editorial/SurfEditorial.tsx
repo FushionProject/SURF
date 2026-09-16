@@ -233,7 +233,7 @@ function Offer({
         : price(offer?.point);
   return (
     <div className="bn-offer">
-      <small className="bn-offer-midpoint">{market === "h2h" ? "Market median" : "Market midpoint"}{offer ? ` · ${offer.booksCompared} books` : ""}</small>
+      <small className="bn-offer-midpoint">{market === "h2h" ? "Market median" : "Market midpoint"}</small>
       <strong>{market === "h2h" ? price(offer?.consensusPrice) : market === "totals" ? `${side ? "U" : "O"} ${offer?.consensusPoint ?? "—"}` : price(offer?.consensusPoint)}</strong>
       <small className="bn-offer-best">Best number · {value}</small>
       <small>
@@ -565,9 +565,6 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
     }
     setLinkedSignal((previous) => ({ id: null, request: previous.request + 1 }));
   }
-  const books = new Set(
-    currentGames.flatMap((g) => g.bookmakers?.map((b) => b.key) ?? []),
-  );
   const newSignals = countNewSignals(signals, lastVisitAt);
   const league = getSurfSportConfig(sport).label;
   const nav = [
@@ -685,14 +682,7 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
               </strong>
             </div>
             <div>
-              <span>02 / SOURCES</span>
-              <strong>
-                {data ? books.size : "—"}
-                <small>sportsbook sources</small>
-              </strong>
-            </div>
-            <div>
-              <span>03 / SIGNALS</span>
+              <span>02 / SIGNALS</span>
               <strong>
                 {data && !data.signalError ? currentSignals.length : "—"}
                 <small>market signals</small>

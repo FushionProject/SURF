@@ -30,7 +30,8 @@ const whale = (amount, id = "game-1", kind = "large_trade") => ({
 const read = (overrides = {}) => buildGameMarketRead({ ...base, ...overrides });
 
 assert.equal(read().kind, "quiet");
-assert.match(read().detail, /10 sportsbooks/);
+assert.match(read().detail, /Compare sportsbooks/);
+assert.doesNotMatch(read().detail, /\d+ sportsbooks/);
 assert.equal(read({ consensus }).kind, "consensus");
 assert.match(read({ consensus }).headline, /62%/);
 assert.match(read({ consensus }).detail, /not Surf's forecast/);
