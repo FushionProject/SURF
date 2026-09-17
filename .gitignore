@@ -43,4 +43,7 @@ next-env.d.ts
 
 # local AI-agent worktrees and launch settings
 /.claude/
-/.surf-data/
+/.surf-data
+
+# local dev launcher (machine-specific)
+/.start-dev.sh
