@@ -61,7 +61,8 @@ assert.ok(international.rows.some(row => row.gameId === "2025_07_LA_JAX" && row.
 assert.equal(card(baseline, "coach-opener").record, "5–1");
 assert.equal(card(baseline, "coach-opener").atsRecord, "4–1–1", "pushes are shown but do not count as decided");
 assert.equal(card(baseline, "coach-opener").leadMetric, "su", "five decided spread results cannot lead");
-assert.match(card(baseline, "coach-opener").headline, /^Sean McVay: 5–1 straight up in Week 1 games$/);
+assert.match(card(baseline, "coach-opener").headline, /^Sean McVay: 5–1 straight up in Week 1 games since 2020$/, "situational headlines name the earliest season in the sample");
+assert.match(card(baseline, "international").headline, / since 2021$/, "the year is the sample's first season, not the window start");
 assert.match(card(baseline, "coach-opener").scope, /^2020–2026 · Regular season · All teams coached$/);
 assert.ok(baseline.cards.every(c => c.prominence === "Standout history"), "every emitted card meets the threshold");
 assert.doesNotMatch(JSON.stringify(baseline.cards), /in season openers|short-rest|long-rest|Early pattern|Franchise history/);
@@ -395,7 +396,7 @@ const bigRows = [1,2,3,4,5,6].map(week => formGame(week, { spread_line: "10", ho
 const bigCurrent = { ...formCurrent, spread_line: "7" };
 const bigFeed = qbInput([...bigRows, bigCurrent]);
 const bigTeam = card(bigFeed, "big-favorite");
-assert.equal(bigTeam.headline, "Rams: 7–0 ATS as a favorite of 7+ points"); assert.equal(bigTeam.category, "Big favorite (7+)");
+assert.match(bigTeam.headline, /^Rams: 7–0 ATS as a favorite of 7\+ points since \d{4}$/); assert.equal(bigTeam.category, "Big favorite (7+)");
 assert.equal(bigTeam.record, "7–0"); assert.equal(bigTeam.order, 3);
 assert.equal(bigTeam.sampleSize, 7, "six home and one road game as a 7+ favorite; the 3-point favorite is out");
 assert.ok(bigTeam.rows.some(r => r.venue === "away"), "home and road are pooled");
@@ -409,7 +410,7 @@ assert.equal(card(qbInput([...bigRows, { ...bigCurrent, spread_line: "" }]), "bi
 assert.equal(card(qbInput([...bigRows, { ...bigCurrent, location: "Neutral" }]), "big-favorite").sampleSize, 7, "the bucket does not need a venue");
 const dogRows = bigRows.map(r => ({ ...r, spread_line: String(-Number(r.spread_line)) }));
 const dogFeed = qbInput([...dogRows, { ...bigCurrent, spread_line: "-9" }]);
-assert.equal(card(dogFeed, "big-underdog").headline, "Rams: 7–0 ATS as an underdog of 7+ points"); assert.equal(card(dogFeed, "big-underdog").category, "Big underdog (+7 or more)");
+assert.match(card(dogFeed, "big-underdog").headline, /^Rams: 7–0 ATS as an underdog of 7\+ points since \d{4}$/); assert.equal(card(dogFeed, "big-underdog").category, "Big underdog (+7 or more)");
 assert.match(card(dogFeed, "big-underdog").why, /as an underdog by 9 points/);
 assert.equal(card(dogFeed, "big-favorite"), undefined);
 assert.equal(card(qbInput([...bigRows, { ...bigCurrent, spread_line: "-9" }]), "big-underdog"), undefined, "no history in the bucket, no card");
@@ -418,7 +419,7 @@ assert.equal(card(noCoachBig, "big-favorite-coach"), undefined, "McVay coached n
 assert.equal(card(noCoachBig, "big-favorite-qb"), undefined); assert.match(card(noCoachBig, "big-favorite").why, /Also applies: QB · Big favorite/);
 assert.doesNotMatch(card(noCoachBig, "big-favorite").why, /Coach ·/);
 const qbOwnBig = qbInput([...bigRows.map(r => Number(r.week) === 1 ? { ...r, home_qb_id: "00-0000001", home_qb_name: "Someone Else" } : r), bigCurrent]);
-assert.equal(card(qbOwnBig, "big-favorite-qb").headline, "Joe Burrow: 6–0 ATS as a favorite of 7+ points", "a different sample is the QB's own card");
+assert.match(card(qbOwnBig, "big-favorite-qb").headline, /^Joe Burrow: 6–0 ATS as a favorite of 7\+ points since \d{4}$/, "a different sample is the QB's own card");
 assert.equal(card(qbOwnBig, "big-favorite-qb").category, "QB · Big favorite (7+)"); assert.match(card(qbOwnBig, "big-favorite-qb").why, /projected QB/);
 assert.equal(card(qbOwnBig, "big-favorite").record, "7–0");
 // Bucket vs general favorite: same subject, 75%+ shared games. The big card stays when it is at least as extreme.
@@ -449,7 +450,7 @@ const firstLoss = meeting(2026, 1, "ARI", "LA", 27, 13, { gameday: "2026-08-30" 
 const rematchCurrent = { ...formCurrent, game_id: "2026_02_ARI_LA", away_team: "ARI", week: "2", div_game: "1" };
 const rematchFeed = qbInput([...rematchRows, firstLoss, rematchCurrent]);
 const lostRematch = card(rematchFeed, "division-rematch-lost-coach");
-assert.equal(lostRematch.headline, "Sean McVay: 7–0 ATS in division rematches after losing the first meeting");
+assert.match(lostRematch.headline, /^Sean McVay: 7–0 ATS in division rematches after losing the first meeting since \d{4}$/);
 assert.equal(lostRematch.category, "Coach · Division rematch · Lost first meeting"); assert.equal(lostRematch.order, 2);
 assert.match(lostRematch.why, /lost the first meeting with the Cardinals this season, 13–27 on August 30\./);
 assert.match(lostRematch.why, /rematch record describes the past/); assert.match(lostRematch.why, /coached both meetings/);
@@ -464,7 +465,7 @@ const wonFeed = qbInput([...rematchRows, { ...firstLoss, home_score: "13", away_
 assert.equal(card(wonFeed, "division-rematch-lost-coach"), undefined);
 assert.equal(card(wonFeed, "division-rematch-won-coach"), undefined, "McVay has never played a rematch after winning the first meeting");
 const wonRows = rematchRows.map(r => Number(r.week) === 3 ? { ...r, home_score: "20", away_score: "10" } : r);
-assert.equal(card(qbInput([...wonRows, { ...firstLoss, home_score: "13", away_score: "27" }, rematchCurrent]), "division-rematch-won-coach").headline, "Sean McVay: 6–0 ATS in division rematches after winning the first meeting", "the Seattle series was a lost first meeting, so six");
+assert.match(card(qbInput([...wonRows, { ...firstLoss, home_score: "13", away_score: "27" }, rematchCurrent]), "division-rematch-won-coach").headline, /^Sean McVay: 6–0 ATS in division rematches after winning the first meeting since \d{4}$/, "the Seattle series was a lost first meeting, so six");
 assert.equal(card(qbInput([...wonRows, { ...firstLoss, home_score: "13", away_score: "27" }, rematchCurrent]), "division-rematch-won-coach").category, "Coach · Division rematch · Won first meeting");
 assert.equal(card(qbInput([...wonRows, firstLoss, rematchCurrent]), "division-rematch-lost-coach"), undefined, "he lost this year's first meeting but never lost one before");
 // Nothing without a completed first meeting, with a tied one, outside the division, or when the subject was not there for it.
@@ -486,7 +487,7 @@ assert.equal(qbInput([...rematchRows, firstLoss, { ...rematchCurrent, game_id: "
 // Six opponents met twice each in 2025 (a synthetic division: only the div_game flag matters here), first meeting lost, rematch won.
 const teamRematch = ["ARI", "SF", "SEA", "DAL", "NYG", "PHI"].flatMap((opponent, i) => [meeting(2025, i + 1, "LA", opponent, 10, 20), meeting(2025, i + 7, opponent, "LA", 17, 24)]);
 const teamRematchFeed = qbInput([...teamRematch, firstLoss, rematchCurrent]);
-assert.equal(card(teamRematchFeed, "division-rematch-lost").headline, "Rams: 6–0 ATS in division rematches after losing the first meeting");
+assert.match(card(teamRematchFeed, "division-rematch-lost").headline, /^Rams: 6–0 ATS in division rematches after losing the first meeting since \d{4}$/);
 assert.ok(card(teamRematchFeed, "division-rematch-lost").scope.startsWith("2025–2026 · Regular season · Team history"));
 assert.equal(card(teamRematchFeed, "division-rematch-lost-coach"), undefined, "identical coach sample folded in");
 assert.match(card(teamRematchFeed, "division-rematch-lost").why, /Also applies: Coach · Division rematch/);

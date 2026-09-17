@@ -270,15 +270,22 @@ export function buildSpotFeed(input: {
       ...(totals ? { totalSummary } : {}) });
   };
   /** A situational card exists only when its lead metric clears notableRecord; nothing is pushed for a weak record. */
+  /** The window belongs in the headline, not just the small scope line: "7–2 at home" reads as
+   *  all-time until it says "since 2025". The year is the earliest season actually in the sample,
+   *  so a second-year quarterback says "since 2025" rather than borrowing the 2020 window. */
+  const sinceLabel = (rows: SpotAuditRow[]) => {
+    const first = Math.min(...rows.map(row => row.season));
+    return first >= through ? "this season" : `since ${first}`;
+  };
   function add(game: UpcomingSpotGame, team: string, key: string, category: string, subject: string,
     phrase: string, why: string, matches: HistoryRow[], order: number, scope: string, totals = false) {
     if (matches.length < STANDOUT_MIN_DECIDED) return false;
-    const rows = sortRows(matches), counts = tally(rows);
+    const rows = sortRows(matches), counts = tally(rows), since = sinceLabel(rows);
     const { wins, losses, covers, nonCovers, missingLines, record, atsRecord, overs, unders, totalPushes, totalMissing } = counts;
     if (totals) {
       // Missing totals could hide a selected subset, so they block the card rather than shrink the sample.
       if (totalMissing !== 0 || !notableRecord(overs, unders)) return false;
-      push(game, team, key, category, `${subject} games have gone ${unders >= overs ? "under" : "over"} in ${unders >= overs ? unders : overs} of ${overs + unders} ${phrase.replace(/^in /, "")}${totalPushes ? ` (${totalPushes} pushes excluded)` : ""}`,
+      push(game, team, key, category, `${subject} games have gone ${unders >= overs ? "under" : "over"} in ${unders >= overs ? unders : overs} of ${overs + unders} ${phrase.replace(/^in /, "")} ${since}${totalPushes ? ` (${totalPushes} pushes excluded)` : ""}`,
         why, scope, rows, counts, order, "su", true);
       return true;
     }
@@ -287,7 +294,7 @@ export function buildSpotFeed(input: {
     const suProminence = notableRecord(wins, losses);
     if (!atsProminence && !suProminence) return false;
     const leadMetric = atsProminence ? "ats" : "su";
-    push(game, team, key, category, `${subject}: ${leadMetric === "ats" ? atsRecord + " ATS" : record + " straight up"} ${phrase}`,
+    push(game, team, key, category, `${subject}: ${leadMetric === "ats" ? atsRecord + " ATS" : record + " straight up"} ${phrase} ${since}`,
       why, scope, rows, counts, order, leadMetric, false);
     return true;
   }
