@@ -16,12 +16,39 @@ export const metadata: Metadata = { title: "Spot Stats · Surf" };
 export const dynamic = "force-dynamic";
 const date = (value: string, time = false) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", ...(time ? { hour: "numeric", minute: "2-digit", timeZoneName: "short" } as const : { year: "numeric" } as const) }).format(new Date(value));
 const signed = (value: number | null) => value === null ? "—" : value > 0 ? `+${value}` : String(value);
+const slateLabel = (kickoff: string) => {
+  const at = new Date(kickoff);
+  const day = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "long", month: "short", day: "numeric" }).format(at);
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(at);
+  return `${day} · ${time}`;
+};
+type GameGroup = { game: SpotCard["game"]; cards: SpotCard[] };
+type Slate = { key: number; label: string; games: GameGroup[]; count: number };
+/** The week in kickoff order: each kickoff window is a slate (Thursday night,
+ *  Sunday 1:00, 4:05, 4:25, Sunday night, Monday night), and within a slate
+ *  each matchup keeps its cards together. Card order inside a matchup is the
+ *  feed's own order, so recent form still leads. */
+function groupBySlate(cards: SpotCard[]): Slate[] {
+  const byGame = new Map<string, GameGroup>();
+  for (const card of cards) {
+    const group = byGame.get(card.game.id) ?? { game: card.game, cards: [] };
+    group.cards.push(card); byGame.set(card.game.id, group);
+  }
+  const games = [...byGame.values()].sort((a, b) => a.game.kickoffAt.localeCompare(b.game.kickoffAt) || a.game.id.localeCompare(b.game.id));
+  const slates: Slate[] = [];
+  for (const group of games) {
+    const key = Date.parse(group.game.kickoffAt);
+    const slate = slates.at(-1)?.key === key ? slates.at(-1)! : (slates.push({ key, label: slateLabel(group.game.kickoffAt), games: [], count: 0 }), slates.at(-1)!);
+    slate.games.push(group); slate.count += group.cards.length;
+  }
+  return slates;
+}
 
-function TrendCard({ card }: { card: SpotCard }) {
+function TrendCard({ card, headline: Headline = "h2" }: { card: SpotCard; headline?: "h2" | "h4" }) {
   return <article className={styles.card} id={card.id} data-spot-card={card.category}>
     <div className={styles.cardTop}><span className={styles.category}>{card.prominence ?? "Matchup context"} · {card.category}</span><span>{card.sampleSize} games{card.smallSample ? " · Small sample" : ""}</span></div>
     <div className={styles.matchup}><Link href={`?game=${encodeURIComponent(card.game.id)}`} prefetch={false}>{feedTeamName(card.game.away)} vs {feedTeamName(card.game.home)}</Link><time dateTime={card.game.kickoffAt}>{date(card.game.kickoffAt, true)}</time></div>
-    <h2>{card.headline}</h2>
+    <Headline>{card.headline}</Headline>
     <p className={styles.why}>{card.why}</p>
     {card.totalSummary ? <p className={styles.category}>Reference totals: {card.totalSummary}</p> : null}
     <dl className={styles.records}>
@@ -69,7 +96,14 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
     {issue ? <section className={styles.empty} role="alert"><h2>Stats paused</h2><p>{issue}</p><Link href="/stats" prefetch={false}>Back to this week</Link></section>
       : locked ? <section className={styles.empty} data-spot-lock="matchup"><h2>Surf Pro matchup</h2><p>{featuredLabel ? `The featured matchup, ${featuredLabel}, is free this week. ` : ""}{hidden.length} {hidden.length === 1 ? "spot" : "spots"} for {chosen ? `${feedTeamName(chosen.away)} vs ${feedTeamName(chosen.home)}` : "this matchup"} {hidden.length === 1 ? "is" : "are"} in Surf Pro.</p>{upgrade}</section>
       : !cards.length ? <section className={styles.empty}><h2>No matching spots yet</h2><p>{feed?.notices[0] ?? (pro || selected !== "all" || !featuredLabel ? "No supported records meet this view’s threshold. Choose a matchup to explore its available history; we do not invent trends to fill the feed." : `No supported records for the featured matchup, ${featuredLabel}, meet this view’s threshold. We do not invent trends to fill the feed.`)}</p></section>
-      : <div className={styles.feed}>{cards.map(card => <TrendCard key={card.id} card={card} />)}</div>}
+      : selected !== "all" ? <div className={styles.feed}>{cards.map(card => <TrendCard key={card.id} card={card} />)}</div>
+      : <div>{groupBySlate(cards).map(slate => <section key={slate.key} className={styles.slate} data-spot-slate={slate.label}>
+        <h2 className={styles.slateHead}><span>{slate.label}</span><span>{slate.games.length} {slate.games.length === 1 ? "matchup" : "matchups"} · {slate.count} {slate.count === 1 ? "spot" : "spots"}</span></h2>
+        {slate.games.map(({ game, cards: gameCards }) => <section key={game.id} className={styles.gameGroup}>
+          <h3 className={styles.gameHead}><Link href={`?game=${encodeURIComponent(game.id)}`} prefetch={false}>{feedTeamName(game.away)} vs {feedTeamName(game.home)}</Link><span>{gameCards.length} {gameCards.length === 1 ? "spot" : "spots"}</span></h3>
+          <div className={styles.feed}>{gameCards.map(card => <TrendCard key={card.id} card={card} headline="h4" />)}</div>
+        </section>)}
+      </section>)}</div>}
     {!locked && hidden.length ? <section className={styles.empty} data-spot-lock="slate" style={{ padding: "18px 24px" }}><p>{hidden.length} more {hidden.length === 1 ? "spot" : "spots"} across {hiddenGames} more {hiddenGames === 1 ? "matchup" : "matchups"} this week {hidden.length === 1 ? "is" : "are"} in Surf Pro.{featuredLabel ? ` ${featuredLabel} is free for everyone this week.` : ""}</p>{upgrade}</section> : null}
 <footer className={styles.footer}><p>Historical-reference spread results, not verified closing lines.</p><p>Team situations use last season and this season; coach and quarterback records go back to 2020, because a coach or quarterback is the same person across seasons while a roster turns over. A spot is shown only when it has at least 6 decided games and at least 75% went one way; recent-form spots cover a subject’s last 10 regular-season games and need at least 8 of them one way; current-streak spots need at least 5 straight decided results; big-line spots pool home and road games where the reference line had the subject favored by 7 or more or an underdog of 7 or more. Ties and pushes do not count toward those thresholds. Near-duplicate home/road samples with at least 75% shared membership are shown once, preferring an already-qualified spread record; otherwise the broader sample stays. These are editorial filters, not statistical significance. Searching many situations can produce extreme records by chance. Coach records use the coach listed for each game; quarterback records use the listed starter.</p>{feed ? <p>Saved schedule: {date(feed.retrievedAt, true)} · No live sportsbook calls on this page. Started games leave the feed when the page is loaded again.</p> : null}<details><summary>Data source</summary><p>nflverse / nfldata contributors · <a href="https://github.com/nflverse/nflverse-data/releases/tag/schedules" target="_blank" rel="noreferrer">Schedules archive ↗</a> · CC BY 4.0. Surf normalizes records and calculates descriptive statistics; data is provided without warranties and no endorsement is implied. The separate API-Sports archive and its pending corrections are not mixed into these cards.</p></details></footer>
   </main></div>;

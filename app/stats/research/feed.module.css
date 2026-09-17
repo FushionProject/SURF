@@ -15,6 +15,13 @@
 .toolbar select, .toolbar button { min-height: 44px; background: var(--ed-card); color: var(--ed-ink); border: 1px solid var(--ed-line); border-radius: 4px; padding: 10px 12px; font: inherit; font-size: 16px; }
 .toolbar button { background: var(--ed-blue); border-color: var(--ed-blue); color: #001316; font-weight: 700; cursor: pointer; }
 .feed { display: grid; gap: 24px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.slate + .slate { margin-top: 44px; }
+.slateHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 2px solid var(--ed-blue); padding-bottom: 10px; margin-bottom: 22px; font-size: 22px; font-weight: 800; letter-spacing: -.04em; }
+.slateHead span:last-child { color: var(--ed-muted); font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.gameGroup + .gameGroup { margin-top: 30px; }
+.gameHead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 17px; font-weight: 750; letter-spacing: -.02em; margin-bottom: 14px; }
+.gameHead a { color: var(--ed-ink); }
+.gameHead span { color: var(--ed-muted); font-size: 14px; font-weight: 500; }
 .feed > * { min-width: 0; }
 .card { background: var(--ed-card); border: 1px solid var(--ed-card-outline); border-top: 2px solid var(--ed-blue); border-radius: 0; padding: 26px; scroll-margin-top: 20px; }
 .cardTop, .matchup, .cardFoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -23,7 +30,7 @@
 .matchup { font-size: 14px; margin-bottom: 14px; }
 .matchup a { font-weight: 650; }
 .matchup time { color: var(--ed-muted); }
-.card h2 { font-size: clamp(24px, 3.7vw, 31px); line-height: 1.35; font-weight: 750; letter-spacing: -.045em; text-wrap: pretty; }
+.card h2, .card h4 { font-size: clamp(24px, 3.7vw, 31px); line-height: 1.35; font-weight: 750; letter-spacing: -.045em; text-wrap: pretty; }
 .why { font-size: 16px; line-height: 1.75; color: var(--ed-muted); margin: 12px 0 22px; }
 .records { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; border-top: 1px solid var(--ed-line); border-bottom: 1px solid var(--ed-line); padding: 20px 0; }
 .records > div { min-width: 0; }
