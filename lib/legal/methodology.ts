@@ -10,7 +10,7 @@ export const METHODOLOGY_BODY = `Surf shows numbers. This page explains where ea
 
 **ESPN** — AP Top 25 rankings and team logos.
 
-**nflverse schedules release** — historical NFL schedules, results and historical reference betting lines. Spot Stats presents 2020 onward. Used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) with attribution. Surf normalizes the records and calculates descriptive statistics from them, and does not redistribute the raw dataset.
+**nflverse schedules release** — historical NFL schedules, results and historical reference betting lines. Angles present 2020 onward. Used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) with attribution. Surf normalizes the records and calculates descriptive statistics from them, and does not redistribute the raw dataset.
 
 **Polymarket** — public prediction-market probabilities and observed large trade activity.
 
@@ -22,13 +22,13 @@ export const METHODOLOGY_BODY = `Surf shows numbers. This page explains where ea
 
 **Line movement.** Recorded from repeated observations over time. Only changes of at least 0.25 are recorded. Surf shows when it observed a line, which is not the same as a verified sportsbook closing price.
 
-**Spot Stats.** Situational records are descriptive counts. Surf defines a situation in advance, then counts completed games that match it. Nothing is modeled, weighted or projected. Records are reported straight-up (win/loss/tie) and against the spread (cover/miss/push). Spread results use nflverse historical reference lines, which are not verified closing quotes.
+**Angles.** Situational records are descriptive counts. Surf defines a situation in advance, then counts completed games that match it. Nothing is modeled, weighted or projected. Records are reported straight-up (win/loss/tie) and against the spread (cover/miss/push). Spread results use nflverse historical reference lines, which are not verified closing quotes.
 
 **Thresholds.** A standout record requires at least 5 decided games at 75% or better. An early pattern is unbeaten or winless across 3 to 4 decided games. Ties and pushes count toward neither.
 
 **Duplicate samples.** Home and road samples sharing at least 75% of their games are near-duplicates. Surf shows them once, so one sample does not look like two pieces of evidence.
 
-**Schedule freshness.** The saved schedule expires after 7 days. If it is not refreshed, Spot Stats stops showing matchups rather than presenting stale ones.
+**Schedule freshness.** The saved schedule expires after 7 days. If it is not refreshed, Angles stop showing matchups rather than presenting stale ones.
 
 ## What these numbers do not mean
 

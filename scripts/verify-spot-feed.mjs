@@ -338,7 +338,7 @@ const travelQb = card(travelFeed, "last10-su-qb");
 assert.equal(travelQb.headline, "Joe Burrow: 9–1 straight up in his last 10 starts");
 assert.equal(travelQb.category, "QB · Recent form · Last 10");
 assert.ok(travelQb.rows.some(r => r.gameId === "2024_05_CIN_PIT" && r.team === "CIN" && r.su === "loss"), "his Bengals start counts");
-assert.match(travelQb.why, /projected QB/); assert.match(travelQb.why, /this spot applies only if he starts/);
+assert.match(travelQb.why, /projected QB/); assert.match(travelQb.why, /this angle applies only if he starts/);
 assert.equal(travelFeed.cards.filter(c => c.totalSummary && /Last 10/.test(c.category)).length, 0, "recent-form totals belong to the team");
 assert.ok(travelFeed.cards.every(c => c.prominence === "Standout history"));
 assert.deepEqual(qbInput([...formRows, formCurrent].reverse()).cards, formFeed.cards, "recent form is deterministic");

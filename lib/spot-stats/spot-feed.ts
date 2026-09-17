@@ -441,7 +441,7 @@ export function buildSpotFeed(input: {
     const qb = qbIdentity(currentRaw, side);
     const starts = qb ? history.filter(item => item.qb?.id === qb.id) : [];
     const qbScope = qb ? `${scope} · All teams with ${qb.name} starting` : "";
-    const projection = qb ? `${qb.name} is the projected QB in the saved schedule for the ${name}; this spot applies only if he starts. These are team results, not individual passing statistics.` : "";
+    const projection = qb ? `${qb.name} is the projected QB in the saved schedule for the ${name}; this angle applies only if he starts. These are team results, not individual passing statistics.` : "";
     const line = !missing(currentRaw.spread_line) && Number.isFinite(Number(currentRaw.spread_line)) ? Number(currentRaw.spread_line) : null;
     // nflverse spread_line is positive when the home team is favored.
     const handicap = line === null ? null : side === "home" ? -line : line;
@@ -457,7 +457,7 @@ export function buildSpotFeed(input: {
     }, coached, false);
     if (qb) addRecency(game, team, "qb", { streak: "QB · Current streak", recent: "QB · Recent form · Last 10" }, qb.name, "his", "starts", {
       streak: `${projection} His current run is counted back from his most recent regular-season start, with any team and across seasons. ${runExplanation} ${recentExplanation}`,
-      recent: `${qb.name} is the projected QB in the saved schedule for the ${name}; this spot applies only if he starts. These are team results in his ${RECENT_FORM_GAMES} most recent regular-season starts, listed most recent first, with any team and across seasons, not individual passing statistics. ${recentExplanation}`,
+      recent: `${qb.name} is the projected QB in the saved schedule for the ${name}; this angle applies only if he starts. These are team results in his ${RECENT_FORM_GAMES} most recent regular-season starts, listed most recent first, with any team and across seasons, not individual passing statistics. ${recentExplanation}`,
     }, starts, false);
     // Season to date needs the standout floor inside one season, so it appears around midseason.
     addSeason(game, team, "", "This season", name,

@@ -55,7 +55,7 @@ assert.match(page, /gateSpotCardsForViewer\(viewCards, selected, featuredId, pro
 assert.doesNotMatch(page, /paidFeatureDenial/, "the page shows the featured matchup instead of a hard denial");
 
 // Methodology copy matches the engine's season and threshold rules.
-assert.match(page, /Team spots use the last two seasons; coach and QB spots go back to 2020\./);
+assert.match(page, /Team angles use the last two seasons; coach and QB angles go back to 2020\./);
 assert.match(page, /Team situations use last season and this season; coach and quarterback records go back to 2020/);
 assert.match(page, /at least 6 decided games and at least 75% went one way/);
 assert.match(page, /last 10 regular-season games and need at least 8 of them one way/);

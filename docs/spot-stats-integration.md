@@ -1,3 +1,5 @@
+> **Naming (September 17, 2026):** the product is called **Angles** in every user-facing surface. Code identifiers, routes (`/stats`), env vars (`SURF_SPOT_STATS_*`) and file paths keep the original `spot-stats` name on purpose; renaming them buys nothing and risks the deploy.
+
 # Spot Stats integration preview
 
 Integrated into local main at `50f14c0`; originally developed on `codex/spot-stats-integration` from main `2b777b7`.

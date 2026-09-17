@@ -6,7 +6,7 @@ import { getLocalPreview } from "@/lib/spot-stats/local-preview-server";
 import { localPreviewAllowed, parsePreviewQuery, PREVIEW_TEAMS, PREVIEW_YEARS, type PreviewParams } from "@/lib/spot-stats/local-preview";
 import styles from "../research.module.css";
 
-export const metadata: Metadata = { title: "NFL Spot Stats · Local research · Surf", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "NFL Angles · Local research · Surf", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 const format = (value: number | null, signed = false) => value === null ? "—" : `${signed && value > 0 ? "+" : ""}${value.toFixed(1)}`;
 const date = (value: string) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
@@ -35,7 +35,7 @@ export default async function LocalStatsPage({ searchParams }: { searchParams: P
         <span className={styles.private}>Local research · NFL only</span>
       </header>
       <div className={styles.intro}>
-        <div><p className={styles.eyebrow}>The history behind the matchup</p><h1>NFL Spot Stats</h1></div>
+        <div><p className={styles.eyebrow}>The history behind the matchup</p><h1>NFL Angles</h1></div>
         <p>Explore a team’s record, then check the games behind it. Historical results—not predictions.</p>
       </div>
       <form action="/stats/research/explore" className={styles.controls}>

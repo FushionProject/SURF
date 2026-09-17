@@ -54,7 +54,7 @@ export function AccountBilling() {
             {canBuyPro && pro ? <button type="button" disabled={pending} onClick={() => void open("checkout")} className="bg-[color:var(--surf-primary)] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{pending ? "Opening…" : `Get ${pro.name} · ${displayPrice(pro.amount, pro.currency)}/month`}</button> : null}
             {status.canManage ? <button type="button" disabled={pending} onClick={() => void open("portal")} className="border border-[color:var(--surf-line-08)] px-4 py-3 text-sm font-semibold disabled:opacity-50">Manage billing</button> : null}
           </div>
-          {canBuyPro ? <p className="mt-3 text-sm leading-6 text-[color:var(--surf-ink-70)]">Surf Pro unlocks Signals and Spot Stats for every matchup. One featured matchup of each stays free every week.</p> : null}
+          {canBuyPro ? <p className="mt-3 text-sm leading-6 text-[color:var(--surf-ink-70)]">Surf Pro unlocks Signals and Angles for every matchup. One featured matchup of each stays free every week.</p> : null}
           <p className="mt-3 text-sm leading-6 text-[color:var(--surf-ink-55)]">Stripe shows the full recurring charge before you confirm. Returning from checkout does not by itself confirm payment.</p>
         </>
       ) : <p className="mt-3 text-sm leading-6 text-[color:var(--surf-ink-55)]">{status?.message ?? (message ? BILLING_UNAVAILABLE : "Checking billing availability…")}</p>}
