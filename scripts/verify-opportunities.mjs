@@ -399,6 +399,21 @@ const duke = moneylineRatingBoard({
   best: 215, median: 190, opposite: -250, books: 9,
 }).opportunities.find(opportunity => opportunity.kind === "best_price");
 assert.ok(monmouth && duke, "both genuine price gaps remain qualified; longshot discount is ranking, not a new gate");
+const baylor = moneylineRatingBoard({
+  id: "baylor-rating", away: "Baylor Bears", home: "Louisiana Tech Bulldogs",
+  best: -1100, median: -1667, opposite: 900, books: 7,
+}).opportunities.find(opportunity => opportunity.kind === "best_price");
+assert.equal(baylor, undefined, "a best price on a heavy favorite (-300 or shorter) is not a signal, however large the implied edge");
+const modestFavorite = moneylineRatingBoard({
+  id: "modest-favorite", away: "Ohio State Buckeyes", home: "Penn State Nittany Lions",
+  best: -250, median: -320, opposite: 260, books: 7,
+}).opportunities.find(opportunity => opportunity.kind === "best_price");
+assert.ok(modestFavorite && modestFavorite.price === -250, "a favorite inside the band still qualifies on its edge");
+const boundaryFavorite = moneylineRatingBoard({
+  id: "boundary-favorite", away: "Georgia Bulldogs", home: "Kentucky Wildcats",
+  best: -300, median: -400, opposite: 320, books: 7,
+}).opportunities.find(opportunity => opportunity.kind === "best_price");
+assert.equal(boundaryFavorite, undefined, "-300 itself is the heavy-favorite line, matching the presentation note");
 assert.equal(monmouth.price, 2000);
 assert.equal(monmouth.consensusPrice, 1239);
 assert.equal(duke.price, 215);

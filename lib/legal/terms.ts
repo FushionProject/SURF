@@ -12,9 +12,9 @@ Surf displays US sports betting market data and Surf's own analysis derived from
 
 Surf is an information and analysis product. It is not a picks service, not a tipster service, and it does not tell you what to bet. Every decision you make is yours.
 
-These features are free: **Game briefs** (sportsbook odds compared across books, market midpoint, best available number, recorded line movement, injury context, prediction-market consensus), **Angles** for one featured matchup each week (historical NFL situational records, win-loss and against the spread), **Signals** for that same featured matchup, **Watchlist**, and **How to use Surf**. You can use the free board without an account. While billing is turned off, the full Signals and Angles slates are open to everyone.
+These features are free: **Game briefs** (sportsbook odds compared across books, market midpoint, best available number, recorded line movement, injury context, prediction-market consensus), **Trends** for one featured matchup each week (historical NFL situational records, win-loss and against the spread), **Signals** for that same featured matchup, **Watchlist**, and **How to use Surf**. You can use the free board without an account. While billing is turned off, the full Signals and Trends slates are open to everyone.
 
-One paid plan is planned but is not active: **Surf Pro** at $9.99 per month, which unlocks Signals and Angles for every matchup on the slate. Billing is turned off. Nobody can subscribe today and Surf is not accepting payments. See section 10.
+One paid plan is planned but is not active: **Surf Pro** at $9.99 per month, which unlocks Signals and Trends for every matchup on the slate. Billing is turned off. Nobody can subscribe today and Surf is not accepting payments. See section 10.
 
 ## 3. What Surf does not do
 
@@ -26,7 +26,7 @@ Read this section carefully. It is the most important part of these terms.
 - Surf is not a sportsbook and is not a broker.
 - Surf does not guarantee profit, accuracy, edge, or any outcome.
 
-Historical records in Angles are descriptive. They report what happened in past situations. They do not predict future results, and a pattern that held before may not hold again.
+Historical records in Trends are descriptive. They report what happened in past situations. They do not predict future results, and a pattern that held before may not hold again.
 
 Odds, injury information and prediction-market data can be delayed, incomplete or wrong. Confirm a number at the sportsbook before you act on it.
 
@@ -90,7 +90,7 @@ Billing is disabled. This section describes how paid plans will work and takes e
 
 When billing is enabled:
 
-- **Plan.** Surf Pro at $9.99 per month, covering Signals and Angles for every matchup. One featured matchup a week stays free without a plan. The price is in US dollars and excludes any applicable tax.
+- **Plan.** Surf Pro at $9.99 per month, covering Signals and Trends for every matchup. One featured matchup a week stays free without a plan. The price is in US dollars and excludes any applicable tax.
 - **Payments.** Handled by Stripe. Surf will not store your full card details.
 - **Renewal, cancellation and refunds.** A subscription renews automatically each month until you cancel. Section 11 sets out how to cancel and what is refundable.
 - **Price changes.** A new price applies to renewals at least 30 days after we tell you.

@@ -39,10 +39,10 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(origin + '/games?sport=americanfootball_nfl');
-  await page.locator('.bn-masthead').getByRole('link', { name: 'Angles', exact: true }).click();
+  await page.locator('.bn-masthead').getByRole('link', { name: 'Trends', exact: true }).click();
   await page.waitForURL('**/stats?sport=americanfootball_nfl');
   assert.equal(await page.getByRole('heading', { name: '404', exact: true }).count(), 0);
-  assert.equal(await page.getByRole('heading', { name: 'Angles', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('heading', { name: 'Trends', exact: true }).count(), 1);
   console.log(JSON.stringify({ results, errors }, null, 2));
   assert.deepEqual(errors, [], 'Runtime/hydration errors');
 } finally { await browser.close(); }

@@ -99,6 +99,11 @@ type OfferSample = {
 const MIN_BOOKS = 4;
 const LINE_EDGE_THRESHOLD = 1;
 const PRICE_EDGE_THRESHOLD_PP = 2.5;
+/** A best-price signal on a heavy favorite is noise: -1100 against a -1667 median clears the
+ *  implied-probability edge, but nobody shops that number and the card reads as a joke. The
+ *  same -300 line that already marks a "heavy favorite" in the presentation now gates the
+ *  signal instead of merely lowering its rating. Longshots stay a ranking discount, not a gate. */
+const HEAVY_FAVORITE_PRICE = -300;
 const MAX_LINE_PRICE_PENALTY_PP = 4;
 const MIN_ARBITRAGE_RETURN_PERCENT = 0.5;
 const MAX_ARBITRAGE_RETURN_PERCENT = 15;
@@ -443,7 +448,8 @@ function buildSlot(
     if (
       booksCompared < MIN_BOOKS ||
       priceEdgePercentagePoints == null ||
-      priceEdgePercentagePoints < PRICE_EDGE_THRESHOLD_PP
+      priceEdgePercentagePoints < PRICE_EDGE_THRESHOLD_PP ||
+      best.price <= HEAVY_FAVORITE_PRICE
     ) {
       return { offer };
     }

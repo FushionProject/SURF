@@ -7,7 +7,7 @@ import styles from "./SurfNavigation.module.css";
 
 const links = [
   { href: "/", label: "Home" },
-  { href: "/stats", label: "Angles" },
+  { href: "/stats", label: "Trends" },
   { href: "/feed", label: "Signals" },
   { href: "/games", label: "Game briefs" },
   { href: "/top", label: "Watchlist" },

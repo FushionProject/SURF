@@ -6,7 +6,7 @@ import styles from "./SurfBottomNav.module.css";
 
 const items = [
   { label: "Home", href: "/", path: "M3 10 12 3l9 7v11h-6v-7H9v7H3Z" },
-  { label: "Angles", href: "/stats", path: "M5 20V10M12 20V4M19 20v-7" },
+  { label: "Trends", href: "/stats", path: "M5 20V10M12 20V4M19 20v-7" },
   { label: "Signals", href: "/feed", path: "M2 12h5l3-8 4 16 3-8h5" },
   { label: "Game briefs", href: "/games", path: "M4 5h16v16H4ZM8 3v4M16 3v4M4 11h16" },
 ];

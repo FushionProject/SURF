@@ -27,7 +27,7 @@ try {
     await page.locator('.bn-game').first().waitFor();
     assert.deepEqual(await page.locator('.bn-game').evaluateAll(cards => cards.map(card => card.dataset.gameId)), ['earlier', 'later']);
     assert.equal(await page.getByRole('combobox', { name: 'Sort games' }).count(), 0);
-    assert.equal(await page.locator('.bn-masthead nav a').first().textContent(), 'Angles');
+    assert.equal(await page.locator('.bn-masthead nav a').first().textContent(), 'Trends');
     assert.equal(await page.getByRole('heading', { name: 'Game briefs', exact: true }).count(), 1);
     assert.equal(await page.getByRole('button', { name: 'Compare sportsbooks', exact: true }).count(), 2);
     assert.equal(await page.locator('.bn-offer-midpoint').count(), 4);
