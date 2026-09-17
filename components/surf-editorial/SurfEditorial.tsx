@@ -64,6 +64,8 @@ type FeedData = {
   nextGameAt?: number;
   dataSource?: string;
   dataNotice?: string;
+  /** Free viewers get the featured game only; the server says what Surf Pro adds. */
+  locked?: { pro: boolean; featuredGameId?: string | null; featuredLabel?: string | null; hiddenSignals?: number; hiddenGames?: number };
 };
 type Snapshot = {
   feed?: FeedData;
@@ -709,6 +711,13 @@ function SurfEditorialContent({ view = "markets" }: { view?: View }) {
               {(view === "signals" ? data?.feed?.dataNotice : undefined) ??
                 data?.games?.dataNotice ??
                 "This is a demonstration, not a live market."}
+            </p>
+          )}
+          {view === "signals" && data?.feed?.locked && !data.feed.locked.pro && (data.feed.locked.hiddenSignals ?? 0) > 0 && (
+            <p className="bn-notice bn-pro-notice" role="status">
+              {data.feed.locked.featuredLabel ? `Featured game is free this week: ${data.feed.locked.featuredLabel}. ` : ""}
+              {data.feed.locked.hiddenSignals} more {data.feed.locked.hiddenSignals === 1 ? "signal" : "signals"} across {data.feed.locked.hiddenGames} {data.feed.locked.hiddenGames === 1 ? "game" : "games"} with Surf Pro.{" "}
+              <Link href="/account" style={{ textDecoration: "underline" }}>Get Surf Pro · $9.99/month</Link>
             </p>
           )}
           {data?.gameError && <p className="bn-notice" role="status">{data.gameError}</p>}

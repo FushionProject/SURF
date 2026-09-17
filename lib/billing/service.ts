@@ -63,7 +63,8 @@ export function resolveBillingEntitlements(subscriptions: Stripe.Subscription[],
     || subscription.items.data.length !== 1 || item?.quantity !== 1 || !Number.isFinite(item.current_period_end)
     || item.current_period_end <= now || (subscription.cancel_at != null && subscription.cancel_at <= now)) return free;
   const planId = (Object.keys(config.priceIds) as PaidPlanId[]).find((id) => config.priceIds[id] === item.price.id);
-  return planId ? { planId, signals: true, spotStats: planId === "signals_spot_stats" && config.spotStatsReleaseReady } : free;
+  // Surf Pro is the one paid plan and unlocks both Signals and Spot Stats.
+  return planId ? { planId, signals: true, spotStats: true } : free;
 }
 
 export function subscriptionSnapshot(subscription: Stripe.Subscription): BillingSubscription {
@@ -88,17 +89,16 @@ export function createBillingService(stripe: Stripe, store: BillingStore, config
       || !price.recurring || price.recurring.usage_type !== "licensed" || price.billing_scheme !== "per_unit"
       || price.id !== config.priceIds[planId] || price.unit_amount !== plan.amount || price.currency !== plan.currency
       || price.recurring.interval !== "month" || price.recurring.interval_count !== 1 || price.transform_quantity) {
-      throw new BillingError("The Surf subscription is not configured for checkout yet.");
+      throw new BillingError("Surf Pro is not configured for checkout yet.");
     }
     const product = price.product;
-    if (typeof product === "string" || product.deleted || !product.active || product.livemode !== config.livemode) throw new BillingError("The Surf subscription is unavailable.");
+    if (typeof product === "string" || product.deleted || !product.active || product.livemode !== config.livemode) throw new BillingError("Surf Pro is unavailable.");
     return { price, product };
   }
 
   async function configuredCatalog() {
-    const [signals, spotStats] = await Promise.all([configuredPrice("signals"), configuredPrice("signals_spot_stats")]);
-    if (signals.product.id === spotStats.product.id) throw new BillingError("Each Surf plan needs its own product.");
-    return [BILLING_PLANS.free, BILLING_PLANS.signals, BILLING_PLANS.signals_spot_stats];
+    await configuredPrice("pro");
+    return [BILLING_PLANS.free, BILLING_PLANS.pro];
   }
 
   async function entitlements(userId: string): Promise<BillingEntitlements> {
@@ -147,7 +147,7 @@ export function createBillingService(stripe: Stripe, store: BillingStore, config
       testMode: !config.livemode,
       plan,
       catalog,
-      purchasablePlans: catalog ? config.spotStatsReleaseReady ? ["signals", "signals_spot_stats"] : ["signals"] : [],
+      purchasablePlans: catalog ? ["pro"] : [],
       entitlements: access,
       subscription: snapshot ? { status: snapshot.status, periodEnd: snapshot.periodEnd, cancelAt: snapshot.cancelAt } : undefined,
       canSubscribe: !!catalog && !active && !subscriptionReadFailed,
@@ -159,7 +159,6 @@ export function createBillingService(stripe: Stripe, store: BillingStore, config
 
   async function checkout(userId: string, planId: PaidPlanId) {
     if (!isPaidPlanId(planId)) throw new BillingError("Choose a valid paid plan.", 400);
-    if (planId === "signals_spot_stats" && !config.spotStatsReleaseReady) throw new BillingError("Spot Stats is coming soon. This plan is not available for purchase yet.", 409);
     await configuredCatalog();
     const priceId = config.priceIds[planId];
     let customer = await store.getCustomer(userId, config.livemode);

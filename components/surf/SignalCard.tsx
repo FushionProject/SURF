@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SurfBrandMark } from "./SurfBrandMark";
 
 import type { SignalCard as SignalCardType } from "@/lib/surf/types";
 import { getLastMovedLabel } from "@/lib/surf/signalCopy";
@@ -478,7 +479,7 @@ export function SignalCard({ card, showStrength, showStrengthLabel = true }: Pro
 
               return (
                 <div className="mt-2 rounded-[var(--surf-radius-inner)] border border-[color:var(--surf-line-06)] bg-[color:var(--surf-inner)] px-4 py-3">
-                  <div className="text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]">🎯 Best Available</div>
+                  <div className="flex items-center gap-1 text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]"><SurfBrandMark className="h-3 w-3 text-[color:var(--surf-primary)]" />Best Available</div>
                   {best ? (
                     <div className="mt-2 flex items-baseline justify-between gap-3">
                       <span
@@ -528,7 +529,7 @@ export function SignalCard({ card, showStrength, showStrengthLabel = true }: Pro
 
               return (
                 <div className="mt-2 rounded-[var(--surf-radius-inner)] border border-[color:var(--surf-line-06)] bg-[color:var(--surf-inner)] px-4 py-3">
-                  <div className="text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]">🎯 Best Available</div>
+                  <div className="flex items-center gap-1 text-[11px] font-semibold tracking-wide text-[color:var(--surf-ink-45)]"><SurfBrandMark className="h-3 w-3 text-[color:var(--surf-primary)]" />Best Available</div>
 
                   <div className="mt-2 flex items-baseline justify-between gap-3">
                     <span

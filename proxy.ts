@@ -11,6 +11,7 @@ export const config = {
     "/account/:path*",
     "/auth/:path*",
     "/feed",
+    "/stats",
     "/api/surf-feed",
     "/api/billing/checkout",
     "/api/billing/portal",

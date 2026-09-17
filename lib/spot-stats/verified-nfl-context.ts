@@ -2,6 +2,15 @@ import type { CoachAppointment, InternationalCoverage } from "./spot-feed.ts";
 
 // Minimal source-backed context, not a copied sports dataset. Historical outcomes
 // are calculated from the separate private archive and never hard-coded here.
+//
+// VERIFIED_COACHES is the only source of *current* head-coach appointments. An
+// entry is valid for the whole season it names (verifiedAt must parse and not be
+// in the future; it no longer expires after a week, which is what silently removed
+// every coach card in September 2026). The schedule's own home_coach/away_coach
+// fields for future games are not trusted and are never used as a veto. When a
+// coach changes mid-season, edit this list: replace the entry for that team and
+// season with the new coach, a fresh https source and a fresh stamp. Two entries
+// for one team-season resolve to nobody, so never leave the old one behind.
 export const INTERNATIONAL_REVIEW_SHA = "7773a55d21119b5f3150b44c8c97faa0cd6126f528c2737f44d64d5e89dc5249";
 export const VERIFIED_COACHES: CoachAppointment[] = [
   {

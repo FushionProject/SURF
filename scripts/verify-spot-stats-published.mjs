@@ -40,4 +40,26 @@ assert.match(research, /Private research/);
 // The published page still hands the dev preview its route.
 assert.match(page, /redirect\("\/stats\/research\?sport=americanfootball_nfl"\)/);
 
-console.log("Published spot feed passed: public page is the feed with team names and 2020 scope, preview-only copy removed, attribution kept, switch defaults off, local preview route unchanged.");
+// One featured matchup is free for everyone; the rest of the slate is Surf Pro.
+// The pick comes from the shared featured picker so Signals lands on the same
+// game, and the viewer check is the fail-closed billing helper.
+assert.match(page, /import \{ viewerHasPro \} from "@\/lib\/billing\/viewer-access"/);
+assert.match(page, /import \{ pickFeaturedGame \} from "@\/lib\/spot-stats\/featured"/);
+assert.match(page, /const pro = await viewerHasPro\(\);/);
+assert.match(page, /pickFeaturedGame\(feed\?\.games \?\? \[\]\)\?\.id \?\? null/);
+assert.match(page, /Surf Pro matchup/);
+assert.match(page, /Get Surf Pro · \$9\.99\/month/);
+assert.match(page, /href="\/account"/);
+assert.match(page, /import \{ gateSpotCardsForViewer \} from "@\/lib\/billing\/featured-spots"/);
+assert.match(page, /gateSpotCardsForViewer\(viewCards, selected, featuredId, pro\)/);
+assert.doesNotMatch(page, /paidFeatureDenial/, "the page shows the featured matchup instead of a hard denial");
+
+// Methodology copy matches the engine's season and threshold rules.
+assert.match(page, /Team spots use the last two seasons; coach and QB spots go back to 2020\./);
+assert.match(page, /Team situations use last season and this season; coach and quarterback records go back to 2020/);
+assert.match(page, /at least 6 decided games and at least 75% went one way/);
+assert.match(page, /last 10 regular-season games and need at least 8 of them one way/);
+assert.match(page, /Ties and pushes do not count toward those thresholds\./);
+assert.doesNotMatch(page, /at least 5 decided games|3–4 decided games/);
+
+console.log("Published spot feed passed: public page is the feed with team names and 2020 scope, preview-only copy removed, attribution kept, switch defaults off, local preview route unchanged, featured matchup free with the rest in Surf Pro.");

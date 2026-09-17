@@ -12,9 +12,9 @@ probe.listen(0, "127.0.0.1");
 await once(probe, "listening");
 const port = probe.address().port;
 await new Promise(resolve => probe.close(resolve));
-const env = { ...process.env, NODE_ENV: "production", SURF_BILLING_ENABLED: "false", SURF_BILLING_LIVE_ENABLED: "false", SURF_SPOT_STATS_RELEASE_READY: "false", SURF_SPOT_STATS_LOCAL_PREVIEW: "true", SURF_PAID_ACCESS_ENFORCED: "false" };
+const env = { ...process.env, NODE_ENV: "production", SURF_BILLING_ENABLED: "false", SURF_BILLING_LIVE_ENABLED: "false", SURF_SPOT_STATS_LOCAL_PREVIEW: "true", SURF_PAID_ACCESS_ENFORCED: "false" };
 // Empty values prevent Next's dotenv loader from filling them from .env.local.
-for (const key of ["ODDS_API_KEY", "API_SPORTS_KEY", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "STRIPE_RESTRICTED_KEY", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_SIGNALS_PRICE_ID", "STRIPE_SIGNALS_SPOT_STATS_PRICE_ID", "ROPE_AUDIT_TOKEN"]) env[key] = "";
+for (const key of ["ODDS_API_KEY", "API_SPORTS_KEY", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "STRIPE_RESTRICTED_KEY", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRO_PRICE_ID", "ROPE_AUDIT_TOKEN"]) env[key] = "";
 const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", String(port)], { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
 let exited = false;
 let startedError;
@@ -36,11 +36,29 @@ try {
     try { await request("/api/billing/status"); ready = true; break; } catch { await new Promise(resolve => setTimeout(resolve, 150)); }
   }
   assert.ok(ready, "Production test server did not become ready");
-  for (const path of ["/api/surf-feed?sport=americanfootball_nfl", "/api/surf-feed?sport=baseball_mlb&debug=1", "/api/billing/status"]) {
-    const { response, body } = await request(path);
-    assert.equal(response.status, 401, `${path} must reject anonymous access`);
-    assert.match(response.headers.get("cache-control") ?? "", /private.*no-store/);
-    assert.doesNotMatch(body, /whaleActivity|stripe_customer_id|checkout_nonce|sk_live_|rk_live_/);
+  const billing = await request("/api/billing/status");
+  assert.equal(billing.response.status, 401, "billing status must reject anonymous access");
+  assert.match(billing.response.headers.get("cache-control") ?? "", /private.*no-store/);
+  assert.doesNotMatch(billing.body, /whaleActivity|stripe_customer_id|checkout_nonce|sk_live_|rk_live_/);
+  const debug = await request("/api/surf-feed?sport=baseball_mlb&debug=1");
+  assert.equal(debug.response.status, 400, "debug feed access closes in production before any provider call");
+  assert.match(debug.response.headers.get("cache-control") ?? "", /private.*no-store/);
+  assert.doesNotMatch(debug.body, /whaleActivity|stripe_customer_id|checkout_nonce|sk_live_|rk_live_/);
+  // Anonymous viewers are no longer walled off from Signals: they get the one
+  // featured game and a count of what Surf Pro adds. This server runs with
+  // SURF_BILLING_ENABLED=false, and while billing is switched off nothing is
+  // for sale, so nothing is locked: the response must say so explicitly. With
+  // no provider key the slate cannot be built and the request fails; if it
+  // ever succeeds the `locked` object must still be present and honest. The
+  // billing-on gated shape is covered by verify-billing and verify-paid-access.
+  const anonymousFeed = await request("/api/surf-feed?sport=americanfootball_nfl");
+  assert.notEqual(anonymousFeed.response.status, 401, "anonymous Signals viewers see the featured game, not a wall");
+  assert.match(anonymousFeed.response.headers.get("cache-control") ?? "", /private.*no-store/);
+  assert.doesNotMatch(anonymousFeed.body, /whaleActivity|stripe_customer_id|checkout_nonce|sk_live_|rk_live_/);
+  if (anonymousFeed.response.status === 200) {
+    const parsed = JSON.parse(anonymousFeed.body);
+    assert.equal(typeof parsed.locked?.pro, "boolean", "every feed response carries the gate state");
+    assert.equal(parsed.locked.pro, true, "billing switched off opens the whole slate to every viewer");
   }
   const feed = await request("/feed");
   assert.equal(feed.response.status, 200);
@@ -54,7 +72,8 @@ try {
     assert.equal(debug.response.status, 400, "Public debug routes must close before provider calls");
     assert.match(debug.response.headers.get("cache-control") ?? "", /private.*no-store/);
   }
-  assert.match(feed.body, /Your account &amp; plans/);
+  assert.match(feed.body, /Explore the signals/, "the Signals page renders the board for everyone");
+  assert.doesNotMatch(feed.body, /Your account &amp; plans|Signals plan|paidFeatureDenial/);
   assert.doesNotMatch(feed.body, /data-spot-card=|"whaleActivity"/);
   for (const path of ["/stats/research?sport=americanfootball_nfl", "/stats/research/explore"]) {
     const result = await request(path);
@@ -66,7 +85,7 @@ try {
     assert.equal(result.response.status, 503, "Unconfigured billing must stay unavailable");
     assert.match(result.response.headers.get("cache-control") ?? "", /private.*no-store/);
   }
-  console.log("Production HTTP access passed: anonymous paid feed blocked, no-store responses, local research hidden, unconfigured billing closed. No payments or sports-provider calls.");
+  console.log("Production HTTP access passed: anonymous billing blocked, debug closed, anonymous Signals gated to the featured game, no-store responses, local research hidden, unconfigured billing closed. No payments or sports-provider calls.");
 } finally {
   if (!exited) child.kill("SIGTERM");
   await Promise.race([finished, new Promise(resolve => { const timer = setTimeout(resolve, 5000); timer.unref(); })]);

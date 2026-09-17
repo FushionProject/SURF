@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LEGAL_CONTACT } from "@/lib/legal/shared";
 import styles from "./legal-footer.module.css";
 
 const LINKS = [
@@ -13,6 +14,7 @@ export function SurfLegalFooter() {
     <nav aria-label="Legal and support">
       {LINKS.map(link => <Link key={link.href} href={link.href} prefetch={false}>{link.label}</Link>)}
     </nav>
+    <p className={styles.contact}>Questions or billing help: <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a></p>
     <p>Surf shows sports market data and its own analysis. It does not accept wagers, hold funds, or tell you what to bet. Betting carries real risk of losing money.</p>
   </footer>;
 }

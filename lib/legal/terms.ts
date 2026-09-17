@@ -12,9 +12,9 @@ Surf displays US sports betting market data and Surf's own analysis derived from
 
 Surf is an information and analysis product. It is not a picks service, not a tipster service, and it does not tell you what to bet. Every decision you make is yours.
 
-These features are free: **Game briefs** (sportsbook odds compared across books, market midpoint, best available number, recorded line movement, injury context, prediction-market consensus), **Spot Stats** (historical NFL situational records, win-loss and against the spread, 2020 onward), **Watchlist**, and **How to use Surf**. You can use the free board without an account.
+These features are free: **Game briefs** (sportsbook odds compared across books, market midpoint, best available number, recorded line movement, injury context, prediction-market consensus), **Spot Stats** for one featured matchup each week (historical NFL situational records, win-loss and against the spread), **Signals** for that same featured matchup, **Watchlist**, and **How to use Surf**. You can use the free board without an account. While billing is turned off, the full Signals and Spot Stats slates are open to everyone.
 
-Two paid features are planned but are not active: **Signals** at $9.99 per month, and **Signals + Spot Stats** at $19.99 per month. Billing is turned off. Nobody can subscribe today and Surf is not accepting payments. See section 10.
+One paid plan is planned but is not active: **Surf Pro** at $9.99 per month, which unlocks Signals and Spot Stats for every matchup on the slate. Billing is turned off. Nobody can subscribe today and Surf is not accepting payments. See section 10.
 
 ## 3. What Surf does not do
 
@@ -90,16 +90,27 @@ Billing is disabled. This section describes how paid plans will work and takes e
 
 When billing is enabled:
 
-- **Plans.** Signals at $9.99 per month; Signals + Spot Stats at $19.99 per month. Prices are in US dollars and exclude any applicable tax.
+- **Plan.** Surf Pro at $9.99 per month, covering Signals and Spot Stats for every matchup. One featured matchup a week stays free without a plan. The price is in US dollars and excludes any applicable tax.
 - **Payments.** Handled by Stripe. Surf will not store your full card details.
-- **Renewal.** A subscription renews automatically each month until you cancel.
-- **Cancellation.** You can cancel at any time from your account. Access continues to the end of the period you have already paid for.
-- **Refunds.** Partial periods are not refunded, except where the law requires it.
+- **Renewal, cancellation and refunds.** A subscription renews automatically each month until you cancel. Section 11 sets out how to cancel and what is refundable.
 - **Price changes.** A new price applies to renewals at least 30 days after we tell you.
 
 We will not charge anyone without asking them to sign up first.
 
-## 11. No warranty
+## 11. Cancellation and Refunds
+
+This section covers how a paid Surf subscription ends and what is refundable. It applies to every paid plan.
+
+- **Monthly and automatic.** Surf subscriptions are billed monthly and renew automatically each month until you cancel.
+- **Cancel at any time.** You can cancel yourself from your [account page](/account). You do not need to email us or ask permission, and there is no cancellation fee.
+- **When cancelling takes effect.** Cancellation takes effect at the end of the billing period you have already paid for. Access continues until that date, and you are not charged again after it.
+- **No partial refunds.** Surf does not give prorated or partial-month refunds for time already elapsed. If you cancel halfway through a month, you keep access for the rest of that month and that month's payment is not refunded.
+- **Where the law gives you more.** Some places give consumers refund rights that these terms cannot remove. Where that is true, those rights apply.
+- **Billing problems.** If you think you were charged in error, charged after cancelling, or charged twice, email [${LEGAL_CONTACT}](mailto:${LEGAL_CONTACT}). Tell us the email address on the account and the date of the charge, and we will look into it and correct a genuine billing error.
+
+Payments and subscriptions are handled by Stripe. Cancelling from your account page cancels the Stripe subscription behind it, and your card is not charged again once the current period ends.
+
+## 12. No warranty
 
 Surf is provided as it is, with whatever faults it has. We do not promise it will be accurate, complete, current, uninterrupted or available at all.
 
@@ -107,7 +118,7 @@ We do not promise anything you learn on Surf will make you money, that a price s
 
 Sports data is messy and sportsbooks change numbers constantly. Treat everything on Surf as a starting point.
 
-## 12. Limitation of liability
+## 13. Limitation of liability
 
 To the extent the law allows, Surf is not liable for money you lose betting, for bets you place or fail to place, for missed opportunities, for lost profits, or for indirect or consequential loss connected to your use of Surf.
 
@@ -115,7 +126,7 @@ If Surf is found liable to you, total liability is limited to what you have paid
 
 Some places do not allow parts of this section. Where that is true those parts do not apply to you and the rest still does.
 
-## 13. Responsible gambling
+## 14. Responsible gambling
 
 Betting can cause real harm. It is not a way to make a living and not a way to fix a financial problem.
 
@@ -123,25 +134,25 @@ If gambling is causing trouble for you or someone close to you, help exists. In 
 
 Surf shows market data. It does not know your finances and cannot tell you what is a sensible amount to risk.
 
-## 14. Changes
+## 15. Changes
 
 Surf is in active development. Features and data sources may be added, changed or removed at any time.
 
 We may change these terms. When we do, the date at the top changes, and material changes will be described on this page. If you keep using Surf after a change takes effect, that counts as accepting it.
 
-## 15. Termination
+## 16. Termination
 
 You can stop using Surf at any time, and can ask us to delete your account.
 
 We can suspend or close an account, or block access, if you break these terms or to protect the site or other users. We can also stop offering Surf entirely.
 
-Sections 9, 11, 12, 13 and 16 survive.
+Sections 9, 12, 13, 14 and 17 survive.
 
-## 16. Governing law
+## 17. Governing law
 
 These terms are governed by the laws of the State of Illinois, without regard to its conflict-of-laws rules.
 
-## 17. Contact
+## 18. Contact
 
 Questions about these terms, account problems, or deletion requests: [${LEGAL_CONTACT}](mailto:${LEGAL_CONTACT}).
 

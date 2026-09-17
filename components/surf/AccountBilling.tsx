@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BILLING_UNAVAILABLE, displayPrice, isStripeRedirect, isPaidPlanId, type PaidPlanId } from "@/lib/billing/config";
+import { BILLING_PLANS, BILLING_UNAVAILABLE, displayPrice, isStripeRedirect } from "@/lib/billing/config";
 import type { BillingStatus } from "@/lib/billing/service";
 
 export function AccountBilling() {
@@ -20,11 +20,12 @@ export function AccountBilling() {
     return () => controller.abort();
   }, []);
 
-  async function open(action: "checkout" | "portal", planId?: PaidPlanId) {
+  async function open(action: "checkout" | "portal") {
     setPending(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/billing/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action === "checkout" ? { planId } : {}) });
+      // Surf Pro is the only paid plan; the server validates it again.
+      const response = await fetch(`/api/billing/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action === "checkout" ? { planId: BILLING_PLANS.pro.id } : {}) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message ?? "Billing could not be opened.");
       if (!isStripeRedirect(body.url, action === "checkout" ? "checkout" : "portal")) throw new Error("Billing could not be opened safely.");
@@ -36,6 +37,8 @@ export function AccountBilling() {
   }
   const plan = status?.plan;
   const amount = plan ? displayPrice(plan.amount, plan.currency) : undefined;
+  const pro = status?.catalog?.find((entry) => entry.id === BILLING_PLANS.pro.id);
+  const canBuyPro = Boolean(status?.canSubscribe && pro && status.purchasablePlans?.includes(BILLING_PLANS.pro.id));
 
   return (
     <section className="mt-5 border border-[color:var(--surf-primary)]/35 bg-[color:var(--surf-surface)] p-5" aria-labelledby="surf-billing-title">
@@ -48,12 +51,10 @@ export function AccountBilling() {
           {status.testMode ? <p className="mt-2 text-sm text-[color:var(--surf-primary)]">Test mode · no real payment</p> : null}
           {status.subscription ? <p className="mt-3 text-sm">Subscription: {status.subscription.status.replaceAll("_", " ")}{status.subscription.cancelAt ? " · cancellation scheduled" : ""}</p> : null}
           <div className="mt-4 flex flex-wrap gap-3">
-            {status.canSubscribe ? status.catalog?.filter((entry) => isPaidPlanId(entry.id)).map((entry) => {
-              const available = isPaidPlanId(entry.id) && status.purchasablePlans?.includes(entry.id);
-              return <button key={entry.id} type="button" disabled={pending || !available} onClick={() => { if (isPaidPlanId(entry.id)) void open("checkout", entry.id); }} className="bg-[color:var(--surf-primary)] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{!available ? `${entry.name} · coming soon` : pending ? "Opening…" : `Review ${entry.name} · ${displayPrice(entry.amount, entry.currency)}/month`}</button>;
-            }) : null}
+            {canBuyPro && pro ? <button type="button" disabled={pending} onClick={() => void open("checkout")} className="bg-[color:var(--surf-primary)] px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{pending ? "Opening…" : `Get ${pro.name} · ${displayPrice(pro.amount, pro.currency)}/month`}</button> : null}
             {status.canManage ? <button type="button" disabled={pending} onClick={() => void open("portal")} className="border border-[color:var(--surf-line-08)] px-4 py-3 text-sm font-semibold disabled:opacity-50">Manage billing</button> : null}
           </div>
+          {canBuyPro ? <p className="mt-3 text-sm leading-6 text-[color:var(--surf-ink-70)]">Surf Pro unlocks Signals and Spot Stats for every matchup. One featured matchup of each stays free every week.</p> : null}
           <p className="mt-3 text-sm leading-6 text-[color:var(--surf-ink-55)]">Stripe shows the full recurring charge before you confirm. Returning from checkout does not by itself confirm payment.</p>
         </>
       ) : <p className="mt-3 text-sm leading-6 text-[color:var(--surf-ink-55)]">{status?.message ?? (message ? BILLING_UNAVAILABLE : "Checking billing availability…")}</p>}

@@ -10,3 +10,5 @@
 .footer a { color: var(--surf-ink-60, #a7b2bd); text-decoration: none; }
 .footer a:hover { color: var(--surf-primary, #00cde5); text-decoration: underline; text-underline-offset: 3px; }
 .footer p { max-width: 42rem; margin: 0 auto; line-height: 1.6; }
+.footer .contact { margin-bottom: 12px; }
+.footer .contact a { text-decoration: underline; text-underline-offset: 3px; }

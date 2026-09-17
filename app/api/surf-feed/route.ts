@@ -1,5 +1,6 @@
 import { pricePressureTitle } from "@/lib/surf/marketHorizonCopy";
-import { paidFeatureDenial } from "@/lib/billing/access";
+import { gateSignalsForViewer, keepFeaturedOnly, type FeaturableSlateGame } from "@/lib/billing/featured-signals";
+import { viewerHasPro } from "@/lib/billing/viewer-access";
 import { getCfbContext, cachedCfbFinals } from "@/lib/surf/cfbContext";
 import { cfbMarketEligible } from "@/lib/surf/cfbContextCore";
 import { surfPersistenceStatus } from "@/lib/surf/supabasePersistence";
@@ -589,7 +590,21 @@ function enrichSignals(signals: SignalCard[], games: OddsApiGame[], detections: 
   });
 }
 
-async function getLiveSurfFeed(request: Request) {
+/** The slate the featured pick is made from: the same games the signals were built on. */
+function featurableSlate(games: readonly OddsApiGame[]): FeaturableSlateGame[] {
+  return games.map((game) => ({ id: game.id, kickoffAt: game.commence_time, homeTeam: game.home_team, awayTeam: game.away_team }));
+}
+
+/** Demo feeds carry no slate of their own; the featured pick uses the games the sample signals name. */
+function demoSlate(signals: readonly SignalCard[]): FeaturableSlateGame[] {
+  const games = new Map<string, FeaturableSlateGame>();
+  for (const signal of signals) {
+    if (!games.has(signal.game.id)) games.set(signal.game.id, { id: signal.game.id, kickoffAt: signal.commenceTime, homeTeam: signal.game.homeTeam, awayTeam: signal.game.awayTeam });
+  }
+  return [...games.values()];
+}
+
+async function getLiveSurfFeed(request: Request, pro: boolean) {
   const url = new URL(request.url);
   const requestedSport = parseRequestedSport(url.searchParams.get("sport"));
   if (!requestedSport.ok) {
@@ -789,14 +804,17 @@ async function getLiveSurfFeed(request: Request) {
       )
     );
 
+    // Gate only what is serialized; audits and telemetry above saw the full slate.
+    const gated = gateSignalsForViewer(taggedSignals, featurableSlate(filteredGames), pro);
     return NextResponse.json({
-      count: taggedSignals.length,
-      signals: taggedSignals,
+      count: gated.signals.length,
+      signals: gated.signals,
+      locked: gated.locked,
       sportKey,
       sportLabel: sportConfig.label,
       generatedAt: now,
       nextGameAt: nextGameAt(filteredGames, now),
-      overnight,
+      overnight: { ...overnight, moves: keepFeaturedOnly(overnight.moves, gated.locked) },
       predictionMarkets: predictionMarketSnapshot.providers,
       activityCoverage: predictionMarketSnapshot.activityCoverage,
       debug,
@@ -850,33 +868,44 @@ async function getLiveSurfFeed(request: Request) {
     );
   }
 
+  // Gate only what is serialized; audits and telemetry above saw the full slate.
+  const gated = gateSignalsForViewer(taggedSignals, featurableSlate(filteredGames), pro);
   return NextResponse.json({
-    count: taggedSignals.length,
+    count: gated.signals.length,
     sportKey,
     sportLabel: sportConfig.label,
     generatedAt: now,
     nextGameAt: nextGameAt(filteredGames, now),
-    overnight,
+    overnight: { ...overnight, moves: keepFeaturedOnly(overnight.moves, gated.locked) },
     predictionMarkets: predictionMarketSnapshot.providers,
     activityCoverage: predictionMarketSnapshot.activityCoverage,
-    signals: taggedSignals,
+    signals: gated.signals,
+    locked: gated.locked,
   });
 }
 
+/** Free viewers see the featured game in full; the rest of the slate is Surf Pro. */
+function gatedDemoFeed(dataSource: "demo" | "fallback", pro: boolean) {
+  const feed = getDemoSurfFeed(dataSource);
+  const gated = gateSignalsForViewer(feed.signals, demoSlate(feed.signals), pro);
+  return NextResponse.json({ ...feed, count: gated.signals.length, signals: gated.signals, locked: gated.locked });
+}
+
 export async function GET(request: Request) {
-  const denial = await paidFeatureDenial("signals");
-  if (denial) return denial;
+  // Resolved before any provider or demo path. Fails closed: a signed-out
+  // viewer or a broken billing runtime is a free viewer, never a full feed.
+  const pro = await viewerHasPro();
   if (process.env.NODE_ENV === "production" && new URL(request.url).searchParams.has("debug")) {
     return NextResponse.json({ error: "Debug access is unavailable." }, { status: 400, headers: { "Cache-Control": "private, no-store" } });
   }
   if (isSurfDemoMode() && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
-    return NextResponse.json(getDemoSurfFeed("demo"));
+    return gatedDemoFeed("demo", pro);
   }
 
   try {
-    const response = await getLiveSurfFeed(request);
+    const response = await getLiveSurfFeed(request, pro);
     if (response.status >= 500 && process.env.NODE_ENV === "development" && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
-      return NextResponse.json(getDemoSurfFeed("fallback"));
+      return gatedDemoFeed("fallback", pro);
     }
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("Vary", "Cookie");
@@ -884,7 +913,7 @@ export async function GET(request: Request) {
   } catch (error) {
     if (process.env.NODE_ENV === "development" && new URL(request.url).searchParams.get("sport") !== "americanfootball_ncaaf") {
       console.warn("[SURF] Live feed failed; serving simulated fallback data.", error);
-      return NextResponse.json(getDemoSurfFeed("fallback"));
+      return gatedDemoFeed("fallback", pro);
     }
     throw error;
   }
