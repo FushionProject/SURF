@@ -1,0 +1,93 @@
+/* Feature tour on the landing page: a vertical reel of panels, one per product
+   surface. Scrolling the box rolls one panel at a time and snaps; a rail of
+   labels beside it shows where you are and jumps on click. Matches the
+   example-card language in landing.module.css. */
+.tour { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.rail { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.railItem, .railActive {
+  display: flex; align-items: baseline; gap: 10px;
+  min-height: 44px; padding: 0 12px 0 0; background: none; border: 0; border-left: 2px solid #282828; cursor: pointer;
+  padding-left: 12px; text-align: left; color: #777; font-size: 11px; letter-spacing: .4px;
+}
+.railActive { color: #fff; border-left-color: var(--cyan); }
+.railItem:hover, .railItem:focus-visible, .railActive:focus-visible { color: #ddd; outline: none; }
+.railIndex { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; color: var(--cyan); }
+.railActive .railIndex { color: var(--cyan); }
+.frame { position: relative; min-width: 0; }
+.reel {
+  height: 470px;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  background: #050505;
+  border: 1px solid #333;
+}
+.reel::-webkit-scrollbar { display: none; }
+.reel:focus-visible { outline: 1px solid var(--cyan); outline-offset: 2px; }
+.panel {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  height: 470px;
+  box-sizing: border-box;
+  padding: 24px 25px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.label { font-size: 8px; letter-spacing: 1.2px; color: #aaa; display: flex; justify-content: space-between; margin-bottom: 16px; }
+.label span:last-child { color: var(--cyan); font-variant-numeric: tabular-nums; }
+.title { font-size: 21px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; text-wrap: pretty; margin: 0; }
+.description { font-size: 12px; line-height: 1.75; color: #a4a6a8; margin: 10px 0 18px; text-wrap: pretty; }
+.body { flex: 1; min-height: 0; border-top: 1px solid #282828; padding-top: 16px; }
+.body h4 { font-size: 16px; font-weight: 500; line-height: 1.3; text-wrap: pretty; margin: 0; }
+.sub { font-size: 11px; color: #aaa; margin: 5px 0 14px; }
+.records { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; border-top: 1px solid #282828; border-bottom: 1px solid #282828; padding: 14px 0; margin: 0; }
+.records div + div { border-left: 1px solid #282828; padding-left: 18px; }
+.records dt { font-size: 11px; color: #aaa; }
+.records dd { font-size: 28px; font-weight: 600; color: var(--cyan); font-variant-numeric: tabular-nums; margin: 4px 0 0; letter-spacing: -0.03em; }
+.scope { font-size: 10px; color: #aaa; margin-top: 12px; line-height: 1.6; }
+.quote { display: grid; grid-template-columns: 1.3fr .7fr 1fr; gap: 10px; padding: 12px 10px; border-top: 1px solid #282828; font-size: 11px; align-items: center; }
+.quote strong { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.quote > span:last-child { text-align: right; color: #aaa; font-size: 10px; }
+.quote small { font-size: 6px; display: block; color: var(--cyan); letter-spacing: 1px; }
+.bestQuote { background: #0c191c; border: 1px solid #26717b; color: var(--cyan); }
+.note { font-size: 9px; color: #aaa; margin-top: 12px; line-height: 1.7; }
+.whale { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 14px; }
+.whale strong { font-size: 30px; font-weight: 600; color: var(--cyan); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+.whale span { font-size: 12px; color: #ddd; }
+.bar { height: 4px; background: #222; border-radius: 2px; overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--cyan); }
+.barLabels { display: flex; justify-content: space-between; font-size: 10px; color: #aaa; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.read { font-size: 11px; color: var(--cyan); font-weight: 600; margin: 0 0 6px; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px; }
+.split > div > span { font-size: 11px; color: #aaa; }
+.split strong { display: block; font-size: 24px; font-weight: 600; margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
+.sports { display: flex; flex-direction: column; justify-content: center; height: 100%; }
+.sportsList { display: flex; gap: 20px; flex-wrap: wrap; align-items: baseline; margin: 0; }
+.sportsList span { font-size: clamp(32px, 4.5vw, 44px); font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
+.sportsList span + span::before { content: "·"; color: #444; margin-right: 20px; font-weight: 400; }
+.sportsSoon { font-size: 14px; color: var(--cyan); margin: 16px 0 0; }
+.cta { display: inline-block; margin-top: 14px; font-size: 12px; font-weight: 600; color: #fff; }
+.cta:hover, .cta:focus-visible { color: var(--cyan); }
+.hint {
+  position: absolute; right: 12px; bottom: 10px; pointer-events: none;
+  font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--cyan);
+  animation: nudge 1.6s ease-in-out infinite;
+}
+.hintHidden { display: none; }
+@keyframes nudge { 0%, 100% { transform: translateY(0); opacity: .9; } 50% { transform: translateY(3px); opacity: .5; } }
+@media (max-width: 760px) {
+  .tour { grid-template-columns: 1fr; gap: 10px; }
+  .rail { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px; order: 2; }
+  .railItem, .railActive { border-left: 0; border-bottom: 2px solid #282828; padding: 0 8px; min-height: 40px; }
+  .railActive { border-bottom-color: var(--cyan); }
+  .railLabel { display: none; }
+  .reel, .panel { height: 440px; }
+  .panel { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reel { scroll-behavior: auto; }
+  .hint { animation: none; }
+}

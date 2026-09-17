@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BILLING_PLANS } from "@/lib/billing/config";
+import { FeatureTour } from "@/components/surf/FeatureTour";
 import styles from "./landing.module.css";
 
 export const metadata: Metadata = {
@@ -38,12 +39,12 @@ export default function Home() {
         </section>
         <div className={styles.strip}><div><span>01 / COMPARE</span><p>Every book.<small>One market view.</small></p></div><div><span>02 / UNDERSTAND</span><p>More context.<small>Beyond the odds.</small></p></div><div><span>03 / EXPLORE</span><p>Your perspective.<small>Your decision.</small></p></div></div>
         <section id="how-it-works" className={styles.section}>
-          <div className={styles.sectionHeading}><p className={styles.eyebrow}>A LITTLE CLARITY GOES A LONG WAY</p><h2>From a wall of numbers<br />to a point of view.</h2><p>You don’t need to speak fluent odds.<br />Start with a matchup. Let the context come together.</p></div>
+          <div className={styles.sectionHeading}><p className={styles.eyebrow}>A LITTLE CLARITY GOES A LONG WAY</p><h2>From a wall of numbers<br />to a point of view.</h2></div>
           <div className={styles.features}>{features.map(feature => <article key={feature.number}><span className={styles.number}>{feature.number}</span><p className={styles.eyebrow}>{feature.tag}</p><h3>{feature.title}</h3><p>{feature.description}</p><Link href={feature.href} className={styles.textLink}>{feature.label} <Arrow /></Link></article>)}</div>
         </section>
         <section className={styles.exampleSection} aria-labelledby="example-title">
-          <div className={styles.exampleCopy}><p className={styles.eyebrow}>SAME GAME. DIFFERENT PRICES.</p><h2 id="example-title">Small differences.<br /><em>Worth understanding.</em></h2><p>One book lists a team at +120. Another has +135. Surf helps you see that difference without piecing together a dozen screens.</p><p>For the same $100 stake, those example prices imply $120 and $135 in profit if the bet wins. Comparing prices gives you context; it doesn’t predict the result.</p><Link href="/how-to-use" className={styles.textLink}>Learn how to read the numbers <Arrow /></Link></div>
-          <div className={styles.exampleCard}><div className={styles.exampleLabel}><span>THE MARKET, SIDE BY SIDE</span><span>EXAMPLE</span></div><h3>Home team to win</h3><p>Same matchup · Same outcome</p><div className={styles.quote}><span>Book A</span><strong>+120</strong><span>$120 profit*</span></div><div className={`${styles.quote} ${styles.bestQuote}`}><span>Book B <small>HIGHER RETURN</small></span><strong>+135</strong><span>$135 profit*</span></div><div className={styles.quote}><span>Book C</span><strong>+125</strong><span>$125 profit*</span></div><p className={styles.exampleNote}>*$100 stake, winning outcome, before fees. Illustrative prices and books; not a live offer. Always check current odds and settlement rules.</p></div>
+          <div className={styles.exampleCopy}><p className={styles.eyebrow}>WHAT’S INSIDE</p><h2 id="example-title">See the market.<br /><em>Then see through it.</em></h2><p>Trends, Signals, whale tracking and game briefs, one at a time. Scroll the panel to roll through what each one shows you.</p><p>Everything on Surf is context — prices, movement and history side by side. None of it predicts the result.</p><Link href="/how-to-use" className={styles.textLink}>Learn how to read the numbers <Arrow /></Link></div>
+          <FeatureTour />
         </section>
         <section id="pricing" className={styles.section}>
           <div className={styles.sectionHeading}><p className={styles.eyebrow}>CHOOSE YOUR DEPTH</p><h2>Start with the market.<br />Go deeper when you’re ready.</h2><p>The market board, game briefs, and one featured matchup of Signals and Trends are free every week.<br />Surf Pro opens the whole slate.</p></div>
