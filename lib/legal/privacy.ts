@@ -12,6 +12,8 @@ This is the complete list.
 
 **Session cookies.** If you sign in, cookies keep you signed in. They are set by the Supabase authentication library and are necessary for sign-in to work.
 
+**Billing data.** If you subscribe to Surf Pro, Surf stores the identifier of your Stripe customer record, the status and current billing period of your subscription, and a log of the billing events Stripe sends about it. That is what lets Surf know your plan is active. Your card details are entered on Stripe's checkout page and are never sent to or stored by Surf.
+
 **Your watchlist and appearance preference.** These are stored in your own browser on the device you are using. They are never sent to Surf's servers. There is no cross-device syncing and there are no alerts.
 
 **Server logs.** Surf's hosting provider produces standard server logs in the ordinary course of serving requests.
@@ -23,7 +25,7 @@ If you never create an account, Surf holds no account data about you.
 - **No analytics.** There are no analytics packages in the application, and no third-party analytics or advertising trackers of any kind.
 - **No advertising.** No ad networks, no data brokers. Surf does not sell or share personal information.
 - **No sportsbook credentials.** Surf never asks for and never stores a login for any sportsbook.
-- **No payment card or bank details.**
+- **No payment card or bank details.** Card details go straight to Stripe (see below) and never pass through Surf's servers.
 - **No government identifiers.**
 - **No location tracking, no contacts access, no device fingerprinting.**
 
@@ -33,7 +35,7 @@ Surf is built with Next.js and hosted on Vercel.
 
 - **Vercel** — hosting and delivery. Serves the application and produces standard server logs.
 - **Supabase** — authentication and database. Holds your account email, authentication metadata and password. Surf's Supabase project is hosted in the **East US (Ohio)** region of the United States.
-- **Stripe** — payments. **Not currently enabled.** Surf processes no payments today, and Stripe receives nothing from Surf unless and until billing is turned on. This page will be updated before that changes.
+- **Stripe** — payments. If you subscribe to Surf Pro, Stripe processes the payment and holds your card details and the email you give at checkout. Surf sends Stripe an internal account identifier so the subscription can be matched to your Surf account, and Stripe sends Surf the status of that subscription. Stripe's own privacy policy governs what Stripe does with the data you give it: [stripe.com/privacy](https://stripe.com/privacy). If you never subscribe, Stripe receives nothing about you from Surf.
 
 ## Third-party data Surf displays
 
@@ -53,6 +55,8 @@ Two different things, working differently.
 
 Account data is kept until you ask us to delete it. On a verified request we remove your account and its data within 30 days.
 
+Billing records are kept while you have a subscription and afterwards for as long as they are needed to handle refunds, disputes and accounting. Stripe keeps its own records under its own policy.
+
 Server logs are retained by our hosting and database providers under their own schedules.
 
 Local storage has no retention period set by Surf, because Surf never receives it. It stays in your browser until you or your browser clears it.
@@ -61,7 +65,7 @@ Local storage has no retention period set by Surf, because Surf never receives i
 
 If you have an account, you can ask us to:
 
-- **Access** the data associated with it — your email address and authentication metadata.
+- **Access** the data associated with it — your email address, authentication metadata and, if you subscribed, your billing records.
 - **Correct** your email address.
 - **Delete** your account and its data.
 
@@ -85,7 +89,9 @@ No service can guarantee data will never be breached, and Surf does not make tha
 
 ## Changes
 
-If this policy changes, the date at the top changes. Material changes — turning on payments, or adding any form of analytics — will be described here before they take effect.
+If this policy changes, the date at the top changes. Material changes — such as adding any form of analytics — will be described here before they take effect.
+
+**September 18, 2026.** Payments through Stripe were turned on. The "Billing data" entry, the Stripe entry under "Who processes your data", and the billing line under "How long data is kept" were added to describe it.
 
 ## Contact
 
@@ -93,4 +99,4 @@ If this policy changes, the date at the top changes. Material changes — turnin
 
 ---
 
-*This policy has not been reviewed by a lawyer. It should be before any paid launch.*`;
+*This policy has not been reviewed by a lawyer.*`;

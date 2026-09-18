@@ -33,10 +33,21 @@ assert.match(PRIVACY_BODY, /not directed at people in other territories/);
 // The 18/21 mismatch is disclosed rather than glossed over.
 assert.match(TERMS_BODY, /legal betting age is 21/);
 
-// Nothing may imply Surf takes money today.
-assert.match(TERMS_BODY, /Billing is turned off/);
-assert.match(TERMS_BODY, /is not accepting payments/);
-assert.match(PRIVACY_BODY, /\*\*Not currently enabled\.\*\*/);
+// Billing is live: nothing may still claim Surf takes no money, and the paid
+// plan, its price, the cancellation route and the Stripe disclosure must be stated.
+for (const [name, body] of Object.entries({ terms: TERMS_BODY, privacy: PRIVACY_BODY })) {
+  assert.doesNotMatch(body, /billing is (turned off|disabled)/i, `${name} still says billing is off`);
+  assert.doesNotMatch(body, /not accepting payments|Not currently enabled|processes no payments/i, `${name} still denies payments`);
+  assert.doesNotMatch(body, /should be before (Surf launches anything|any) paid/, `${name} still carries the pre-launch lawyer note`);
+}
+assert.match(TERMS_BODY, /\*\*Surf Pro\*\* at \$9\.99 per month/);
+assert.match(TERMS_BODY, /never sees or stores your full card details/);
+assert.match(TERMS_BODY, /cancel yourself from your \[account page\]\(\/account\)/);
+assert.match(TERMS_BODY, /No partial refunds/);
+assert.match(PRIVACY_BODY, /\*\*Billing data\.\*\*/);
+assert.match(PRIVACY_BODY, /never sent to or stored by Surf/);
+assert.match(PRIVACY_BODY, /stripe\.com\/privacy/);
+assert.match(PRIVACY_BODY, /If you never subscribe, Stripe receives nothing about you from Surf/);
 
 // Claims that must stay true and visible.
 for (const body of [TERMS_BODY, METHODOLOGY_BODY]) {
@@ -61,4 +72,4 @@ assert.match(layout, /<SurfLegalFooter \/>/);
 const renderer = await readFile(new URL("../components/surf/LegalDocument.tsx", import.meta.url), "utf8");
 assert.doesNotMatch(renderer, /dangerouslySetInnerHTML=/);
 
-console.log("Legal pages passed: no placeholders, current helpline, consistent age and territory, payments not implied, attribution and storage location stated, routes and footer wired, renderer injection-free.");
+console.log("Legal pages passed: no placeholders, current helpline, consistent age and territory, paid plan and Stripe disclosed, attribution and storage location stated, routes and footer wired, renderer injection-free.");

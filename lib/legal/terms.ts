@@ -12,9 +12,9 @@ Surf displays US sports betting market data and Surf's own analysis derived from
 
 Surf is an information and analysis product. It is not a picks service, not a tipster service, and it does not tell you what to bet. Every decision you make is yours.
 
-These features are free: **Game briefs** (sportsbook odds compared across books, market midpoint, best available number, recorded line movement, injury context, prediction-market consensus), **Trends** for one featured matchup each week (historical NFL situational records, win-loss and against the spread), **Signals** for that same featured matchup, **Watchlist**, and **How to use Surf**. You can use the free board without an account. While billing is turned off, the full Signals and Trends slates are open to everyone.
+These features are free: **Game briefs** (sportsbook odds compared across books, market midpoint, best available number, recorded line movement, injury context, prediction-market consensus), **Trends** for one featured matchup each week (historical NFL situational records, win-loss and against the spread), **Signals** for that same featured matchup, **Watchlist**, and **How to use Surf**. You can use the free board without an account.
 
-One paid plan is planned but is not active: **Surf Pro** at $9.99 per month, which unlocks Signals and Trends for every matchup on the slate. Billing is turned off. Nobody can subscribe today and Surf is not accepting payments. See section 10.
+One paid plan: **Surf Pro** at $9.99 per month, which unlocks Signals and Trends for every matchup on the slate. Sections 10 and 11 cover payment, renewal, cancellation and refunds.
 
 ## 3. What Surf does not do
 
@@ -86,12 +86,10 @@ nflverse data is used under CC BY 4.0, with attribution shown on the site.
 
 ## 10. Paid subscriptions
 
-Billing is disabled. This section describes how paid plans will work and takes effect only if billing is switched on. Until then nothing here obliges you to pay anything, and Surf cannot charge you.
-
-When billing is enabled:
+Surf Pro is optional. Nothing on Surf charges you unless you sign up for it yourself from your account page, and everything in section 2 that is free stays free without a plan.
 
 - **Plan.** Surf Pro at $9.99 per month, covering Signals and Trends for every matchup. One featured matchup a week stays free without a plan. The price is in US dollars and excludes any applicable tax.
-- **Payments.** Handled by Stripe. Surf will not store your full card details.
+- **Payments.** Handled by Stripe. You enter your card on Stripe's checkout page, and Surf never sees or stores your full card details. You need a confirmed Surf account to subscribe.
 - **Renewal, cancellation and refunds.** A subscription renews automatically each month until you cancel. Section 11 sets out how to cancel and what is refundable.
 - **Price changes.** A new price applies to renewals at least 30 days after we tell you.
 
@@ -122,7 +120,7 @@ Sports data is messy and sportsbooks change numbers constantly. Treat everything
 
 To the extent the law allows, Surf is not liable for money you lose betting, for bets you place or fail to place, for missed opportunities, for lost profits, or for indirect or consequential loss connected to your use of Surf.
 
-If Surf is found liable to you, total liability is limited to what you have paid Surf in the twelve months before the claim. Because billing is disabled, that amount is currently zero for everyone.
+If Surf is found liable to you, total liability is limited to what you have paid Surf in the twelve months before the claim. If you have never paid Surf anything, that amount is zero.
 
 Some places do not allow parts of this section. Where that is true those parts do not apply to you and the rest still does.
 
@@ -158,4 +156,4 @@ Questions about these terms, account problems, or deletion requests: [${LEGAL_CO
 
 ---
 
-*These terms have not been reviewed by a lawyer. They should be before Surf launches anything paid.*`;
+*These terms have not been reviewed by a lawyer.*`;
